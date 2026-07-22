@@ -1,3 +1,4 @@
+![outis-256.png](docs/img/outis-256.png)
 # Outis
 
 ***No one player.*** A Kotlin Multiplatform video player for **Android, iOS and Web**: one
