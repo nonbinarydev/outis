@@ -100,3 +100,6 @@ Thumbs.db
 *.orig
 *.rej
 *.bak
+
+# Qodana local analysis output
+.qodana/

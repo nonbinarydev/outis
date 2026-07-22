@@ -79,6 +79,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 import kotlin.concurrent.Volatile
+import kotlin.time.Duration.Companion.milliseconds
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.exoplayer.source.MediaSource as ExoMediaSource
 import com.google.ads.interactivemedia.v3.api.AdEvent as ImaAdEvent
@@ -531,7 +532,7 @@ internal class ExoPlayerEngine(
                         resolveSeek()
                     }
                 }
-                delay(config.positionPollIntervalMs)
+                delay(config.positionPollIntervalMs.milliseconds)
             }
         }
     }

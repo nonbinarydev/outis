@@ -110,7 +110,14 @@ data class LicenseRequest(
         this === other ||
             (other is LicenseRequest && url == other.url && body === other.body && headers == other.headers)
 
-    /** Consistent with [equals]: [body] contributes its identity hash, not its contents. */
+    /**
+     * Consistent with [equals]: [body] contributes its identity hash, not its contents.
+     *
+     * The identity hash on an array is the point here, not an oversight — [equals] compares [body]
+     * with `===`, so hashing its contents would break the equals/hashCode contract in the other
+     * direction. Hence the suppression.
+     */
+    @Suppress("KotlinArrayHashCode")
     override fun hashCode(): Int = (url.hashCode() * 31 + body.hashCode()) * 31 + headers.hashCode()
 }
 

@@ -22,6 +22,7 @@ import dev.nonbinary.outis.core.track.MediaTrack
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -250,7 +251,7 @@ fun rememberPlayerControlsState(
     // Re-arms on every interaction (interactionTick) and on relevant state changes.
     LaunchedEffect(state.controlsVisible, state.keepVisible, state.showPlayIcon, state.interactionTick) {
         if (state.controlsVisible && !state.keepVisible && !state.showPlayIcon) {
-            delay(state.autoHideMillis)
+            delay(state.autoHideMillis.milliseconds)
             state.hideControls()
         }
     }
