@@ -1,0 +1,24 @@
+# Code owners for Outis.
+#
+# Owners listed here are automatically requested for review on any pull request
+# touching a matching path.
+#
+# NOTE: this file only *requests* review. It is not enforced until branch
+# protection on `main` enables "Require review from Code Owners".
+#
+# Syntax:  <path pattern>  <owner…>
+# Later matching rules win, so order matters — put the broadest rule first.
+#
+# An owner must have write access to the repository, otherwise GitHub reports
+# "Unknown owner" and the rule is silently skipped.
+
+# Default owner for everything in the repository.
+*   @indieboyalex
+
+# As the project grows, add narrower rules below. For example, once there is a
+# maintainers team in the nonbinarydev org:
+#
+#   /core/               @nonbinarydev/core-maintainers
+#   /ui/                 @nonbinarydev/ui-maintainers
+#   /.github/            @indieboyalex
+#   *.gradle.kts         @indieboyalex
