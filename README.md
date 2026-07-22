@@ -1,4 +1,4 @@
-![outis-256.png](docs/img/outis-256.png)
+![lockup-light-636w.png](docs/img/lockup-light-636w.png "Outis - KMP Video Player")
 # Outis
 
 ***No one player.*** A Kotlin Multiplatform video player for **Android, iOS and Web**: one

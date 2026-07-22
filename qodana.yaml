@@ -46,3 +46,7 @@ projectJDK: "26" #(Applied in CI/CD pipeline)
 
 #Specify Qodana linter for analysis (Applied in CI/CD pipeline)
 linter: jetbrains/qodana-jvm-community:2026.1
+
+include:
+  - name: ConvertTwoComparisonsToRangeCheck
+  - name: RemoveExplicitTypeArguments
