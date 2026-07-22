@@ -1,5 +1,9 @@
-![lockup-light-636w.png](docs/img/lockup-light-636w.png "Outis - KMP Video Player")
-# Outis
+<p align="start"><picture>
+<source media="(prefers-color-scheme: dark)" srcset="docs/img/lockup-dark-1273w.png">
+<img src="docs/img/lockup-light-1273w.png" width="480" alt="Outis — a Kotlin Multiplatform video player">
+</picture></p>
+
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.nonbinarydev/outis-core?label=maven%20central)](https://central.sonatype.com/artifact/io.github.nonbinarydev/outis-core) [![Licence](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE) [![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-blue)](https://kotlinlang.org) ![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS%20%7C%20Web-blue)
 
 ***No one player.*** A Kotlin Multiplatform video player for **Android, iOS and Web**: one
 engine-agnostic API, plus an optional Compose Multiplatform UI. Write your playback logic once; each
@@ -7,25 +11,11 @@ platform runs its native engine underneath — so there is no single player here
 
 | Platform | Engine |
 |---|---|
-| Android | Media3 / ExoPlayer |
+| Android | Media3 / ExoPlayer 1.10.1 |
 | iOS | AVFoundation `AVPlayer` |
-| Web | Shaka Player (over an HTML `<video>`) |
+| Web (JS) | Shaka Player 4.11.2, over an HTML `<video>` |
 
-No platform type and no Compose type ever appears in the core API, so `:core` is usable
-from any KMP target; the Compose surface is a separate, optional module.
-
----
-
-## Modules
-
-| Module | Maven coordinate | What it is |
-|---|---|---|
-| `:core` | `io.github.nonbinarydev:outis-core:0.1.0-alpha01` | The engine-agnostic player: `VideoPlayer`, `PlayerState`, `PlayerEvent`, `MediaItem`, DRM. No UI. |
-| `:ui` | `io.github.nonbinarydev:outis-ui:0.1.0-alpha01` | Compose Multiplatform `PlayerView` + a fully customisable controls overlay. Depends on `:core`. |
-
-You can ship with just `:core` and build your own UI, or take `:ui` for a batteries-included player.
-
----
+**Status: `0.1.0-alpha01`.** Not yet published to Maven Central; the coordinates below will not resolve until the first release.
 
 ## Capability matrix
 
@@ -36,141 +26,85 @@ You can ship with just `:core` and build your own UI, or take `:ui` for a batter
 | **DASH** | ✅ | ❌ (AVPlayer is HLS-only) | ✅ |
 | **Live** (HLS/DASH) | ✅ | ✅ (HLS) | ✅ |
 | **Widevine** DRM | ✅ | ❌ | ✅ (Chrome/Edge/Firefox) |
-| **PlayReady** DRM | ✅ | ❌ | ✅ (Edge) |
+| **PlayReady** DRM | ✅ (device CDM only) | ❌ | ✅ (Edge) |
 | **FairPlay** DRM | ❌ | ✅ | ✅ (Safari) |
 | Audio / subtitle track selection | ✅ | ✅ | ✅ |
+| Client-side ads (IMA) | ✅ | ❌ | ✅ (adaptive sources only) |
+| Server-side ads (SSAI) | app-driven | app-driven | app-driven |
+| Embedded chapters (MP4 / Matroska) | ✅ | ✅ | ❌ |
+| Picture-in-Picture | ✅ (`rememberPlayerWindow`) | host-supplied | host-supplied |
 
-The DRM split is the unavoidable one: Widevine has no CDM on Apple platforms, FairPlay is Apple-only.
-See **[docs/drm.md](docs/drm.md)** for how to target each.
+The DRM split is the unavoidable one: Widevine has no CDM on Apple platforms, FairPlay is Apple-only. SSAI is
+*app-driven*: no engine reads `AdConfig.ServerSide` — the stitched stream plays unchanged and you drive the shared
+`AdController`. On web the shared Compose overlay composites over the engine's `<video>` rather than falling back to
+native controls ([how](docs/ui.md#web-surface)). **Not yet:** video-rendition (quality) selection — `currentTrack` and
+`availableTracks` are reserved and never populated, so the track-selection row means audio and subtitles only; cap the
+ladder with `MediaItem.videoConstraints`. Full per-platform behaviour, gaps and target sets → **[docs/platform-support.md](docs/platform-support.md)**.
 
----
+## Requirements
+
+Android `minSdk` 24 and `compileSdk` 36; JVM target 11; Kotlin 2.4.10; Compose Multiplatform 1.11.1 for `:ui`. Apple
+targets build on macOS only, and `iosArm64` / `iosSimulatorArm64` are the only ones published — there is no `iosX64`, so
+Intel Macs cannot run the simulator build.
 
 ## Install
 
-Both modules are Kotlin Multiplatform. In a shared module's `commonMain`:
-
 ```kotlin
-kotlin {
-    sourceSets {
-        commonMain.dependencies {
-            implementation("io.github.nonbinarydev:outis-core:0.1.0-alpha01")
-            implementation("io.github.nonbinarydev:outis-ui:0.1.0-alpha01")   // optional UI
-        }
-    }
-}
+// outis-core publishes: jvm, android, iosArm64, iosSimulatorArm64, js, wasmJs
+implementation("io.github.nonbinarydev:outis-core:0.1.0-alpha01")
+// outis-ui publishes: android, iosArm64, iosSimulatorArm64, js — no jvm, no wasmJs
+implementation("io.github.nonbinarydev:outis-ui:0.1.0-alpha01")   // optional Compose UI
 ```
 
-Platform notes are in [Platform setup](#platform-setup) below — Android needs nothing extra, iOS
-needs the framework wired into Xcode, Web needs the `shaka-player` npm dependency.
-
----
+Declare these in a shared `commonMain` only if that module's targets are a subset of the artifact's — a `commonMain`
+dependency on `outis-ui` from a module that also targets jvm or wasmJs will not resolve. Setup: [Android](docs/getting-started-android.md) · [iOS](docs/getting-started-ios.md) · [Web](docs/getting-started-web.md).
 
 ## Quick start
-
-### Core only
 
 ```kotlin
 import dev.nonbinary.outis.core.*
 import dev.nonbinary.outis.core.source.*
-
-// Construct on the main/UI thread (engines are main-thread-affine). Android passes a real context;
-// iOS/Web take the no-arg AppContext().
-val player = VideoPlayer(appContext)
-
-player.setMediaItem(
-    MediaItem(MediaSource.Url("https://example.com/master.m3u8"), mimeType = MimeType.HLS),
-    autoPlay = true,
-)
-
-// Observe — `state` is a conflated snapshot for the UI; `events` is a timed, one-shot stream.
-scope.launch { player.state.collect { render(it) } }
-
-// Transport is fire-and-forget; results land on state/events.
-player.play(); player.pause(); player.seekTo(30_000); player.setVolume(0.5f)
-
-player.release()   // idempotent
-```
-
-`appContext` is an [`AppContext`](#appcontext-per-platform): `AppContext(context.applicationContext)`
-on Android, `AppContext()` everywhere else.
-
-### With the Compose UI (`:ui`)
-
-```kotlin
-import androidx.compose.runtime.*
-import dev.nonbinary.outis.ui.*
-
-@OptIn(ExperimentalPlayerUiApi::class)
-@Composable
-fun Player(appContext: AppContext) {
-    val player = remember { VideoPlayer(appContext) }
-    DisposableEffect(player) { onDispose { player.release() } }
-    LaunchedEffect(player) {
-        player.setMediaItem(MediaItem(MediaSource.Url("https://example.com/master.m3u8")), autoPlay = true)
-    }
-    PlayerView(player)          // batteries included — surface + customisable overlay
+// Each platform entry point builds the AppContext — AppContext(context.applicationContext) on Android,
+// AppContext() on iOS and web — and constructs the player on the main/UI thread.
+fun start(appContext: AppContext): VideoPlayer {
+    val player = VideoPlayer(appContext)
+    player.setMediaItem(
+        MediaItem(MediaSource.Url("https://example.com/master.m3u8"), mimeType = MimeType.HLS),
+        autoPlay = true,
+    )
+    // Fire-and-forget: results land on `state` (conflated — drive UI off it) and `events` (drive analytics off it).
+    player.play()
+    player.seekTo(30_000)
+    player.setVolume(0.5f)   // 0f..1f, independent of setMuted
+    player.pause()
+    return player               // ...and player.release() when done — idempotent
 }
 ```
 
-Full walkthroughs:
-- **[docs/playback.md](docs/playback.md)** — sources, transport, state & events, the UI, tracks, live, quality caps, error handling.
-- **[docs/drm.md](docs/drm.md)** — integrating Widevine / PlayReady / FairPlay protected streams.
+## Documentation
 
----
+| Guide | What it covers |
+|---|---|
+| Getting started: [Android](docs/getting-started-android.md) · [iOS](docs/getting-started-ios.md) · [Web](docs/getting-started-web.md) | From an empty project to a playing video. |
+| [Playback](docs/playback.md) | Sources, transport, state and events, tracks, live, quality caps, errors. |
+| [Compose UI](docs/ui.md) | `PlayerView`, the controls overlay, four tiers of customisation. |
+| [DRM](docs/drm.md) | Widevine, PlayReady, FairPlay, and the license request/response interceptors. |
+| [Ads — client-side](docs/ads-client-side.md) | IMA on Android and Web, and what `AdState` actually carries. |
+| [Ads — server-side](docs/ads-server-side.md) | `AdController`, MediaTailor avails, SCTE-35 cues, beaconing. |
+| [Local files and chapters](docs/local-files.md) | On-device playback, embedded chapters and thumbnails. |
+| [Analytics and QoS](docs/analytics.md) | `PlayerComponent`, the native handle, which events fire where. |
+| [Platform support](docs/platform-support.md) | Requirements, published targets, per-platform gaps. |
+| [Troubleshooting](docs/troubleshooting.md) | Symptom, cause, fix. |
+| Full index | [docs/README.md](docs/README.md) |
 
-## `AppContext` per platform
+## Threading and lifecycle
 
-`VideoPlayer(context, config)` takes an `AppContext` so the Android engine can reach a `Context`
-(needed by `ExoPlayer.Builder`). Everywhere else it carries nothing.
+Construct `VideoPlayer(...)` on the main/UI thread; call its methods from anywhere (each engine marshals
+internally); always `release()` when done — it is idempotent, and under Compose belongs in a `DisposableEffect`.
 
-| Platform | Construct it as | Typical source |
-|---|---|---|
-| Android | `AppContext(applicationContext)` | from your `Activity` / `Application` |
-| iOS | `AppContext()` | — |
-| Web (JS) | `AppContext()` | — |
+## Project
 
-In a shared `App(appContext: AppContext)` composable, each platform entry point builds its own
-`AppContext` and passes it down.
-
----
-
-## Platform setup
-
-### Android
-- No extra player config. Your app needs `<uses-permission android:name="android.permission.INTERNET" />`.
-- For fullscreen/PiP declare the capability on your Activity — see the UI guide and [`:ui` README](ui/README.md).
-- The engine is pinned to the main `Looper`; build the player on the main thread.
-
-### iOS
-- Wire the KMP framework into your Xcode app with a *Run Script* build phase that invokes
-  `./gradlew :core:embedAndSignAppleFrameworkForXcode` (add `:ui` too if you use the Compose surface),
-  and add the build output to *Framework Search Paths*. Host the Kotlin entry point in a SwiftUI
-  `UIViewControllerRepresentable`.
-- The SDK sets the `AVAudioSession` category to `.playback` itself, so media audio plays through the
-  hardware mute switch — you don't need to.
-- For HTTP (non-TLS) test streams, add the relevant `NSAppTransportSecurity` keys to `Info.plist`.
-
-### Web (JS)
-- The Shaka engine pulls in the `shaka-player` npm package (declared by `:core`'s JS target); a
-  webpack build bundles it.
-- Compose Multiplatform renders the UI into one `<canvas>` (skiko). The web `PlayerSurface` keeps the
-  engine's `<video>` **underneath** the canvas and punches a transparent hole through it
-  (`BlendMode.Clear`), so the **same shared Compose overlay composites over the video** — just like
-  Android/iOS, no native controls. See [docs/playback.md](docs/playback.md#web-surface) for the layering.
-
----
-
-## Threading & lifecycle
-
-- **Construct** `VideoPlayer(...)` on the main/UI thread.
-- **Transport methods** (`play`, `seekTo`, `setMediaItem`, …) are safe to call from any thread and are
-  fire-and-forget — each engine marshals to the thread it needs and reports results on `state`/`events`.
-- **Always call `release()`** when done (it's idempotent). With Compose, do it in a `DisposableEffect`.
-
----
-
-## Versioning
-
-`0.1.0-alpha01`. The published contract is intentionally **additive**: new `VideoPlayer` methods keep
-default bodies, new `PlayerState`/config fields arrive with defaults. At alpha, source-additive changes
-may still be binary-incompatible (data-class `copy`/`componentN` arity) — recompile consumers.
+Alpha, solo-maintained, and the published contract is deliberately additive — [CHANGELOG.md](CHANGELOG.md) records what
+changed and which changes need a consumer recompile. Building and contributing: [CONTRIBUTING.md](CONTRIBUTING.md). Bugs and
+questions: [GitHub issues](https://github.com/nonbinarydev/outis/issues). Vulnerabilities: [SECURITY.md](SECURITY.md).
+Apache-2.0 ([LICENSE](LICENSE)). Repository: <https://github.com/nonbinarydev/outis>.

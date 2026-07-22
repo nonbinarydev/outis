@@ -150,7 +150,9 @@ detekt {
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))
     buildUponDefaultConfig = true
     parallel = true
-    autoCorrect = true
+    // Fix formatting in place locally, but never on CI — a lint task that rewrites the runner's
+    // checkout reports success against source the commit does not contain.
+    autoCorrect = System.getenv("CI") == null
 }
 
 dokka {

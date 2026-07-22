@@ -23,9 +23,9 @@ profile:
 #    paths:
 #      - <path/where/not/run/inspection>
 
-# Matches the toolchain the modules actually compile against (jvmTarget = JVM_11 in core/ui
-# build.gradle.kts). Analysing under a newer JDK than the build targets surfaces findings the
-# compiler would never raise, and hides ones it would.
+# NOT chosen to match jvmTarget (the modules emit JVM 11 bytecode). 21 is required because the
+# Android linter image defaults to Corretto 11 and Gradle 9.6.1 will not start a daemon below JDK 17.
+# Setting this to 11 to "match" the target breaks the project import.
 projectJDK: "21"
 
 #Execute shell command before Qodana execution (Applied in CI/CD pipeline)
@@ -48,15 +48,30 @@ projectJDK: "21"
 #    total: 50
 
 #Specify Qodana linter for analysis (Applied in CI/CD pipeline)
-linter: jetbrains/qodana-jvm-community:2026.1
+# qodana-jvm-community ships NO org.jetbrains.android plugin and no Android SDK, so it cannot create
+# a module for androidMain — which is why every `expect` in :ui was reported as having no `actual`.
+# qodana-jvm-android is the same IntelliJ IDEA Community base plus the Android plugin and an SDK at
+# /opt/android-sdk, and carries the same free Community licence. (Note: "qodana-android", without the
+# jvm- prefix, is the Ultimate-tier image and is NOT free — the names are easy to confuse.)
+#
+# UNVERIFIED: whether this image's IDE build can import AGP 9.1.1 with the
+# com.android.kotlin.multiplatform.library plugin. Treat the first run as an experiment and check
+# <results-dir>/projectStructure for androidMain modules — a zero-finding run is not proof of success.
+linter: jetbrains/qodana-jvm-android:2026.1
 
 include:
   - name: ConvertTwoComparisonsToRangeCheck
   - name: RemoveExplicitTypeArguments
 
 exclude:
-  # The linter above is qodana-jvm-community: it has no Android SDK and no Android Gradle plugin, so
-  # it cannot resolve the androidMain source set and reports every `expect` in :ui as having no
-  # `actual`. The actuals do exist — ui/src/{androidMain,iosMain,jsMain}/.../PlayerSurface.*.kt — and
-  # `./gradlew :ui:compileAndroidMain` compiles them. Revisit if the linter ever gains Android support.
-  - name: KotlinNoActualForExpect
+  # Kotlin/Native source sets are NOT skipped by Qodana — they are parsed and inspected against a
+  # Linux container that has no Apple platform libraries, so every `platform.AVFoundation` /
+  # `platform.Foundation` import resolves to nothing and the whole file reports as broken. Confident
+  # garbage is worse than silence, hence excluding by path. This cannot be fixed by configuration:
+  # every Qodana linter carrying the Android plugin is Docker/Linux-only, and cinterop-derived
+  # Kotlin/Native libraries only exist on a macOS host with Xcode. detekt covers these files instead.
+  - name: All
+    paths:
+      - core/src/iosMain
+      - core/src/appleMain
+      - ui/src/iosMain
