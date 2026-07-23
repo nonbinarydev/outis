@@ -724,8 +724,8 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     }
 
     /**
-     * Point Shaka's CDM at the license server before [load], and stage the license-request headers
-     * that the [init] request filter injects into LICENSE requests. The header set is reset each call
+     * Point Shaka's CDM at the license server before `load`, and stage the license-request headers
+     * that the `init` request filter injects into LICENSE requests. The header set is reset each call
      * (empty for clear content). Note Shaka's `configure()` **merges** — it never deletes keys — so a
      * value a prior item set survives unless this call overwrites it; we therefore rewrite the fields a
      * later item could otherwise inherit (`servers[keySystem]`, and for Widevine the robustness — `""`

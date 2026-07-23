@@ -15,6 +15,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Rational
 import androidx.activity.ComponentActivity
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -65,7 +66,7 @@ fun rememberPlayerWindow(
         if (componentActivity == null) {
             onDispose { }
         } else {
-            // The dedicated listener, not a LifecycleEventObserver reading isInPictureInPictureMode.
+            // The dedicated listener, not a LifecycleEventObserver, reading isInPictureInPictureMode.
             // Entering PIP dispatches ON_PAUSE as well, and the order of that against the mode flag is
             // not guaranteed — so a lifecycle observer can sample the flag before it flips and report
             // the previous mode. This callback carries the new value with it, so there is nothing to
@@ -84,19 +85,18 @@ fun rememberPlayerWindow(
     }
 
     // Auto-enter has to be armed *before* the user leaves, so the Activity's standing params are kept
-    // in step with playback rather than being built at the moment PIP is requested.
+    // in-step with playback rather than being built at the moment PIP is requested.
     //
-    // Collected in an effect rather than read through collectAsState: PlayerState carries the playback
-    // position, which changes on every poll, so observing it as Compose state would recompose this
-    // (and everything reading the returned PlayerWindow) several times a second to watch two fields
-    // that rarely change. distinctUntilChanged then reduces that to the transitions that matter.
+    // Collected in an effect rather than read through collectAsState. PlayerState carries the playback
+    // position, which changes on every poll. Observing it as Compose state would therefore recompose
+    // this — and everything reading the returned PlayerWindow — several times a second, to watch one
+    // boolean that rarely changes. distinctUntilChanged reduces it to the transitions that matter.
     LaunchedEffect(activity, pipSupported) {
-        val host = activity
-        if (!pipSupported || host == null) return@LaunchedEffect
+        if (!pipSupported || activity == null) return@LaunchedEffect
         player.state
             .map { it.isPlaying }
             .distinctUntilChanged()
-            .collect { isPlaying -> host.updatePipParams(player, autoEnter = isPlaying) }
+            .collect { isPlaying -> activity.updatePipParams(player, autoEnter = isPlaying) }
     }
 
     return PlayerWindow(
@@ -147,10 +147,16 @@ private fun Activity.isPipAllowed(): Boolean {
  * The params describing this player's PIP tile: the video's aspect ratio, and the on-screen rectangle
  * the system animates *from*.
  *
- * Without a `sourceRectHint` the shrink animation starts from the whole window and visibly jumps; the
+ * Without a `sourceRectHint` the shrink animation starts from the whole window and visibly jumps. The
  * rectangle comes from the surface itself, recorded by `PlayerSurface` as it is laid out.
+ *
+ * Not an extension on Activity: it reads only the player and the recorded bounds, so a receiver would
+ * be decoration. Annotated rather than version-checked because both callers already gate — [enterPip]
+ * on API 26, [updatePipParams] on API 31 — and re-checking here would only hide a future caller that
+ * does not.
  */
-private fun Activity.pipParams(player: VideoPlayer): PictureInPictureParams.Builder {
+@RequiresApi(Build.VERSION_CODES.O)
+private fun pipParams(player: VideoPlayer): PictureInPictureParams.Builder {
     val builder = PictureInPictureParams.Builder()
     val size = player.state.value.videoSize
     if (size != null && size.width > 0 && size.height > 0) {
@@ -164,14 +170,15 @@ private fun Activity.pipParams(player: VideoPlayer): PictureInPictureParams.Buil
 }
 
 /**
- * Keeps the Activity's standing PIP params current, and turns **auto-enter** on only while something is
+ * Keeps the Activity's standing PIP params current. Turns **auto-enter** on only while something is
  * actually playing.
  *
- * Auto-enter is what makes the home gesture drop a playing video into a PIP tile instead of backgrounding
- * it, and it cannot be requested at the moment of entry — it is a property the Activity carries in
- * advance, which is why this is a standing subscription rather than part of [enterPip]. Gating it on
- * playback matters: left permanently on, backgrounding a *paused* player would also open a PIP tile,
- * which is not what a user leaving a paused video expects.
+ * Auto-enter is what makes the home gesture drop a playing video into a PIP tile rather than
+ * backgrounding it. It cannot be requested at the moment of entry, being a property the Activity
+ * carries in advance, which is why this is a standing subscription rather than part of [enterPip].
+ *
+ * Gating it on playback matters. Left permanently on, backgrounding a *paused* player would also open
+ * a PIP tile, which is not what a user leaving a paused video expects.
  *
  * API 31+ only. Below that, auto-enter does not exist and PIP stays button-driven.
  */
@@ -180,9 +187,10 @@ private fun Activity.updatePipParams(player: VideoPlayer, autoEnter: Boolean) {
     try {
         setPictureInPictureParams(pipParams(player).setAutoEnterEnabled(autoEnter).build())
     } catch (_: IllegalStateException) {
-        // The Activity is finishing or otherwise refuses params; nothing to recover, PIP simply
-        // stays unavailable. Never surfaced to the user — no request was made.
+        // Finishing, or otherwise refusing params. Nothing to recover: PIP simply stays unavailable,
+        // and it is never surfaced to the user because no request was made.
     } catch (_: IllegalArgumentException) {
+        // Rejected params (an aspect ratio the platform dislikes). Same handling, same reason.
     }
 }
 

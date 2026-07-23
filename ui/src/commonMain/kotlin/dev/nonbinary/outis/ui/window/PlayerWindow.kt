@@ -16,7 +16,7 @@ import androidx.compose.runtime.Immutable
  * A button self-hides when its capability is absent: [onToggleFullscreen] `== null` hides the
  * fullscreen button; `!isPipSupported || onEnterPip == null` hides the PIP button.
  *
- * On Android, [dev.nonbinary.outis.ui.window.rememberPlayerWindow] wires all of this to the
+ * On Android, `rememberPlayerWindow` (androidMain, so not linkable from here) wires all of this to the
  * Activity for you. On iOS/web the host implements the same callbacks
  * (`AVPictureInPictureController` / `requestPictureInPicture()` + `requestFullscreen()`).
  */

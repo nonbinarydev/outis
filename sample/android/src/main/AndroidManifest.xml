@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- The engine streams over HTTP(S); without this every load fails with a network error. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -29,13 +30,21 @@
             is a configuration change, so without screenSize|smallestScreenSize|screenLayout the
             Activity would be recreated on the way in, tearing down and rebuilding the player. The same
             declaration keeps rotation from dropping playback position and re-buffering.
+
+            PictureInPictureIssue is suppressed because it is already satisfied, just not where lint
+            looks. It wants setAutoEnterEnabled(true) and setSourceRectHint(...) for targetSdk 31+, and
+            :ui's rememberPlayerWindow calls both on this Activity's behalf — auto-enter kept in step
+            with playback, and the hint taken from the player surface's own bounds. Lint analyses this
+            application module and cannot see into the library, so it reports the calls as absent.
+            Revisit if the host ever stops using rememberPlayerWindow: then the warning would be real.
         -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
-            android:theme="@style/Theme.Outis">
+            android:theme="@style/Theme.Outis"
+            tools:ignore="PictureInPictureIssue">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
