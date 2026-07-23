@@ -8,15 +8,13 @@ package dev.nonbinary.outis.sample
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.PlaybackState
@@ -42,6 +42,7 @@ import dev.nonbinary.outis.sample.generated.resources.Res
 import dev.nonbinary.outis.sample.generated.resources.outis_lockup
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import dev.nonbinary.outis.ui.PlayerView
+import dev.nonbinary.outis.ui.controls.DefaultControls
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -59,6 +60,18 @@ private const val ASPECT_16_9 = 16f / 9f
 
 /** Tall enough to read the descriptor under the wordmark, short enough not to crowd the player. */
 private val LOCKUP_HEIGHT = 120.dp
+
+/** Beyond this the player stops growing, so a wide desktop window doesn't get a wall of video. */
+private val PLAYER_MAX_WIDTH = 960.dp
+
+/** Breathing room between the window edge and anything drawn in it. */
+private val EDGE_PADDING = 16.dp
+
+/** Gap between the lockup's baseline and the top of the player. */
+private val LOCKUP_GAP = 24.dp
+
+/** Gap between the bottom of the player and the top of the status line. */
+private val STATUS_GAP = 16.dp
 
 /**
  * The whole sample: construct a player, load one item, render it.
@@ -101,41 +114,68 @@ fun App(appContext: AppContext, modifier: Modifier = Modifier) {
 
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = modifier.fillMaxSize()) {
-            if (window.isFullscreen) {
-                PlayerView(
-                    player,
-                    modifier = Modifier.fillMaxSize().background(Color.Black),
-                    window = window,
-                )
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    // The dark-ground lockup: the sample runs a dark colour scheme, and this variant is
-                    // the one drawn with light ink and a transparent background.
-                    Image(
-                        painter = painterResource(Res.drawable.outis_lockup),
-                        contentDescription = "Outis — a Kotlin Multiplatform video player",
-                        // Padding before height: modifiers apply outside-in, so height last means the
-                        // lockup gets its full LOCKUP_HEIGHT and the gap sits below it. The other order
-                        // would make 24.dp of the 72.dp be padding.
-                        modifier = Modifier.padding(bottom = 24.dp).height(LOCKUP_HEIGHT),
-                    )
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                // Picture-in-picture resizes the *host's own window* down to the PiP tile — it does not
+                // hand the player a separate surface. So the same rule applies as for fullscreen: fill
+                // what we are given. Laying out the windowed arrangement inside a PiP tile puts a
+                // centred 16:9 player inside a 16:9 tile with the margins still applied, which is what
+                // a black border all the way around actually is.
+                val fullscreen = window.isFullscreen || window.isInPip
+                val playerSize = if (fullscreen) {
+                    DpSize(maxWidth, maxHeight)
+                } else {
+                    windowedPlayerSize(maxWidth - EDGE_PADDING * 2, maxHeight - EDGE_PADDING * 2)
+                }
+                val halfPlayerHeight = playerSize.height / 2
 
-                    Box(
-                        modifier = Modifier
-                            .widthIn(max = 960.dp)
-                            .fillMaxWidth()
-                            .aspectRatio(ASPECT_16_9)
-                            .background(Color.Black),
-                    ) {
-                        PlayerView(
-                            player,
-                            modifier = Modifier.fillMaxSize(),
-                            // Supplying this is what makes the fullscreen button appear at all.
-                            window = window,
+                // ONE PlayerView, sized differently — not one per branch. Two call sites either side of
+                // an `if` are two different composables to Compose, so toggling fullscreen would dispose
+                // one and create the other. On web that is not cosmetic: PlayerSurface removes the
+                // <video> from the DOM on dispose, which drops it out of picture-in-picture and
+                // restarts buffering. Keeping it first among the Box's children also keeps its slot
+                // stable as the sibling content below appears and disappears.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(playerSize)
+                        .background(Color.Black),
+                ) {
+                    PlayerView(
+                        player,
+                        modifier = Modifier.fillMaxSize(),
+                        // Supplying this is what makes the fullscreen and PiP buttons appear at all.
+                        window = window,
+                        // No chrome in the PiP tile: it is too small to hit, the system draws its own
+                        // controls over it, and touches go to the system rather than to us anyway.
+                        controls = { if (!window.isInPip) DefaultControls() },
+                    )
+                }
+
+                if (!fullscreen) {
+                    // Both are anchored to TopCenter and pushed down with padding, rather than laid out
+                    // in a Column, because a Column centres the *whole stack* — which is what put the
+                    // player below the middle of the window by half the height of the logo and status.
+                    // Anchoring from the top also lets the status line grow downwards at a large font
+                    // scale instead of being clipped to a fixed band.
+                    val centreY = maxHeight / 2
+                    val spaceAbovePlayer = centreY - halfPlayerHeight
+
+                    if (spaceAbovePlayer >= LOCKUP_HEIGHT + LOCKUP_GAP + EDGE_PADDING) {
+                        // The dark-ground lockup: the sample runs a dark colour scheme, and this variant
+                        // is the one drawn with light ink on a transparent background. Dropped entirely
+                        // rather than shrunk when the window is too short — an illegible 30dp lockup is
+                        // worse than none, and the player must not move to make room for it.
+                        //
+                        // The guard above is also what keeps this padding non-negative (which would
+                        // throw): it is exactly spaceAbovePlayer - LOCKUP_GAP - LOCKUP_HEIGHT, so the
+                        // condition leaves at least EDGE_PADDING.
+                        Image(
+                            painter = painterResource(Res.drawable.outis_lockup),
+                            contentDescription = "Outis — a Kotlin Multiplatform video player",
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = spaceAbovePlayer - LOCKUP_GAP - LOCKUP_HEIGHT)
+                                .height(LOCKUP_HEIGHT),
                         )
                     }
 
@@ -143,11 +183,36 @@ fun App(appContext: AppContext, modifier: Modifier = Modifier) {
                         text = statusLine(state.playbackState, state.error?.category?.name),
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 16.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .padding(
+                                top = centreY + halfPlayerHeight + STATUS_GAP,
+                                start = EDGE_PADDING,
+                                end = EDGE_PADDING,
+                            ),
                     )
                 }
             }
         }
+    }
+}
+
+/**
+ * The player's size in the windowed layout: as wide as it is allowed to get, then 16:9, then shrunk to
+ * fit if that would be taller than the window.
+ *
+ * The height clamp is what stops a tall-and-narrow window (a phone in portrait, a half-width browser)
+ * producing a player taller than the space it has. `aspectRatio` alone does not do this — it satisfies
+ * the ratio against the incoming width and lets the result overflow vertically.
+ */
+private fun windowedPlayerSize(availableWidth: Dp, availableHeight: Dp): DpSize {
+    val width = minOf(availableWidth, PLAYER_MAX_WIDTH)
+    val height = width / ASPECT_16_9
+    return if (height <= availableHeight) {
+        DpSize(width, height)
+    } else {
+        DpSize(availableHeight * ASPECT_16_9, availableHeight)
     }
 }
 

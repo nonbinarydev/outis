@@ -170,16 +170,32 @@ A library cannot inject these; the host Activity must declare them.
 </activity>
 ```
 
-- `android:supportsPictureInPicture="true"` is what makes `rememberPlayerWindow` report PiP as
-  available. Without it the PiP button hides itself rather than failing at the tap
-  (`PlayerWindow.kt:36-37`, `PlayerWindow.android.kt:56,83-87`).
+- `android:supportsPictureInPicture="true"` is what permits `enterPictureInPictureMode()` at all.
+  **This one is not optional and its absence is not self-correcting**: `rememberPlayerWindow` judges
+  availability from the device's `FEATURE_PICTURE_IN_PICTURE` and the app's AppOps grant, neither of
+  which can see your manifest (`PlayerWindow.android.kt:56,97-114`). So without the attribute the
+  button still renders, and every tap is rejected by the system with `IllegalStateException`, caught
+  and reported as "did not enter" (`PlayerWindow.android.kt:135-140`). The symptom is a button that
+  looks fine and does nothing.
 - `android:configChanges` stops the Activity being recreated when PiP resizes it — and, as a useful
   side effect, on rotation, which keeps a player held in `remember` alive across an orientation
   change.
 
-PiP availability is also checked against the system feature and the app's AppOps permission at
-runtime, so a user who has revoked PiP for your app gets no button rather than a dead one
-(`PlayerWindow.android.kt:97-114`).
+PiP availability *is* checked against the system feature and the app's AppOps permission at runtime,
+so a user who has revoked PiP for your app gets no button rather than a dead one
+(`PlayerWindow.android.kt:97-114`). That covers revocation, not misconfiguration.
+
+Supply `onPipUnavailable` so a refusal is visible rather than silent — it is the only signal you get
+when entry fails, and during development it is usually the manifest:
+
+```kotlin
+rememberPlayerWindow(
+    player = player,
+    onPipUnavailable = {
+        Toast.makeText(context, "Picture-in-picture is unavailable here", Toast.LENGTH_SHORT).show()
+    },
+)
+```
 
 ---
 

@@ -55,8 +55,12 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(project(":core"))
-                implementation(project(":ui"))
+                // `api`, not `implementation`, for exactly the reason :core promotes its own
+                // dependencies: App(appContext: AppContext) exposes AppContext in a public signature,
+                // and rememberSampleWindow returns a PlayerWindow, so a consumer of this module — the
+                // Android host — needs both on its compile classpath.
+                api(project(":core"))
+                api(project(":ui"))
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.ui)
@@ -64,6 +68,16 @@ kotlin {
                 // Generates typed accessors for src/commonMain/composeResources — the lockup shown
                 // above the player.
                 implementation(compose.components.resources)
+            }
+        }
+
+        val androidMain by getting {
+            dependencies {
+                // WindowInsetsControllerCompat, for the immersive fullscreen toggle. It arrives
+                // transitively via activity-compose, but the fullscreen implementation imports it
+                // directly, so it is declared directly — an transitive dependency that a refactor
+                // upstream could drop is not something to compile against by accident.
+                implementation(libs.androidx.core.ktx)
             }
         }
     }
