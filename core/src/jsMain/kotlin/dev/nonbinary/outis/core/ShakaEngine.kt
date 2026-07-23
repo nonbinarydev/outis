@@ -55,7 +55,7 @@ private fun jsBodyToByteArray(body: dynamic): ByteArray {
         Int8Array(
             viewBuffer.unsafeCast<ArrayBuffer>(),
             body.byteOffset.unsafeCast<Int>(),
-            body.byteLength.unsafeCast<Int>()
+            body.byteLength.unsafeCast<Int>(),
         )
     } else {
         Int8Array(body.unsafeCast<ArrayBuffer>())
@@ -166,9 +166,7 @@ private external object shaka {
 // other platforms: the player wiring, the DRM request/response filters, the ad manager bridge and
 // the state reconciler all bind to the same `shaka.Player` instance and its listener lifecycle.
 @Suppress("LargeClass")
-internal class ShakaEngine(
-    private val config: PlayerConfig,
-) : VideoPlayer {
+internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
 
     private val _state = MutableStateFlow(PlayerState(volume = config.initialVolume))
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
@@ -317,7 +315,7 @@ internal class ShakaEngine(
                         LicenseRequest(
                             request.uris[0] as String,
                             jsBodyToByteArray(request.body),
-                            jsHeadersToMap(request.headers)
+                            jsHeadersToMap(request.headers),
                         ),
                     )
                     request.uris = arrayOf(out.url)
@@ -695,6 +693,7 @@ internal class ShakaEngine(
                     )
                 }
             }
+
             TrackType.TEXT -> textTrackById[track.id]?.let { shakaTrack ->
                 shakaPlayer.selectTextTrack(shakaTrack)
                 shakaPlayer.setTextTrackVisibility(true)
@@ -705,6 +704,7 @@ internal class ShakaEngine(
                     )
                 }
             }
+
             TrackType.VIDEO -> Unit
         }
         // The variantchanged/textchanged events re-emit the authoritative lists; the above is optimistic.
@@ -781,6 +781,7 @@ internal class ShakaEngine(
      * manual alike). Always reset (to `Infinity` when unconstrained) so a capped item doesn't leave a
      * stale ceiling on the next source.
      */
+
     /** Pre-select audio/subtitle language before load so the right track is active at first frame. */
     private fun configureLanguagePreferences(item: MediaItem) {
         val audio = item.preferredAudioLanguage
@@ -816,7 +817,9 @@ internal class ShakaEngine(
                 reconcile()
                 emit { p, t -> PlayerEvent.SeekCompleted(p, t) }
             }
+
             "error" -> if (!errorEmitted) onMediaElementError()
+
             else -> reconcile()
         }
     }
@@ -1000,7 +1003,9 @@ internal class ShakaEngine(
 /** Adaptive (Shaka) vs progressive (native `video.src`) — Shaka can't play single-file mp4/webm. */
 private fun isProgressive(item: MediaItem, url: String): Boolean = when (item.mimeType) {
     MimeType.MP4 -> true
+
     MimeType.HLS, MimeType.DASH -> false
+
     null -> when {
         item.source is MediaSource.LocalFile -> true
         url.endsWith(".m3u8", ignoreCase = true) || url.endsWith(".mpd", ignoreCase = true) -> false

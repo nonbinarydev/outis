@@ -5,6 +5,8 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.nonbinarydev/outis-core?label=maven%20central)](https://central.sonatype.com/artifact/io.github.nonbinarydev/outis-core) [![Licence](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE) [![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-blue)](https://kotlinlang.org) ![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS%20%7C%20Web-blue)
 
+[![Quality gate](https://sonarcloud.io/api/project_badges/measure?project=nonbinarydev_outis&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nonbinarydev_outis) [![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=nonbinarydev_outis&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=nonbinarydev_outis) [![detekt](https://github.com/nonbinarydev/outis/actions/workflows/detekt.yml/badge.svg)](https://github.com/nonbinarydev/outis/actions/workflows/detekt.yml) [![Qodana](https://github.com/nonbinarydev/outis/actions/workflows/qodana_code_quality.yml/badge.svg)](https://github.com/nonbinarydev/outis/actions/workflows/qodana_code_quality.yml)
+
 ***No one player.*** A Kotlin Multiplatform video player for **Android, iOS and Web**: one
 engine-agnostic API, plus an optional Compose Multiplatform UI. Write your playback logic once; each
 platform runs its native engine underneath — so there is no single player here, which is rather the point.
