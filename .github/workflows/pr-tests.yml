@@ -1,0 +1,243 @@
+# Runs the shared test suite on every target that can host it, then posts one PR comment summarising
+# the result per target.
+#
+# The multiplatform point of this workflow: `commonTest` is compiled and executed six ways — JVM,
+# Node, browser, Wasm/Node, Wasm/browser and the iOS simulator. The same assertions running everywhere
+# is what makes putting the parsers and the ad controller in commonMain worthwhile, so the comment is
+# grouped by TARGET rather than only by test class.
+#
+# Apple targets need a macOS host, everything else runs on Linux, so the run is a matrix. Results are
+# uploaded as artifacts and a separate job merges them into a single comment — two jobs each posting
+# their own comment would fight over the same thread.
+#
+# :ui has no test source set today. When it gains one, add its tasks to the matrix below.
+
+name: PR tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Never cancel the sibling on first failure — knowing whether a break is platform-specific or
+      # universal is the most useful signal this workflow produces.
+      fail-fast: false
+      matrix:
+        include:
+          - name: JVM, JS and Wasm
+            os: ubuntu-latest
+            key: linux
+            tasks: ":core:jvmTest :core:jsNodeTest :core:jsBrowserTest :core:wasmJsNodeTest :core:wasmJsBrowserTest"
+          - name: iOS simulator
+            os: macos-latest
+            key: apple
+            tasks: ":core:iosSimulatorArm64Test"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Run tests
+        id: tests
+        # Do not fail here: the reporting job must run so the comment is posted either way. Overall
+        # pass/fail is decided in that job, from the parsed results.
+        continue-on-error: true
+        run: ./gradlew --no-daemon ${{ matrix.tasks }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.key }}
+          path: core/build/test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+  report:
+    name: Report
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          path: all-results
+
+      - name: Summarise and comment
+        id: summarise
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const marker = '<!-- pr-tests-comment -->';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // JUnit XML escapes these in attributes; &amp; last so nothing is double-decoded.
+            const decode = (s) => s
+              .replace(/&#xd;/gi, '\n').replace(/&#xa;/gi, '\n')
+              .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+              .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+              .replace(/&amp;/g, '&');
+
+            // Walk every downloaded artifact. The directory holding the XML is the Gradle test task
+            // name (jvmTest, iosSimulatorArm64Test, …), which is what we group by.
+            const walk = (dir) => fs.existsSync(dir)
+              ? fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+                  const p = path.join(dir, e.name);
+                  return e.isDirectory() ? walk(p) : (e.name.endsWith('.xml') ? [p] : []);
+                })
+              : [];
+
+            const files = walk('all-results');
+            const targets = new Map();      // task name -> totals
+            const failures = [];
+
+            const prettify = (task) => task
+              .replace(/Test$/, '')
+              .replace('jvm', 'JVM').replace('jsNode', 'JS / Node')
+              .replace('jsBrowser', 'JS / browser').replace('wasmJsNode', 'Wasm / Node')
+              .replace('wasmJsBrowser', 'Wasm / browser')
+              .replace('iosSimulatorArm64', 'iOS simulator');
+
+            for (const file of files) {
+              const task = path.basename(path.dirname(file));
+              const xml = fs.readFileSync(file, 'utf-8');
+
+              const num = (attr) => parseInt(
+                new RegExp(`<testsuite[^>]*\\s${attr}="(\\d+)"`).exec(xml)?.[1] ?? '0', 10);
+              const tests = num('tests');
+              if (tests === 0 && !/<testsuite/.test(xml)) continue;
+
+              const fails = num('failures'), errors = num('errors'), skipped = num('skipped');
+              const time = parseFloat(/<testsuite[^>]*\stime="([\d.]+)"/.exec(xml)?.[1] ?? '0');
+              const suite = /<testsuite[^>]*\sname="([^"]+)"/.exec(xml)?.[1] ?? path.basename(file);
+
+              const t = targets.get(task) ?? { tests: 0, fails: 0, skipped: 0, time: 0, classes: 0 };
+              t.tests += tests; t.fails += fails + errors; t.skipped += skipped;
+              t.time += time; t.classes += 1;
+              targets.set(task, t);
+
+              const re = /<testcase\s+([^>]+?)>\s*<(failure|error)\s+([^>]*?)>([\s\S]*?)<\/\2>/g;
+              let m;
+              while ((m = re.exec(xml)) !== null) {
+                const testName = decode(/name="([^"]*)"/.exec(m[1])?.[1] ?? '?');
+                const message = decode(/message="([^"]*)"/.exec(m[3])?.[1] ?? '');
+                let body = decode(m[4].replace(/<!\[CDATA\[/g, '').replace(/]]>/g, '').trim());
+                const lines = body.split('\n');
+                body = lines.slice(0, 10).join('\n');
+                if (body.length > 800) body = body.slice(0, 800) + '\n...';
+                else if (lines.length > 10) body += `\n... (${lines.length - 10} more lines)`;
+                failures.push({
+                  target: prettify(task), suite: suite.split('.').pop(), testName, message, body,
+                });
+              }
+            }
+
+            const totals = [...targets.values()].reduce(
+              (a, t) => ({ tests: a.tests + t.tests, fails: a.fails + t.fails,
+                           skipped: a.skipped + t.skipped, time: a.time + t.time }),
+              { tests: 0, fails: 0, skipped: 0, time: 0 });
+
+            const out = [marker, '', '## Unit tests', ''];
+
+            if (files.length === 0 || targets.size === 0) {
+              out.push('**No test results were produced.** The build most likely failed before the ' +
+                       'tests ran — a compilation error, or a Gradle configuration failure. The run ' +
+                       'log has the actual cause.', '',
+                       `Run #${context.runNumber} — [view in Actions](${runUrl})`);
+            } else {
+              out.push(totals.fails === 0
+                ? `**All ${totals.tests} test executions passed** across ${targets.size} targets.`
+                : `**${totals.fails} of ${totals.tests} test executions failed** across ${targets.size} targets.`,
+                '');
+
+              out.push('| Target | Tests | Passed | Failed | Skipped | Time |',
+                       '|---|---:|---:|---:|---:|---:|');
+              for (const [task, t] of [...targets].sort((a, b) => a[0].localeCompare(b[0]))) {
+                out.push(`| ${prettify(task)} | ${t.tests} | ${t.tests - t.fails - t.skipped} | ` +
+                         `${t.fails > 0 ? `**${t.fails}**` : '0'} | ${t.skipped} | ${t.time.toFixed(1)}s |`);
+              }
+              out.push(`| **Total** | **${totals.tests}** | ` +
+                       `**${totals.tests - totals.fails - totals.skipped}** | ` +
+                       `**${totals.fails}** | **${totals.skipped}** | **${totals.time.toFixed(1)}s** |`, '');
+
+              // A shared-code break fails on every target; a platform break fails on one. Say which.
+              const failedTargets = [...targets].filter(([, t]) => t.fails > 0).map(([k]) => prettify(k));
+              if (failedTargets.length > 0 && failedTargets.length < targets.size) {
+                out.push(`Failing on ${failedTargets.join(', ')} only — the other targets passed, so ` +
+                         'this looks platform-specific rather than a break in shared code.', '');
+              } else if (failedTargets.length === targets.size) {
+                out.push('Failing on every target, which points at shared code rather than a ' +
+                         'platform quirk.', '');
+              }
+
+              if (failures.length > 0) {
+                out.push('### Failures', '');
+                let len = out.join('\n').length, shown = 0;
+                for (const f of failures) {
+                  const block = [
+                    `<details open><summary><strong>${f.suite}</strong> — ${f.testName} ` +
+                    `<em>(${f.target})</em></summary>`, '',
+                    f.message ? '> ' + f.message.split('\n').join('\n> ') : '', '',
+                    '```', f.body, '```', '</details>', '',
+                  ].join('\n');
+                  if (len + block.length > 60000) {
+                    out.push(`_… ${failures.length - shown} more failure(s) truncated — ` +
+                             `see the [run page](${runUrl})._`);
+                    break;
+                  }
+                  out.push(block); len += block.length; shown++;
+                }
+              }
+
+              out.push(`Run #${context.runNumber} — [view in Actions](${runUrl})`);
+            }
+
+            core.setOutput('failed', String(totals.fails > 0 || targets.size === 0));
+            core.summary.addRaw(out.slice(2).join('\n')).write();
+
+            // Only comment on a real PR — this workflow also allows workflow_dispatch.
+            if (!context.payload.pull_request) return;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            for (const stale of comments.filter(c => c.body?.includes(marker))) {
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner, repo: context.repo.repo, comment_id: stale.id,
+              });
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, body: out.join('\n'),
+            });
+
+      - name: Fail if any test failed
+        if: steps.summarise.outputs.failed == 'true'
+        run: |
+          echo "::error::Tests failed — see the PR comment for the per-target summary."
+          exit 1

@@ -1,0 +1,52 @@
+# Shared formatting rules. Read by IntelliJ/Android Studio, ktlint, detekt and most editors, so this
+# file — not an IDE setting — is the single source of truth for how Outis is formatted.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+# 120 matches how this codebase is already written (99th percentile is 118) and is roughly where
+# GitHub's web view begins scrolling horizontally — which matters for a repo people read in a browser.
+# Enforced by detekt's MaximumLineLength, which exempts raw strings: a couple of test fixtures embed a
+# verbatim HLS playlist or MediaTailor JSON payload, and wrapping those would change what is tested.
+max_line_length = 120
+ktlint_code_style = intellij_idea
+
+# Compose composables are PascalCase by convention; ktlint's camelCase rule is a false positive here.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+
+
+# Trailing commas keep diffs to a single line when a parameter is added, and the codebase already
+# uses them throughout.
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# Wildcard imports hide what a file actually depends on; the codebase imports explicitly.
+ij_kotlin_name_count_to_use_star_import = 2147483647
+ij_kotlin_name_count_to_use_star_import_for_members = 2147483647
+
+[*.{yml,yaml,json}]
+indent_size = 2
+
+[*.md]
+indent_size = 2
+# Two trailing spaces are a hard line break in Markdown, so stripping them changes rendering.
+trim_trailing_whitespace = false
+
+[gradle/libs.versions.toml]
+indent_size = 4
+
+[*.{bat,cmd}]
+end_of_line = crlf
+
+# The Gradle wrapper is generated — leave it exactly as shipped.
+[{gradlew,gradlew.bat,gradle/wrapper/**}]
+trim_trailing_whitespace = false
+insert_final_newline = false
