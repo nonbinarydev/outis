@@ -74,6 +74,13 @@ kotlin {
                 // because VideoPlayer.setAdViewProvider exposes AdViewProvider.
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.activity.ktx) // ComponentActivity PIP listener + PictureInPictureModeChangedInfo
+                // ComponentActivity implements androidx.lifecycle.LifecycleOwner, so resolving any call
+                // on it needs that supertype on this source set's classpath. It does arrive anyway —
+                // transitively, from the *multiplatform* org.jetbrains lifecycle that commonMain
+                // declares — which is why Gradle compiles without it and the IDE still reports
+                // MISSING_DEPENDENCY_SUPERCLASS. Declared here because this source set genuinely
+                // compiles against it, rather than relying on another source set's transitive graph.
+                implementation(libs.androidx.lifecycle.runtime)
             }
         }
         // iosMain (shared by both iOS targets) comes from the default hierarchy template — no custom

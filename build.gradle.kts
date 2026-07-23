@@ -10,6 +10,10 @@ import io.gitlab.arturbosch.detekt.report.ReportMergeTask
 plugins {
     alias(libs.plugins.kotlinMultiplatform) apply false
     alias(libs.plugins.androidKotlinMultiplatformLibrary) apply false
+    // Declared here so :sample:android can apply it without a version — a subproject cannot
+    // version a plugin that is already on the build classpath. AGP 9 provides Kotlin support
+    // built in, so no separate kotlin-android plugin is needed.
+    alias(libs.plugins.androidApplication) apply false
     alias(libs.plugins.kotlinSerialization) apply false
     alias(libs.plugins.jetbrainsCompose) apply false
     alias(libs.plugins.kotlinComposeCompiler) apply false

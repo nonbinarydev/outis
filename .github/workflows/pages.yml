@@ -8,8 +8,8 @@
 # The catalogue is validated before publishing. Already-distributed sample apps fetch this file at
 # runtime, so a malformed or schema-breaking version cannot be caught by their build — only here.
 #
-# Aggregated API docs and the web demo are not built yet; see issue #10. When they are, add the steps
-# that produce them into `_site/api/` and `_site/demo/` — nothing else here needs to change.
+# The web demo at /demo/ is the :sample module's Kotlin/JS browser distribution. Aggregated API docs
+# at /api/ are not built yet; see issue #10.
 #
 # Requires: repository Settings -> Pages -> Source = "GitHub Actions".
 
@@ -19,7 +19,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'sample/catalogue.json'
+      - 'sample/**'
       - 'site/**'
       - 'docs/img/lockup-*'
       - '.github/workflows/pages.yml'
@@ -42,8 +42,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
       - name: Validate the catalogue
         run: python3 sample/validate-catalogue.py
+
+      # Compose for web produces a large bundle (skiko), so this is the slow step by a wide margin.
+      - name: Build the web demo
+        run: ./gradlew --no-daemon :sample:jsBrowserDistribution
 
       - name: Assemble _site
         run: |
@@ -52,6 +63,13 @@ jobs:
           cp sample/catalogue.json _site/catalogue.json
           cp docs/img/lockup-light.svg _site/lockup-light.svg
           cp docs/img/lockup-dark.svg  _site/lockup-dark.svg
+          mkdir -p _site/demo
+          cp -r sample/build/dist/js/productionExecutable/. _site/demo/
+          # skikod8.mjs is skiko's V8-shell build — nothing in a browser references it. The two .wasm
+          # files are byte-identical duplicates, but both are referenced from sample.js, so removing
+          # either risks a silently blank canvas; left alone deliberately.
+          rm -f _site/demo/skikod8.mjs
+          echo "demo bundle: $(du -sh _site/demo | cut -f1)"
           # Jekyll would otherwise ignore files and directories beginning with an underscore.
           touch _site/.nojekyll
           echo "--- published files ---"
