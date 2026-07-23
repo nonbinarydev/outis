@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outis — a Kotlin Multiplatform video player</title>
+<meta name="description" content="One engine-agnostic playback API for Android, iOS and Web, plus an optional Compose Multiplatform UI.">
+<style>
+  :root { --ink:#1B1A21; --muted:#6E6B76; --rule:#DEDCD4; --paper:#F7F6F1; --card:#fff; --accent:#7B3FAE; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#E9E7E1; --muted:#95918A; --rule:#2E2C36; --paper:#15141A; --card:#1D1C23; --accent:#B583D9; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); line-height:1.6;
+         font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:720px; margin:0 auto; padding:64px 24px 96px; }
+  img.lockup { max-width:340px; width:100%; height:auto; display:block; margin-bottom:32px; }
+  h1 { font-size:15px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted);
+       font-weight:600; margin:0 0 12px; }
+  p.lede { font-size:20px; margin:0 0 32px; text-wrap:balance; }
+  table { border-collapse:collapse; width:100%; font-size:15px; margin:0 0 32px; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--rule); }
+  th { font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:13.5px; }
+  a { color:var(--accent); }
+  .links { display:flex; flex-wrap:wrap; gap:20px; padding-top:24px; border-top:1px solid var(--rule);
+           font-size:15px; }
+  footer { margin-top:48px; font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="lockup-dark.svg">
+    <img class="lockup" src="lockup-light.svg" alt="Outis — a Kotlin Multiplatform video player">
+  </picture>
+
+  <h1>No one player</h1>
+  <p class="lede">One engine-agnostic playback API for Android, iOS and Web, plus an optional Compose
+  Multiplatform UI. Each platform runs its native engine underneath — so there is no single player
+  here, which is rather the point.</p>
+
+  <table>
+    <thead><tr><th>Platform</th><th>Engine</th></tr></thead>
+    <tbody>
+      <tr><td>Android</td><td>Media3 / ExoPlayer</td></tr>
+      <tr><td>iOS</td><td>AVFoundation <code>AVPlayer</code></td></tr>
+      <tr><td>Web</td><td>Shaka Player, over an HTML <code>&lt;video&gt;</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="links">
+    <a href="https://github.com/nonbinarydev/outis">Source</a>
+    <a href="https://github.com/nonbinarydev/outis/tree/main/docs">Documentation</a>
+    <a href="catalogue.json">Sample catalogue</a>
+    <a href="https://github.com/nonbinarydev/outis/issues">Issues</a>
+  </div>
+
+  <footer>
+    Alpha. API docs and a web demo are not published here yet —
+    <a href="https://github.com/nonbinarydev/outis/issues/10">tracked in #10</a>.
+    Licensed under Apache-2.0.
+  </footer>
+</div>
+</body>
+</html>

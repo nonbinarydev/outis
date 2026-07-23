@@ -1,0 +1,81 @@
+{
+  "$comment": "Sample-app stream catalogue. See README.md in this directory for the schema contract.",
+  "version": 1,
+  "updated": "2026-07-23",
+  "posters": {
+    "bbcTestcard": "https://ichef.bbci.co.uk/images/ic/1920x1080/p0cmk788.jpg",
+    "bigBuckBunny": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg",
+    "tearsOfSteel": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Tos-poster.png/1280px-Tos-poster.png"
+  },
+  "rails": [
+    {
+      "id": "bbc-testcard",
+      "title": "BBC Test Card",
+      "note": "The same one-hour reference content as VOD and as a simulcast, across DASH and HLS, AVC and HEVC. iOS cannot play any of these: the test card's HLS uses in-band parameter sets (avc3), and AVPlayer has no DASH.",
+      "items": [
+        { "id": "bbc-vod-dash-avc",   "title": "AVC",  "label": "BBC Test Card · VOD · DASH (AVC)",   "url": "https://rdmedia.bbc.co.uk/testcard/vod/manifests/avc-full.mpd",        "mimeType": "DASH", "poster": "bbcTestcard", "tags": ["VOD", "DASH"] },
+        { "id": "bbc-vod-hls-avc",    "title": "AVC",  "label": "BBC Test Card · VOD · HLS (AVC)",    "url": "https://rdmedia.bbc.co.uk/testcard/vod/manifests/avc-full.m3u8",       "mimeType": "HLS",  "poster": "bbcTestcard", "tags": ["VOD", "HLS"] },
+        { "id": "bbc-live-dash-avc",  "title": "AVC",  "label": "BBC Test Card · Live · DASH (AVC)",  "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/avc-full.mpd",  "mimeType": "DASH", "poster": "bbcTestcard", "tags": ["LIVE", "DASH"] },
+        { "id": "bbc-live-hls-avc",   "title": "AVC",  "label": "BBC Test Card · Live · HLS (AVC)",   "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/avc-full.m3u8", "mimeType": "HLS",  "poster": "bbcTestcard", "tags": ["LIVE", "HLS"] },
+        { "id": "bbc-live-dash-hevc", "title": "HEVC", "label": "BBC Test Card · Live · DASH (HEVC)", "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/hevc-ctv.mpd",  "mimeType": "DASH", "poster": "bbcTestcard", "tags": ["LIVE", "DASH"], "note": "HEVC: no Chrome decoder." },
+        { "id": "bbc-live-hls-hevc",  "title": "HEVC", "label": "BBC Test Card · Live · HLS (HEVC)",  "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/hevc-ctv.m3u8", "mimeType": "HLS",  "poster": "bbcTestcard", "tags": ["LIVE", "HLS"],  "note": "HEVC: no Chrome decoder." }
+      ]
+    },
+    {
+      "id": "big-buck-bunny",
+      "title": "Big Buck Bunny",
+      "note": "The same film across delivery formats and codecs. No clean public Widevine or FairPlay Big Buck Bunny stream exists — every one is clear except Microsoft's PlayReady-only asset — so general DRM is demonstrated on the Streams rail instead.",
+      "items": [
+        { "id": "bbb-hls",  "title": "Adaptive",    "label": "Big Buck Bunny · HLS (adaptive, up to 1080p)",       "url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",                                        "mimeType": "HLS",  "poster": "bigBuckBunny", "tags": ["VOD", "HLS"],               "note": "All-avc1 master, so it plays on every engine including iOS." },
+        { "id": "bbb-4k",   "title": "Adaptive",    "label": "Big Buck Bunny · DASH · 4K (H.264, up to 2160p)",    "url": "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",                                "mimeType": "DASH", "poster": "bigBuckBunny", "tags": ["VOD", "DASH", "4K"],        "note": "Genuine 3840x2160 H.264 ladder — verified, unlike many listings that label 1080p as 4K. Android and web only; AVPlayer has no DASH." },
+        { "id": "bbb-mp4",  "title": "Progressive", "label": "Big Buck Bunny · MP4 (progressive, 360p)",           "url": "https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_640x360.m4v",          "mimeType": "MP4",  "poster": "bigBuckBunny", "tags": ["VOD", "MP4"],               "note": "MimeType.MP4 routes this to the native <video> element on web. The old commondatastorage.googleapis.com BBB mp4 is now 403 — do not use it." },
+        { "id": "bbb-av1",  "title": "AV1",         "label": "Big Buck Bunny · AV1 (MP4, progressive)",            "url": "https://storage.googleapis.com/downloads.webmproject.org/av1/exoplayer/bbb-av1-480p.mp4",  "mimeType": "MP4",  "poster": "bigBuckBunny", "tags": ["VOD", "MP4", "AV1"],        "note": "Chrome and Android decode AV1; iOS and Safari surface a graceful codec error." },
+        { "id": "bbb-playready", "title": "PlayReady", "label": "Big Buck Bunny · DASH · PlayReady DRM",           "url": "https://test.playready.microsoft.com/media/dash/APPLEENC_CBCS_BBB_1080p/1080p.mpd",        "mimeType": "DASH", "poster": "bigBuckBunny", "tags": ["DASH", "DRM"],
+          "drm": { "scheme": "PLAYREADY", "licenseServerUrl": "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:150)" },
+          "note": "The only DRM-protected Big Buck Bunny asset that exists. PlayReady decrypts only on Edge/Windows and PlayReady-capable Android; everywhere else this surfaces a clean DRM error, which is itself worth demonstrating." }
+      ]
+    },
+    {
+      "id": "tears-of-steel",
+      "title": "Tears of Steel",
+      "items": [
+        { "id": "tos-hls", "title": "Adaptive", "label": "Tears of Steel · HLS (adaptive)",                  "url": "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8", "mimeType": "HLS",  "poster": "tearsOfSteel", "tags": ["VOD", "HLS"] },
+        { "id": "tos-4k",  "title": "4K UHD",   "label": "Tears of Steel · 4K UHD · HLS (H.264, all engines)", "url": "https://media.axprod.net/TestVectors/v9-MultiFormat/Clear/Manifest.m3u8",                            "mimeType": "HLS",  "poster": "tearsOfSteel", "tags": ["HLS", "4K"],  "note": "The rare 4K that plays everywhere: UHD H.264 over HLS. Most 4K ships as HEVC, VP9 or AV1, which no single engine set can all decode." },
+        { "id": "tos-vp9", "title": "VP9",      "label": "Tears of Steel · VP9 · DASH",                      "url": "https://storage.googleapis.com/wvmedia/clear/vp9/tears/tears.mpd",                                     "mimeType": "DASH", "poster": "tearsOfSteel", "tags": ["VOD", "DASH", "VP9"], "note": "Chrome and Android only; iOS has neither DASH nor VP9, Safari has no VP9." },
+        { "id": "tos-widevine", "title": "Widevine", "label": "Tears of Steel · Widevine DRM · DASH",        "url": "https://storage.googleapis.com/wvmedia/cenc/h264/tears/tears.mpd",                                     "mimeType": "DASH", "poster": "tearsOfSteel", "tags": ["DASH", "DRM"],
+          "drm": { "scheme": "WIDEVINE", "licenseServerUrl": "https://proxy.uat.widevine.com/proxy?video_id=2015_tears&provider=widevine_test" } }
+      ]
+    },
+    {
+      "id": "streams-and-drm",
+      "title": "Streams & DRM",
+      "items": [
+        { "id": "dolby-vision",   "title": "Dolby Vision",   "label": "Dolby Vision HDR · HLS",   "url": "https://d3rlna7iyyu8wu.cloudfront.net/DolbyVision_Atmos/profile5_HLS/master.m3u8",                  "mimeType": "HLS", "tint": "#1E1B4B", "tags": ["HLS", "HDR"], "note": "Profile-5 over HLS specifically so iOS can play it. Dolby Vision is HEVC-based: Safari, iOS and DV-capable Android with an HDR display; Chrome surfaces a codec error. True HDR that also plays on Chrome would need VP9-HDR, AV1-HDR or HDR10." },
+        { "id": "apple-bipbop",   "title": "Apple BipBop",   "label": "Apple BipBop · HLS",       "url": "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_adv_example_hevc/master.m3u8", "mimeType": "HLS", "tint": "#374151", "tags": ["HLS"] },
+        { "id": "elephants-dream","title": "Elephants Dream","label": "Elephants Dream · DASH",   "url": "https://rdmedia.bbc.co.uk/elephants_dream/1/client_manifest-all.mpd",                                "mimeType": "DASH","tint": "#4B5563", "tags": ["DASH"] },
+        { "id": "fairplay",       "title": "FairPlay",       "label": "FairPlay DRM · HLS",       "url": "https://fps.ezdrm.com/demo/video/ezdrm.m3u8",                                                        "mimeType": "HLS", "tint": "#5B21B6", "tags": ["HLS", "DRM"],
+          "drm": { "scheme": "FAIRPLAY", "licenseServerUrl": "https://fps.ezdrm.com/api/licenses/09cc0377-6dd4-40cb-b09d-b582236e70fe", "certificateUrl": "https://fps.ezdrm.com/demo/video/eleisure.cer" },
+          "note": "FairPlay requires certificateUrl; without it the key session cannot start." }
+      ]
+    },
+    {
+      "id": "ads",
+      "title": "Ads",
+      "note": "Server-side insertion is app-driven: no engine reads AdConfig.ServerSide, the stitched stream plays unchanged and the app feeds an AdController. Client-side insertion runs inside the engine on Android and Web only.",
+      "items": [
+        { "id": "scte35-live", "title": "SCTE-35 (live)", "label": "Unified Streaming · live SCTE-35 ad signalling", "url": "https://demo.unified-streaming.com/k8s/live/scte35.isml/.m3u8", "mimeType": "HLS", "tint": "#0B3D2E", "tags": ["LIVE", "HLS", "SCTE-35"],
+          "scte35MasterUrl": "https://demo.unified-streaming.com/k8s/live/scte35.isml/.m3u8",
+          "note": "A real broadcast signal carrying recurring avails roughly every 120 seconds, CORS-enabled. The poller reads genuine cue-points from the manifest rather than simulating them." },
+        { "id": "csai-ima", "title": "CSAI · IMA", "label": "Big Buck Bunny · IMA client-side ads", "url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", "mimeType": "HLS", "poster": "bigBuckBunny", "tags": ["HLS", "IMA"],
+          "ads": { "type": "clientSide", "adTagUri": "https://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/124319096/external/single_ad_samples&ciu_szs=300x250&impl=s&gdfp_req=1&env=vp&output=vast&unviewed_position_start=1&cust_params=deployment%3Ddevsite%26sample_ct%3Dlinear&correlator=" },
+          "note": "Google's canonical single-inline-linear VAST pre-roll. IMA renders its own skip and countdown UI. Android and Web only; iOS has the bridge but no adapter ships." },
+        { "id": "ssai-simulated", "title": "SSAI Ads", "label": "Big Buck Bunny · SSAI cue-points (simulated)", "url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", "mimeType": "HLS", "poster": "bigBuckBunny", "tags": ["HLS", "ADS"],
+          "ads": { "type": "serverSide", "breaks": [
+            { "id": "preroll", "startMs": 0,     "ads": [ { "id": "pre-1", "durationMs": 8000,  "title": "Pre-roll",   "skipOffsetMs": 5000 } ] },
+            { "id": "midroll", "startMs": 20000, "ads": [ { "id": "mid-1", "durationMs": 10000, "title": "Mid-roll 1" }, { "id": "mid-2", "durationMs": 8000, "title": "Mid-roll 2" } ] }
+          ] },
+          "note": "Cue-points are simulated. A real integration parses them from a MediaTailor tracking response or from SCTE-35, both of which have parsers in :core." }
+      ]
+    }
+  ]
+}
