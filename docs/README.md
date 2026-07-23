@@ -42,6 +42,17 @@ Per-subsystem references. Read them in any order; each is self-contained.
 | [Platform support, requirements and known gaps](platform-support.md) | Toolchain and dependency versions, the exact target set each artifact publishes, and every known per-platform gap in one place. The single source of truth for capability claims; the README's matrix is a summary of this page. |
 | [Troubleshooting](troubleshooting.md) | Symptom, cause and fix for the failure modes that are easy to hit and hard to diagnose: construction throwing on unsupported targets, a black video on web, blocked autoplay, iOS refusing a stream that is not actually a DRM problem, and unresolved references from the quick start. |
 
+## Decisions
+
+[Decision records](decisions/README.md) — why the project is shaped the way it is, one short record per
+decision that would otherwise have to be reverse-engineered from the code.
+
+## Sample
+
+The [sample catalogue](../sample/README.md) is the stream list the sample application plays, kept as
+remotely-loadable JSON so it can change without redistributing the app. The application itself is not
+built yet.
+
 ## Maintainer docs
 
 [Releasing](maintainers/releasing.md) is the publishing runbook, executable only on the machine that

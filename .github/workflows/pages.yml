@@ -1,0 +1,73 @@
+# Publishes the GitHub Pages site.
+#
+# Today that is a landing page plus the sample catalogue, which sample applications fetch at runtime.
+# The catalogue is served from here rather than from raw.githubusercontent.com because Pages returns
+# `content-type: application/json` as well as `access-control-allow-origin: *`; raw returns the CORS
+# header but types everything `text/plain`.
+#
+# The catalogue is validated before publishing. Already-distributed sample apps fetch this file at
+# runtime, so a malformed or schema-breaking version cannot be caught by their build — only here.
+#
+# Aggregated API docs and the web demo are not built yet; see issue #10. When they are, add the steps
+# that produce them into `_site/api/` and `_site/demo/` — nothing else here needs to change.
+#
+# Requires: repository Settings -> Pages -> Source = "GitHub Actions".
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sample/catalogue.json'
+      - 'site/**'
+      - 'docs/img/lockup-*'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a deploy in flight — a half-published site is worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate the catalogue
+        run: python3 sample/validate-catalogue.py
+
+      - name: Assemble _site
+        run: |
+          mkdir -p _site
+          cp -r site/. _site/
+          cp sample/catalogue.json _site/catalogue.json
+          cp docs/img/lockup-light.svg _site/lockup-light.svg
+          cp docs/img/lockup-dark.svg  _site/lockup-dark.svg
+          # Jekyll would otherwise ignore files and directories beginning with an underscore.
+          touch _site/.nojekyll
+          echo "--- published files ---"
+          find _site -type f | sort
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
