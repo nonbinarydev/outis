@@ -362,7 +362,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         val fresh = shaka.Player()
         wireShaka(fresh)
         shakaPlayer = fresh
-        return old.destroy().catch { it }.then<dynamic>({ _ ->
+        return old.destroy().catch { it }.then({ _ ->
             if (released) js("Promise.resolve()") else fresh.attach(video)
         })
     }
@@ -435,7 +435,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         // Reset Shaka before the new source: recreate it if a prior load wedged it (unload() can't
         // recover a Safari DRM failure), otherwise just unload to clear the previous content.
         val reset: dynamic = if (shakaBroken) recreateShaka() else shakaPlayer.unload()
-        return reset.then<dynamic>(
+        return reset.then(
             { _ -> onReset(generation, progressive, item, url) },
             { _ -> onReset(generation, progressive, item, url) }, // proceed even if reset rejected
         )
@@ -724,8 +724,8 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     }
 
     /**
-     * Point Shaka's CDM at the license server before [load], and stage the license-request headers
-     * that the [init] request filter injects into LICENSE requests. The header set is reset each call
+     * Point Shaka's CDM at the license server before `load`, and stage the license-request headers
+     * that the `init` request filter injects into LICENSE requests. The header set is reset each call
      * (empty for clear content). Note Shaka's `configure()` **merges** — it never deletes keys — so a
      * value a prior item set survives unless this call overwrites it; we therefore rewrite the fields a
      * later item could otherwise inherit (`servers[keySystem]`, and for Widevine the robustness — `""`

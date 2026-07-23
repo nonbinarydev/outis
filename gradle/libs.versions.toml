@@ -1,18 +1,26 @@
 [versions]
-# Held at 9.0.0 deliberately: the qodana-jvm-android:2026.1 image's bundled IDE refuses to import
-# anything newer, and Qodana gates PRs. See the note in qodana.yaml before raising this.
-agp = "9.0.0"
+# Raised back to 9.1.1 as one half of an experiment — see qodana.yaml, which moves to the 2026.2 EAP
+# linter at the same time. The 2026.1 linter's bundled IDE refuses to import anything past 9.0.0, so
+# these two versions have to move together: revert BOTH or neither.
+#
+# 9.1.1 also matters beyond the linter. AGP 9.0.0 bundles R8 9.0.32, which predates Kotlin 2.4.10 and
+# cannot parse its metadata — every build logs "Unexpected error during rewriting of Kotlin metadata"
+# for PlayerState, AdEvent$AdCompleted and others. AGP 9.1's R8 is new enough to read it.
+agp = "9.1.1"
 kotlin = "2.4.10"
 android-minSdk = "24"
-android-compileSdk = "36"
+android-compileSdk = "37"
 
-androidx-lifecycle = "2.10.0"
+# 2.11.0 and androidx.core 1.19.0 are available, and Android Lint nags for both, but each requires
+# compileSdk 37 (checkAarMetadata fails hard on 36). Raising compileSdk is a deliberate change of its
+# own — new APIs become callable and new lint checks apply — so these stay put until that is decided.
+androidx-lifecycle = "2.11.0"
 desugarJdkLibs = "2.1.5"
 androidxActivity = "1.13.0"
-androidxCore = "1.18.0"
+androidxCore = "1.19.0" # see the note on androidx-lifecycle: 1.19.0 needs compileSdk 37
 composePlugin = "1.11.1"
 detekt = "1.23.8"
-detektCompose = "0.4.22"
+detektCompose = "0.6.3"
 detektCompose2 = "1.4.0"
 dokka = "2.2.0"
 ktlint = "14.2.0"
@@ -23,8 +31,6 @@ kotlinxDatetime = "0.8.0"
 kotlinxSerializationJson = "1.11.0"
 media3 = "1.10.1"
 napier = "2.7.1"
-# 0.37.0+ is required: earlier releases predate the Sonatype Central Portal migration
-# and still use the since-removed SonatypeHost API.
 maven-publish = "0.37.0"
 
 [libraries]

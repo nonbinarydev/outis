@@ -54,12 +54,22 @@ projectJDK: "21"
 # /opt/android-sdk, and carries the same free Community licence. (Note: "qodana-android", without the
 # jvm- prefix, is the Ultimate-tier image and is NOT free — the names are easy to confuse.)
 #
-# VERIFIED, the hard way: this image's IDE build caps at AGP 9.0.0. On AGP 9.1.1 the Gradle build
-# itself succeeded and the *IDE model import* then refused outright — "The project is using an
-# incompatible version (AGP 9.1.1)... Latest supported version is AGP 9.0.0" — so Qodana analysed
-# nothing at all. `agp` in gradle/libs.versions.toml is pinned to 9.0.0 to keep this working; raising
-# it breaks this job until a linter image with a newer bundled IDE is available.
-linter: jetbrains/qodana-jvm-android:2026.1
+# EXPERIMENT (2026-07-23): does the 2026.2 EAP image import AGP 9.1.1?
+#
+# The 2026.1 image caps at AGP 9.0.0. On 9.1.1 the Gradle build succeeded and the *IDE model import*
+# refused outright — "The project is using an incompatible version (AGP 9.1.1)... Latest supported
+# version is AGP 9.0.0" — so Qodana analysed nothing. That forced `agp` down to 9.0.0, which in turn
+# left the build on an R8 too old for Kotlin 2.4.10's metadata. This tag is the first published image
+# that could plausibly lift both.
+#
+# Failure here is loud and early: an AndroidSyncException during model import, before any analysis
+# runs. A pass is therefore unambiguous. If it fails, revert this line AND `agp` together.
+#
+# CAVEAT if this is kept: `-eap` is a MUTABLE tag — JetBrains re-push it through the EAP cycle (see
+# 2026.1-eap, last pushed months before 2026.1 shipped). A green PR can go red with nothing in the
+# diff to explain it. Acceptable while experimenting; decide deliberately before leaving it as the
+# standing gate, and prefer 2026.2 stable once it exists.
+linter: jetbrains/qodana-jvm-android:2026.2-eap
 
 include:
   - name: ConvertTwoComparisonsToRangeCheck

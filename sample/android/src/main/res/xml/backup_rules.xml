@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup rules for API 30 and below, where <data-extraction-rules> does not exist.
+
+    android:allowBackup="false" already disables backup on these versions, so nothing here can actually
+    take effect — it is declared because the platform pairs `fullBackupContent` with
+    `dataExtractionRules` and Android Lint (AndroidLintDataExtractionRules) flags an app that sets the
+    API 31+ file without its older counterpart. Keeping both means the intent survives if allowBackup is
+    ever flipped: this sample has nothing worth restoring, only re-derivable engine cache.
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>
