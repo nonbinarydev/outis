@@ -7,9 +7,23 @@
 
 [![Quality gate](https://sonarcloud.io/api/project_badges/measure?project=nonbinarydev_outis&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nonbinarydev_outis) [![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=nonbinarydev_outis&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=nonbinarydev_outis) [![detekt](https://github.com/nonbinarydev/outis/actions/workflows/detekt.yml/badge.svg)](https://github.com/nonbinarydev/outis/actions/workflows/detekt.yml) [![Qodana](https://github.com/nonbinarydev/outis/actions/workflows/qodana_code_quality.yml/badge.svg)](https://github.com/nonbinarydev/outis/actions/workflows/qodana_code_quality.yml)
 
-***No one player.*** A Kotlin Multiplatform video player for **Android, iOS and Web**: one
+## ***No one player.*** 
+
+A Kotlin Multiplatform video player for **Android, iOS and Web**: one
 engine-agnostic API, plus an optional Compose Multiplatform UI. Write your playback logic once; each
 platform runs its native engine underneath — so there is no single player here, which is rather the point.
+
+<table>
+<tr>
+<td width="72%"><img src="docs/img/demo-web.jpg" alt="The Outis sample running in a browser: catalogue-driven player with the shared Compose controls"></td>
+<td><img src="docs/img/demo-android.png" alt="The same sample on an Android phone, playing an adaptive DASH ladder"></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><em>The same Compose UI on both, with Shaka Player and Media3 underneath. 
+
+Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo</a>, or read the <a href="sample/">sample</a>.<br></em></td>
+</tr>
+</table>
 
 | Platform | Engine |
 |---|---|
