@@ -6,6 +6,7 @@
 
 package dev.nonbinary.outis.sample
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
@@ -36,8 +38,11 @@ import dev.nonbinary.outis.core.VideoPlayer
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
+import dev.nonbinary.outis.sample.generated.resources.Res
+import dev.nonbinary.outis.sample.generated.resources.outis_lockup
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import dev.nonbinary.outis.ui.PlayerView
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * Big Buck Bunny as an adaptive HLS ladder. Chosen because its master playlist is all `avc1` — no
@@ -51,6 +56,9 @@ private const val STREAM_URL = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u
 
 /** Widescreen. The surface is letterboxed within it rather than cropped, matching ContentScale.Fit. */
 private const val ASPECT_16_9 = 16f / 9f
+
+/** Tall enough to read the descriptor under the wordmark, short enough not to crowd the player. */
+private val LOCKUP_HEIGHT = 120.dp
 
 /**
  * The whole sample: construct a player, load one item, render it.
@@ -85,29 +93,59 @@ fun App(appContext: AppContext, modifier: Modifier = Modifier) {
 
     val state by player.state.collectAsState()
 
+    // Hoisted, because the layout has to react to it. `PlayerWindow.isFullscreen` is purely the host's
+    // report — the SDK only picks the expand/collapse icon from it and never changes layout itself, so
+    // filling the screen is this application's job. Requesting browser fullscreen without also doing
+    // this leaves the page filling the display and the player still a small box in the middle of it.
+    val window = rememberSampleWindow(player)
+
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .widthIn(max = 960.dp)
-                        .fillMaxWidth()
-                        .aspectRatio(ASPECT_16_9)
-                        .background(Color.Black),
-                ) {
-                    PlayerView(player, modifier = Modifier.fillMaxSize())
-                }
-
-                Text(
-                    text = statusLine(state.playbackState, state.error?.category?.name),
-                    style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 16.dp),
+            if (window.isFullscreen) {
+                PlayerView(
+                    player,
+                    modifier = Modifier.fillMaxSize().background(Color.Black),
+                    window = window,
                 )
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    // The dark-ground lockup: the sample runs a dark colour scheme, and this variant is
+                    // the one drawn with light ink and a transparent background.
+                    Image(
+                        painter = painterResource(Res.drawable.outis_lockup),
+                        contentDescription = "Outis — a Kotlin Multiplatform video player",
+                        // Padding before height: modifiers apply outside-in, so height last means the
+                        // lockup gets its full LOCKUP_HEIGHT and the gap sits below it. The other order
+                        // would make 24.dp of the 72.dp be padding.
+                        modifier = Modifier.padding(bottom = 24.dp).height(LOCKUP_HEIGHT),
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = 960.dp)
+                            .fillMaxWidth()
+                            .aspectRatio(ASPECT_16_9)
+                            .background(Color.Black),
+                    ) {
+                        PlayerView(
+                            player,
+                            modifier = Modifier.fillMaxSize(),
+                            // Supplying this is what makes the fullscreen button appear at all.
+                            window = window,
+                        )
+                    }
+
+                    Text(
+                        text = statusLine(state.playbackState, state.error?.category?.name),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
             }
         }
     }

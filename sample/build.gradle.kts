@@ -61,9 +61,18 @@ kotlin {
                 implementation(compose.foundation)
                 implementation(compose.ui)
                 implementation(compose.material3)
+                // Generates typed accessors for src/commonMain/composeResources — the lockup shown
+                // above the player.
+                implementation(compose.components.resources)
             }
         }
     }
+}
+
+// Without this the accessor package is derived from the project path ("outis.sample.generated
+// .resources"), which does not match the module's own package and reads as a mistake in imports.
+compose.resources {
+    packageOfResClass = "dev.nonbinary.outis.sample.generated.resources"
 }
 
 detekt {
