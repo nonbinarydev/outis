@@ -98,3 +98,13 @@ per-platform actual:
 Runs on Android, iOS and Web. The overlay + controls are validated by compilation and review; full
 rendering, D-pad navigation and PiP are best verified on a real device/TV (there is no runnable UI
 test target in this module yet).
+
+Published for `android`, `iosArm64`, `iosSimulatorArm64` and `js` — **no `jvm`, no `wasmJs`**, so a
+`commonMain` dependency only resolves if that source set's targets are a subset of those.
+
+## See also
+
+- [The Compose UI guide](../docs/ui.md) — the same ground in depth: every building block, the input
+  model, and the four tiers of customisation
+- [`:core`](../core/README.md) — the player this module renders
+- [Documentation index](../docs/README.md)

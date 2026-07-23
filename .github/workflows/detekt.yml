@@ -1,0 +1,112 @@
+# Static analysis with detekt (ktlint rules included via detekt's formatting ruleset).
+#
+# Two jobs, because Apple targets cannot be analysed on Linux — the Kotlin/Native platform libraries
+# for iOS only exist on a macOS host with Xcode. Splitting keeps the common case on the cheap runner.
+#
+# NOTE ON TASK CHOICE: the plain `detekt` task runs WITHOUT type resolution, so rules such as
+# UnnecessaryNotNullOperator, RedundantSuspendModifier, IgnoredReturnValue and the UnusedPrivate*
+# family never execute. The per-target tasks below are the point of this workflow — detektJvmMain and
+# detektAndroidMain resolve types (and therefore also compile), which is strictly more analysis than
+# the aggregate task performs.
+#
+# autoCorrect is disabled whenever CI is set (see core/build.gradle.kts), so these runs report rather
+# than rewriting the checkout.
+
+name: detekt
+
+on:
+  pull_request:
+  push:
+    branches: [main, development]
+  workflow_dispatch:
+
+concurrency:
+  group: detekt-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write   # required to upload SARIF to code scanning
+
+jobs:
+  jvm:
+    name: Common, JVM, Android, JS, Wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Run detekt
+        run: |
+          ./gradlew --no-daemon \
+            :core:detektMetadataCommonMain :core:detektMetadataWebMain \
+            :core:detektJvmMain :core:detektJvmTest \
+            :core:detektAndroidMain \
+            :core:detektJsMain :core:detektWasmJsMain \
+            :ui:detektMetadataCommonMain \
+            :ui:detektAndroidMain \
+            :ui:detektJsMain
+
+      # Runs even on failure: a red build is exactly when the findings are worth reading.
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .
+          category: detekt-jvm
+
+      - name: Upload HTML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: detekt-reports-jvm
+          path: '**/build/reports/detekt/*.html'
+          if-no-files-found: ignore
+
+  apple:
+    name: iOS and Apple metadata
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # No type resolution is available for Kotlin/Native, so these are parse-level only — but they
+      # are the ONLY analysis iosMain gets anywhere in CI. Qodana cannot see these files at all.
+      - name: Run detekt
+        run: |
+          ./gradlew --no-daemon \
+            :core:detektMetadataIosMain \
+            :core:detektIosArm64Main :core:detektIosSimulatorArm64Main \
+            :ui:detektMetadataIosMain :ui:detektMetadataAppleMain :ui:detektMetadataNativeMain \
+            :ui:detektIosArm64Main :ui:detektIosSimulatorArm64Main
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .
+          category: detekt-apple
+
+      - name: Upload HTML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: detekt-reports-apple
+          path: '**/build/reports/detekt/*.html'
+          if-no-files-found: ignore

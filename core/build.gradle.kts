@@ -155,6 +155,18 @@ detekt {
     autoCorrect = System.getenv("CI") == null
 }
 
+// SARIF feeds GitHub code scanning, which puts findings inline on the pull request diff rather than
+// leaving them in a log nobody opens. The per-source-set tasks each emit their own file.
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    reports {
+        sarif.required.set(true)
+        html.required.set(true)
+        txt.required.set(true)
+        xml.required.set(false)
+        md.required.set(false)
+    }
+}
+
 dokka {
     moduleName.set("Outis Core")
     dokkaSourceSets.configureEach {

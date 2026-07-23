@@ -95,6 +95,7 @@ fun start(appContext: AppContext): VideoPlayer {
 | [Analytics and QoS](docs/analytics.md) | `PlayerComponent`, the native handle, which events fire where. |
 | [Platform support](docs/platform-support.md) | Requirements, published targets, per-platform gaps. |
 | [Troubleshooting](docs/troubleshooting.md) | Symptom, cause, fix. |
+| Module reference | [`outis-core`](core/README.md) · [`outis-ui`](ui/README.md) — the per-module API notes that ship to Maven Central. |
 | Full index | [docs/README.md](docs/README.md) |
 
 ## Threading and lifecycle

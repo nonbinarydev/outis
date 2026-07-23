@@ -98,15 +98,30 @@ live edge on `ERROR_CODE_BEHIND_LIVE_WINDOW`, and iOS nudges a wedged player aft
 (Android/Web self-recover natively) — both reported via `PlayerEvent.PlaybackRecovered(reason)`, not
 `FatalError`.
 
+## Ads
+
+Both insertion models ship, and they work differently:
+
+- **Server-side (SSAI)** — `AdController` is an engine-agnostic cue-point tracker in `commonMain`,
+  driven by *your* app: no engine reads `AdConfig.ServerSide`, the stitched stream plays unchanged, and
+  you feed positions in. Includes parsers for MediaTailor avails JSON and SCTE-35 cues in HLS
+  playlists. See [../docs/ads-server-side.md](../docs/ads-server-side.md).
+- **Client-side (CSAI)** — Google IMA, wired inside the engines on **Android and Web only**. Surfaced
+  through `PlayerState.adState`, whose populated fields differ between those two engines. iOS has the
+  bridge (`updateAdState`, `setAdContainer`, `adContainer`) but no adapter ships. See
+  [../docs/ads-client-side.md](../docs/ads-client-side.md).
+
 ## Reserved for the roadmap (present but unused in v1)
 
 - **Video-quality selection** — `PlayerState.{currentTrack, availableTracks}`, `VideoFormat`
   (audio/text selection *is* shipped; video-rendition selection is not).
-- **Ads** — `PlayerState.adState`, `AdState`.
-- **Offline** — `MediaSource.LocalFile` (produced by a future download manager).
-- **QoS events emitted-but-unconsumed** — `BitrateChanged` / `BandwidthSample` / `DroppedFrames` are
-  emitted now so a Conviva/Mux adapter attaches to a populated stream later.
-- **`wasmJs` engine** — headless stub.
+- **Offline** — `MediaSource.LocalFile` plays today, but there is no download manager to produce those
+  files.
+- **QoS events on non-Android engines** — `BitrateChanged` / `BandwidthSample` / `DroppedFrames` are
+  emitted by the Media3 engine only; the iOS and Web engines expose no comparable callback that this
+  SDK currently maps. See [../docs/analytics.md](../docs/analytics.md).
+- **`wasmJs` and `jvm` engines** — both targets compile the full API and throw
+  `UnsupportedOperationException` on construction. `jvm` exists so `commonTest` runs fast.
 
 ## Known platform gaps
 

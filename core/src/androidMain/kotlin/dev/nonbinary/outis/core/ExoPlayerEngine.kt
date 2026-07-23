@@ -58,6 +58,7 @@ import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -105,6 +106,11 @@ import com.google.ads.interactivemedia.v3.api.AdEvent as ImaAdEvent
 internal class ExoPlayerEngine(
     context: Context,
     private val config: PlayerConfig,
+    /**
+     * Where blocking container parsing runs. Injected rather than hardcoded so a test can pass a
+     * deterministic dispatcher; the default is the only value production uses.
+     */
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : VideoPlayer {
 
     private val _state = MutableStateFlow(PlayerState(volume = config.initialVolume))
@@ -358,6 +364,11 @@ internal class ExoPlayerEngine(
         if (present) component.detach()
     }
 
+    // detekt's UnreachableCode fires on the elvis below when run with type resolution. It is wrong:
+    // the flagged line is the FIRST statement in the lambda, so nothing can precede it. The cause is
+    // TrackSelectionOverride being a Media3 (Java) platform type — the analysis treats the map lookup
+    // as non-null and concludes the `?: return` branch is dead. Track selection works on device.
+    @Suppress("UnreachableCode")
     override fun selectTrack(track: MediaTrack) = onPlayerThread { exo ->
         val override = trackOverrides[track.id] ?: return@onPlayerThread
         exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
@@ -585,7 +596,7 @@ internal class ExoPlayerEngine(
     /** Parse embedded chapters from a local file off-thread and publish them — no-op for remote sources. */
     private fun extractChaptersAsync(item: MediaItem) {
         val path = localFilePath(item) ?: return
-        scope.launch(Dispatchers.IO) {
+        scope.launch(ioDispatcher) {
             val chapters = runCatching {
                 RandomAccessFile(File(path), "r").use { raf ->
                     ChapterExtractor.extract(
