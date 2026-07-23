@@ -2,8 +2,14 @@
 
 # Sample
 
-A minimal Compose Multiplatform application that plays one stream through `PlayerView`, and the
-catalogue a fuller sample would draw on.
+A Compose Multiplatform application that plays the published catalogue through `PlayerView`, or any
+stream you paste in. It runs on Android, iOS and the web from one shared `App()`.
+
+The **Videos** dialog holds two ways of choosing what to play: the catalogue, fetched at runtime from
+`catalogue.json` so the stream list changes without a rebuild, and a custom-stream form that builds a
+`MediaItem` by hand — URL, container, DRM scheme, licence server and FairPlay certificate. **Player
+settings** is a placeholder; `PlayerConfig` is fixed at construction, so changing it means rebuilding
+the player and restoring position.
 
 ## The application
 

@@ -11,6 +11,7 @@ plugins {
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
     alias(libs.plugins.jetbrainsCompose)
     alias(libs.plugins.kotlinComposeCompiler)
+    alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.detekt)
 }
 
@@ -68,16 +69,39 @@ kotlin {
                 // Generates typed accessors for src/commonMain/composeResources — the lockup shown
                 // above the player.
                 implementation(compose.components.resources)
+
+                // The catalogue is fetched at runtime rather than bundled, so the stream list can change
+                // without shipping a new build. Ktor and Koin are the sample's own dependencies — the SDK
+                // ships neither, and nothing here is required to consume :core or :ui.
+                implementation(libs.koin.core)
+                implementation(libs.koin.compose)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
 
         val androidMain by getting {
             dependencies {
+                implementation(libs.ktor.client.okhttp)
                 // WindowInsetsControllerCompat, for the immersive fullscreen toggle. It arrives
                 // transitively via activity-compose, but the fullscreen implementation imports it
                 // directly, so it is declared directly — an transitive dependency that a refactor
                 // upstream could drop is not something to compile against by accident.
                 implementation(libs.androidx.core.ktx)
+            }
+        }
+
+        // Typed accessor, not `by getting`: the hierarchy template materialises iosMain lazily, so an
+        // eager lookup fails with "KotlinSourceSet with name 'iosMain' not found".
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+        }
+
+        val jsMain by getting {
+            dependencies {
+                implementation(libs.ktor.client.js)
             }
         }
     }

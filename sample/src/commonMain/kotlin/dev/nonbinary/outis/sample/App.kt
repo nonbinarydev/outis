@@ -8,14 +8,19 @@ package dev.nonbinary.outis.sample
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
@@ -24,7 +29,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,105 +43,79 @@ import androidx.compose.ui.unit.dp
 import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.VideoPlayer
-import dev.nonbinary.outis.core.source.MediaItem
-import dev.nonbinary.outis.core.source.MediaSource
-import dev.nonbinary.outis.core.source.MimeType
+import dev.nonbinary.outis.sample.catalogue.CatalogueItem
+import dev.nonbinary.outis.sample.catalogue.CatalogueRepository
+import dev.nonbinary.outis.sample.catalogue.CatalogueState
+import dev.nonbinary.outis.sample.catalogue.toMediaItem
+import dev.nonbinary.outis.sample.di.sampleModule
 import dev.nonbinary.outis.sample.generated.resources.Res
 import dev.nonbinary.outis.sample.generated.resources.outis_lockup
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import dev.nonbinary.outis.ui.PlayerView
 import dev.nonbinary.outis.ui.controls.DefaultControls
 import org.jetbrains.compose.resources.painterResource
+import org.koin.compose.KoinApplication
+import org.koin.compose.koinInject
 
-/**
- * Big Buck Bunny as an adaptive HLS ladder. Chosen because its master playlist is all `avc1` — no
- * in-band parameter sets — so every engine can play it: Media3, AVPlayer and Shaka alike. No DRM, so
- * there is no CDM to negotiate and nothing platform-specific to go wrong.
- *
- * That makes it the right stream for a smoke test: if this does not play, the problem is the
- * integration, not the content.
- */
-private const val STREAM_URL = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
-
-/** Widescreen. The surface is letterboxed within it rather than cropped, matching ContentScale.Fit. */
 private const val ASPECT_16_9 = 16f / 9f
-
-/** Tall enough to read the descriptor under the wordmark, short enough not to crowd the player. */
-private val LOCKUP_HEIGHT = 120.dp
-
-/** Beyond this the player stops growing, so a wide desktop window doesn't get a wall of video. */
 private val PLAYER_MAX_WIDTH = 960.dp
-
-/** Breathing room between the window edge and anything drawn in it. */
 private val EDGE_PADDING = 16.dp
-
-/** Gap between the lockup's baseline and the top of the player. */
+private val LOCKUP_HEIGHT = 128.dp
 private val LOCKUP_GAP = 24.dp
-
-/** Gap between the bottom of the player and the top of the status line. */
 private val STATUS_GAP = 16.dp
 
-/**
- * The whole sample: construct a player, load one item, render it.
- *
- * Deliberately minimal. There is no catalogue, no navigation and no custom chrome — `PlayerView`'s
- * own `DefaultControls` are what a consumer gets out of the box, and showing them unmodified is the
- * point.
- */
-@OptIn(ExperimentalPlayerUiApi::class)
+/** Starts Koin around the app. `KoinApplication` remembers the container, so this runs once. */
 @Composable
 fun App(appContext: AppContext, modifier: Modifier = Modifier) {
-    // Constructed once and tied to this composition. Engines are main-thread-affine, which is where a
-    // composable body runs, and `release()` is idempotent so the DisposableEffect is safe.
+    KoinApplication(application = { modules(sampleModule) }) {
+        AppContent(appContext, modifier)
+    }
+}
+
+@OptIn(ExperimentalPlayerUiApi::class)
+@Composable
+private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
     val player = remember { VideoPlayer(appContext) }
     DisposableEffect(player) {
         onDispose { player.release() }
     }
 
-    LaunchedEffect(player) {
-        player.setMediaItem(
-            MediaItem(
-                MediaSource.Url(STREAM_URL),
-                mimeType = MimeType.HLS,
-                // Browsers block unmuted autoplay from a non-interactive context, and a visitor who
-                // has never interacted with this origin is exactly that. Without this the demo shows a
-                // black rectangle that never starts. The controls carry a mute toggle to turn it up.
-                startMuted = true,
-            ),
-            autoPlay = true,
-        )
+    val repository = koinInject<CatalogueRepository>()
+    val catalogue by produceState<CatalogueState>(CatalogueState.Loading, repository) {
+        value = repository.load()
+    }
+
+    var selected by remember { mutableStateOf<CatalogueItem?>(null) }
+    var showSource by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+
+    // First item of the first rail, once the catalogue arrives. Keyed on the state so it runs on the
+    // transition to Ready rather than on every recomposition, and never overrides a user's choice.
+    LaunchedEffect(catalogue) {
+        val ready = catalogue as? CatalogueState.Ready ?: return@LaunchedEffect
+        if (selected == null) selected = ready.catalogue.rails.firstOrNull()?.items?.firstOrNull()
+    }
+    LaunchedEffect(selected) {
+        selected?.let { player.setMediaItem(it.toMediaItem(), autoPlay = true) }
     }
 
     val state by player.state.collectAsState()
-
-    // Hoisted, because the layout has to react to it. `PlayerWindow.isFullscreen` is purely the host's
-    // report — the SDK only picks the expand/collapse icon from it and never changes layout itself, so
-    // filling the screen is this application's job. Requesting browser fullscreen without also doing
-    // this leaves the page filling the display and the player still a small box in the middle of it.
     val window = rememberSampleWindow(player)
+    val immersive = window.isFullscreen || window.isInPip
 
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = modifier.fillMaxSize()) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                // Picture-in-picture resizes the *host's own window* down to the PiP tile — it does not
-                // hand the player a separate surface. So the same rule applies as for fullscreen: fill
-                // what we are given. Laying out the windowed arrangement inside a PiP tile puts a
-                // centred 16:9 player inside a 16:9 tile with the margins still applied, which is what
-                // a black border all the way around actually is.
-                val fullscreen = window.isFullscreen || window.isInPip
-                val playerSize = if (fullscreen) {
+                val playerSize = if (immersive) {
                     DpSize(maxWidth, maxHeight)
                 } else {
                     windowedPlayerSize(maxWidth - EDGE_PADDING * 2, maxHeight - EDGE_PADDING * 2)
                 }
-                val halfPlayerHeight = playerSize.height / 2
+                val halfPlayer = playerSize.height / 2
+                val centreY = maxHeight / 2
 
-                // ONE PlayerView, sized differently — not one per branch. Two call sites either side of
-                // an `if` are two different composables to Compose, so toggling fullscreen would dispose
-                // one and create the other. On web that is not cosmetic: PlayerSurface removes the
-                // <video> from the DOM on dispose, which drops it out of picture-in-picture and
-                // restarts buffering. Keeping it first among the Box's children also keeps its slot
-                // stable as the sibling content below appears and disappears.
+                // One PlayerView, sized by mode. The dialog is a sibling, so opening it never moves or
+                // rebuilds the surface.
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -143,89 +125,106 @@ fun App(appContext: AppContext, modifier: Modifier = Modifier) {
                     PlayerView(
                         player,
                         modifier = Modifier.fillMaxSize(),
-                        // Supplying this is what makes the fullscreen and PiP buttons appear at all.
                         window = window,
-                        // No chrome in the PiP tile: it is too small to hit, the system draws its own
-                        // controls over it, and touches go to the system rather than to us anyway.
                         controls = { if (!window.isInPip) DefaultControls() },
                     )
                 }
 
-                if (!fullscreen) {
-                    // Both are anchored to TopCenter and pushed down with padding, rather than laid out
-                    // in a Column, because a Column centres the *whole stack* — which is what put the
-                    // player below the middle of the window by half the height of the logo and status.
-                    // Anchoring from the top also lets the status line grow downwards at a large font
-                    // scale instead of being clipped to a fixed band.
-                    val centreY = maxHeight / 2
-                    val spaceAbovePlayer = centreY - halfPlayerHeight
-
-                    if (spaceAbovePlayer >= LOCKUP_HEIGHT + LOCKUP_GAP + EDGE_PADDING) {
-                        // The dark-ground lockup: the sample runs a dark colour scheme, and this variant
-                        // is the one drawn with light ink on a transparent background. Dropped entirely
-                        // rather than shrunk when the window is too short — an illegible 30dp lockup is
-                        // worse than none, and the player must not move to make room for it.
-                        //
-                        // The guard above is also what keeps this padding non-negative (which would
-                        // throw): it is exactly spaceAbovePlayer - LOCKUP_GAP - LOCKUP_HEIGHT, so the
-                        // condition leaves at least EDGE_PADDING.
+                if (!immersive) {
+                    // Anchored to the player's edges rather than laid out in a Column, so the player
+                    // stays on the centre line instead of being pushed down by the lockup above it.
+                    val spaceAbove = centreY - halfPlayer
+                    if (spaceAbove >= LOCKUP_HEIGHT + LOCKUP_GAP + EDGE_PADDING) {
                         Image(
                             painter = painterResource(Res.drawable.outis_lockup),
                             contentDescription = "Outis — a Kotlin Multiplatform video player",
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
-                                .padding(top = spaceAbovePlayer - LOCKUP_GAP - LOCKUP_HEIGHT)
+                                .padding(top = spaceAbove - LOCKUP_GAP - LOCKUP_HEIGHT)
                                 .height(LOCKUP_HEIGHT),
                         )
                     }
 
-                    Text(
-                        text = statusLine(state.playbackState, state.error?.category?.name),
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
+                    Column(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
-                            .padding(
-                                top = centreY + halfPlayerHeight + STATUS_GAP,
-                                start = EDGE_PADDING,
-                                end = EDGE_PADDING,
-                            ),
-                    )
+                            .padding(top = centreY + halfPlayer + STATUS_GAP, start = EDGE_PADDING, end = EDGE_PADDING),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = statusLine(catalogue, selected, state.playbackState, state.error?.category?.name),
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                        )
+                        Row(
+                            modifier = Modifier.padding(top = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Button(onClick = { showSource = true }) { Text("Videos") }
+                            OutlinedButton(onClick = { showSettings = true }) { Text("Player settings") }
+                        }
+                    }
                 }
             }
+        }
+
+        if (showSource && !immersive) {
+            SourceDialog(
+                catalogue = catalogue,
+                selectedId = selected?.id,
+                onSelect = {
+                    selected = it
+                    showSource = false
+                },
+                onDismiss = { showSource = false },
+            )
+        }
+
+        if (showSettings && !immersive) {
+            PlayerSettingsDialog(onDismiss = { showSettings = false })
         }
     }
 }
 
 /**
- * The player's size in the windowed layout: as wide as it is allowed to get, then 16:9, then shrunk to
- * fit if that would be taller than the window.
- *
- * The height clamp is what stops a tall-and-narrow window (a phone in portrait, a half-width browser)
- * producing a player taller than the space it has. `aspectRatio` alone does not do this — it satisfies
- * the ratio against the incoming width and lets the result overflow vertically.
+ * 16:9 within the space allowed, capped so a wide desktop window does not get a wall of video, and
+ * shrunk to fit when the window is short — `aspectRatio` alone satisfies the ratio against the incoming
+ * width and lets the result overflow vertically.
  */
 private fun windowedPlayerSize(availableWidth: Dp, availableHeight: Dp): DpSize {
     val width = minOf(availableWidth, PLAYER_MAX_WIDTH)
     val height = width / ASPECT_16_9
     return if (height <= availableHeight) {
-        DpSize(width, height)
+        DpSize(
+            width,
+            height
+        )
     } else {
         DpSize(availableHeight * ASPECT_16_9, availableHeight)
     }
 }
 
-/**
- * A one-line readout of what the player is doing. This is the actual point of the smoke test: it
- * distinguishes "nothing rendered" from "rendered but never became ready", which look identical on a
- * black surface.
- */
-private fun statusLine(playbackState: PlaybackState, errorCategory: String?): String = when {
-    errorCategory != null -> "Failed — $errorCategory. See the browser console or logcat for the engine's own code."
-    playbackState == PlaybackState.IDLE -> "Idle — no media loaded yet."
-    playbackState == PlaybackState.BUFFERING -> "Buffering…"
-    playbackState == PlaybackState.READY -> "Playing Big Buck Bunny over HLS — muted, so autoplay is not blocked."
-    playbackState == PlaybackState.ENDED -> "Ended."
-    else -> playbackState.name
+/** One line saying what the player is doing, and where the stream list came from. */
+private fun statusLine(
+    catalogue: CatalogueState,
+    selected: CatalogueItem?,
+    playbackState: PlaybackState,
+    errorCategory: String?,
+): String {
+    val source = when {
+        catalogue is CatalogueState.Ready && catalogue.fromFallback ->
+            "Catalogue unavailable — playing the built-in stream"
+        selected != null -> selected.label ?: selected.title
+        else -> "No item selected"
+    }
+    val playback = when {
+        errorCategory != null -> "failed — $errorCategory"
+        playbackState == PlaybackState.IDLE -> "idle"
+        playbackState == PlaybackState.BUFFERING -> "buffering…"
+        playbackState == PlaybackState.READY -> "playing"
+        playbackState == PlaybackState.ENDED -> "ended"
+        else -> playbackState.name.lowercase()
+    }
+    return "$source · $playback"
 }

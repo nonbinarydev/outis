@@ -16,6 +16,7 @@ readable. That is the whole point of keeping them.
 | [0003](0003-analytics-adapters-bind-natively.md) | Analytics adapters bind to the native player, not to `PlayerEvent` | Accepted |
 | [0004](0004-static-analysis-split.md) | Three analysers, with distinct responsibilities | Accepted |
 | [0005](0005-branching-strategy.md) | `main` + `development` + short-lived topic branches | Accepted |
+| [0006](0006-demo-form-input-in-compose.md) | The demo's stream-tester form is Compose, not DOM inputs on web | Accepted |
 
 ## Writing a new one
 
