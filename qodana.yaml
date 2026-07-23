@@ -54,9 +54,11 @@ projectJDK: "21"
 # /opt/android-sdk, and carries the same free Community licence. (Note: "qodana-android", without the
 # jvm- prefix, is the Ultimate-tier image and is NOT free — the names are easy to confuse.)
 #
-# UNVERIFIED: whether this image's IDE build can import AGP 9.1.1 with the
-# com.android.kotlin.multiplatform.library plugin. Treat the first run as an experiment and check
-# <results-dir>/projectStructure for androidMain modules — a zero-finding run is not proof of success.
+# VERIFIED, the hard way: this image's IDE build caps at AGP 9.0.0. On AGP 9.1.1 the Gradle build
+# itself succeeded and the *IDE model import* then refused outright — "The project is using an
+# incompatible version (AGP 9.1.1)... Latest supported version is AGP 9.0.0" — so Qodana analysed
+# nothing at all. `agp` in gradle/libs.versions.toml is pinned to 9.0.0 to keep this working; raising
+# it breaks this job until a linter image with a newer bundled IDE is available.
 linter: jetbrains/qodana-jvm-android:2026.1
 
 include:
