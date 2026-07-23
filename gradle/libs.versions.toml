@@ -1,27 +1,28 @@
 [versions]
-# Raised back to 9.1.1 as one half of an experiment — see qodana.yaml, which moves to the 2026.2 EAP
-# linter at the same time. The 2026.1 linter's bundled IDE refuses to import anything past 9.0.0, so
-# these two versions have to move together: revert BOTH or neither.
+# Tied to the linter in qodana.yaml, which must stay on 2026.2-eap or newer: the 2026.1 image's bundled
+# IDE refuses to import anything past AGP 9.0.0 and analyses nothing at all. Lower AGP only together
+# with that, never alone.
 #
-# 9.1.1 also matters beyond the linter. AGP 9.0.0 bundles R8 9.0.32, which predates Kotlin 2.4.10 and
-# cannot parse its metadata — every build logs "Unexpected error during rewriting of Kotlin metadata"
-# for PlayerState, AdEvent$AdCompleted and others. AGP 9.1's R8 is new enough to read it.
+# 9.1.x also matters beyond the linter. AGP 9.0.0 bundles R8 9.0.32, which predates Kotlin 2.4.10 and
+# cannot parse its metadata — every build logged "Unexpected error during rewriting of Kotlin metadata"
+# for PlayerState, AdEvent$AdCompleted and others. AGP 9.1's R8 reads it, and those are gone.
 agp = "9.1.1"
 kotlin = "2.4.10"
 android-minSdk = "24"
 android-compileSdk = "37"
 
-# 2.11.0 and androidx.core 1.19.0 are available, and Android Lint nags for both, but each requires
-# compileSdk 37 (checkAarMetadata fails hard on 36). Raising compileSdk is a deliberate change of its
-# own — new APIs become callable and new lint checks apply — so these stay put until that is decided.
+# This and androidx.core below both require compileSdk 37 — checkAarMetadata fails hard on 36, so
+# lowering android-compileSdk without also lowering these two breaks the Android build outright.
 androidx-lifecycle = "2.11.0"
 desugarJdkLibs = "2.1.5"
 androidxActivity = "1.13.0"
-androidxCore = "1.19.0" # see the note on androidx-lifecycle: 1.19.0 needs compileSdk 37
+androidxCore = "1.19.0" # needs compileSdk 37, as androidx-lifecycle above
 composePlugin = "1.11.1"
 detekt = "1.23.8"
 detektCompose = "0.6.3"
 detektCompose2 = "1.4.0"
+koin = "4.1.0"
+ktor = "3.5.0"
 dokka = "2.2.0"
 ktlint = "14.2.0"
 guava = "33.6.0-android" # matches the Guava that Media3 resolves; declared so the IDE sees Tracks' ImmutableList
@@ -45,6 +46,16 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 napier = { module = "io.github.aakira:napier", version.ref = "napier" }
+
+# Sample only — the SDK itself ships no DI container and no HTTP client.
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
 
 # Android — Media3 playback engine (core) and the View-based PlayerView surface (ui).
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
