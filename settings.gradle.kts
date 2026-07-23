@@ -34,3 +34,4 @@ rootProject.name = "outis"
 
 include(":core")
 include(":ui")
+include(":sample")
