@@ -16,6 +16,13 @@ import androidx.compose.runtime.Immutable
  * A button self-hides when its capability is absent: [onToggleFullscreen] `== null` hides the
  * fullscreen button; `!isPipSupported || onEnterPip == null` hides the PIP button.
  *
+ * **You do not need to memoise the callbacks.** Building a fresh instance with fresh lambdas on every
+ * composition pass is fine and expected. This is a `data class` whose `equals` includes three
+ * function-typed properties, so such an instance is essentially never equal to its predecessor — but
+ * nothing in `:ui` keys an effect or a `remember` on the instance any more. The window is tracked
+ * through `rememberUpdatedState` and effects are keyed on the controls state instead, so a rebuilt
+ * window no longer restarts the gesture detector or re-registers the web keyboard listener.
+ *
  * On Android, `rememberPlayerWindow` (androidMain, so not linkable from here) wires all of this to the
  * Activity for you. On iOS/web the host implements the same callbacks
  * (`AVPictureInPictureController` / `requestPictureInPicture()` + `requestFullscreen()`).
