@@ -62,14 +62,16 @@ kotlin {
                 implementation(compose.material3)
                 implementation(compose.materialIconsExtended)
                 implementation(libs.androidx.lifecycle.runtime.compose)
-                implementation(libs.kotlinx.collections.immutable)
+                // kotlinx-collections-immutable arrives transitively: :core exposes ImmutableList in
+                // PlayerState and declares it `api`, so it is already on this module's compile classpath.
             }
         }
         val androidMain by getting {
             dependencies {
                 // Android surface uses the View-based PlayerView (stable API; renders subtitle cues natively).
                 implementation(libs.media3.ui)
-                implementation(libs.media3.common)
+                // media3-common likewise arrives via :core's `api(libs.media3.common)`, declared there
+                // because VideoPlayer.setAdViewProvider exposes AdViewProvider.
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.activity.ktx) // ComponentActivity PIP listener + PictureInPictureModeChangedInfo
             }
