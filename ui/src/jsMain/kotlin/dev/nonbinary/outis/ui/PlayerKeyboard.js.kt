@@ -22,10 +22,14 @@ internal actual fun PlatformPlayerKeyboard(
     window: PlayerWindow,
     isActive: () -> Boolean,
 ) {
-    // The listener is registered once and outlives recomposition, so it must not capture `isActive`
-    // directly — a caller passing a fresh lambda would keep being gated by the stale one.
+    // The listener is registered once and outlives recomposition, so it must not capture `isActive` or
+    // `window` directly — a caller passing a fresh lambda would keep being gated by the stale one.
     val currentIsActive by rememberUpdatedState(isActive)
-    DisposableEffect(state, window) {
+    // Same reasoning, and it is also why `window` is no longer an effect key. PlayerWindow is a data
+    // class of lambdas that hosts rebuild every pass, so keying on it tore down and re-registered this
+    // document listener continuously.
+    val currentWindow by rememberUpdatedState(window)
+    DisposableEffect(state) {
         val handler: (Event) -> Unit = handler@{ event ->
             if (!currentIsActive()) return@handler
             val ke = event as? KeyboardEvent ?: return@handler
@@ -40,8 +44,8 @@ internal actual fun PlatformPlayerKeyboard(
                     state.toggleMute()
                     true
                 }
-                "f" -> window.onToggleFullscreen?.let {
-                    it(!window.isFullscreen)
+                "f" -> currentWindow.onToggleFullscreen?.let {
+                    it(!currentWindow.isFullscreen)
                     true
                 } ?: false
                 else -> false

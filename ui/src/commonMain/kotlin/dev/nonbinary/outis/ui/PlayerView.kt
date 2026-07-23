@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.KeyEventType
@@ -89,7 +90,13 @@ fun PlayerView(
         }
     }
     val focusRequester = remember { FocusRequester() }
-    val scope = remember(state, window, focusRequester) { PlayerControlsScopeImpl(state, window, focusRequester) }
+    // The window is tracked as State, and nothing below is keyed on the PlayerWindow *instance*.
+    // PlayerWindow is a data class of lambdas that hosts rebuild each pass, so it is never equal to its
+    // predecessor; keying on it restarted the gesture detector on every recomposition, and a host that
+    // recomposes at playback cadence could lose taps entirely because awaitEachGesture never survived
+    // long enough to see a down and its matching up.
+    val currentWindow = rememberUpdatedState(window)
+    val scope = remember(state, focusRequester) { PlayerControlsScopeImpl(state, currentWindow, focusRequester) }
     // True while a mouse hovers the player. Gates the web keyboard shortcuts so Space etc. only act on the
     // player — when the pointer is elsewhere the page still scrolls on Space as normal.
     val pointerOver = remember { mutableStateOf(false) }
@@ -109,7 +116,7 @@ fun PlayerView(
             // Tap / click. TOUCH → toggle overlay (mobile). MOUSE → single click = play/pause (immediate);
             // a double click = fullscreen (desktop). awaitFirstDown ignores presses consumed by a control,
             // so clicking a button does only that.
-            .pointerInput(state, window) {
+            .pointerInput(state) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     if (waitForUpOrCancellation() == null) return@awaitEachGesture
@@ -122,13 +129,14 @@ fun PlayerView(
                     state.showControls()
                     // Where fullscreen is wired, a quick second click = double-click → fullscreen; undo the
                     // first play/pause so a double-click leaves playback state unchanged.
-                    val toggleFullscreen = window.onToggleFullscreen
+                    val liveWindow = currentWindow.value
+                    val toggleFullscreen = liveWindow.onToggleFullscreen
                     if (toggleFullscreen != null) {
                         val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) { awaitFirstDown() }
                         if (second != null) {
                             waitForUpOrCancellation()
                             state.playPause()
-                            toggleFullscreen(!window.isFullscreen)
+                            toggleFullscreen(!currentWindow.value.isFullscreen)
                         }
                     }
                 }

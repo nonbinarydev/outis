@@ -7,6 +7,7 @@
 package dev.nonbinary.outis.ui.controls
 
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.ui.focus.FocusRequester
 import dev.nonbinary.outis.core.VideoPlayer
 import dev.nonbinary.outis.ui.window.PlayerWindow
@@ -42,10 +43,24 @@ interface PlayerControlsScope {
     val focusRequester: FocusRequester
 }
 
+/**
+ * [window] is held as [State] rather than a value so this scope keeps a stable identity across
+ * recomposition while still reporting the current window.
+ *
+ * [PlayerWindow] is a `data class` carrying three function-typed properties, and hosts build it with
+ * fresh capturing lambdas on every composition pass, so it is essentially never `equals` to its
+ * predecessor. Constructing the scope with `remember(state, window, …)` therefore reallocated it
+ * constantly, and — worse — any effect keyed on the same instance restarted with it.
+ *
+ * Reading `window` inside a composable subscribes to the snapshot, so controls still recompose when the
+ * host reports a new fullscreen or PIP state. That is what keeps this honest as a [Stable] type: the
+ * property changes, but never without notifying the composition.
+ */
 internal class PlayerControlsScopeImpl(
     override val state: PlayerControlsState,
-    override val window: PlayerWindow,
+    private val windowState: State<PlayerWindow>,
     override val focusRequester: FocusRequester,
 ) : PlayerControlsScope {
     override val player: VideoPlayer get() = state.player
+    override val window: PlayerWindow get() = windowState.value
 }
