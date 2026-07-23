@@ -9,12 +9,12 @@ package dev.nonbinary.outis.ui.controls
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -172,7 +172,11 @@ fun BufferingIndicator(state: PlayerControlsState, modifier: Modifier = Modifier
 fun MuteButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
     IconButton(onClick = state::toggleMute, modifier = modifier.controlFocusRing()) {
         Icon(
-            imageVector = if (state.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+            imageVector = if (state.isMuted) {
+                Icons.AutoMirrored.Filled.VolumeOff
+            } else {
+                Icons.AutoMirrored.Filled.VolumeUp
+            },
             contentDescription = if (state.isMuted) "Unmute" else "Mute",
         )
     }
@@ -218,7 +222,7 @@ fun PlaybackSpeedButton(
                         if (state.playbackSpeed == speed) {
                             Icon(
                                 Icons.Filled.Check,
-                                contentDescription = null
+                                contentDescription = null,
                             )
                         }
                     },

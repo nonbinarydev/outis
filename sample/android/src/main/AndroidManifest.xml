@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The engine streams over HTTP(S); without this every load fails with a network error. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        allowBackup="false" turns off cloud backup everywhere. dataExtractionRules is still required on
+        API 31+, where it — and not allowBackup — is what governs device-to-device transfer.
+    -->
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:usesCleartextTraffic="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Outis">
+
+        <!--
+            supportsPictureInPicture is what actually permits enterPictureInPictureMode(). Without it
+            the system rejects every call with IllegalStateException, which :ui catches and reports as
+            "did not enter" — so the button renders (support is judged from the device feature and the
+            AppOps grant, neither of which can see this attribute) and then does nothing when tapped.
+
+            configChanges is handled here rather than by the system, and PiP requires it: entering PiP
+            is a configuration change, so without screenSize|smallestScreenSize|screenLayout the
+            Activity would be recreated on the way in, tearing down and rebuilding the player. The same
+            declaration keeps rotation from dropping playback position and re-buffering.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:supportsPictureInPicture="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:theme="@style/Theme.Outis">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

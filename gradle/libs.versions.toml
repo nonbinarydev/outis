@@ -1,11 +1,15 @@
 [versions]
-agp = "9.1.1"
+# Held at 9.0.0 deliberately: the qodana-jvm-android:2026.1 image's bundled IDE refuses to import
+# anything newer, and Qodana gates PRs. See the note in qodana.yaml before raising this.
+agp = "9.0.0"
 kotlin = "2.4.10"
 android-minSdk = "24"
 android-compileSdk = "36"
 
 androidx-lifecycle = "2.10.0"
+desugarJdkLibs = "2.1.5"
 androidxActivity = "1.13.0"
+androidxCore = "1.18.0"
 composePlugin = "1.11.1"
 detekt = "1.23.8"
 detektCompose = "0.4.22"
@@ -46,14 +50,20 @@ media3-common = { module = "androidx.media3:media3-common", version.ref = "media
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 
 androidx-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
+# The ANDROIDX lifecycle, not the org.jetbrains multiplatform one above: ComponentActivity
+# implements androidx.lifecycle.LifecycleOwner, so Android code calling it needs this supertype.
+androidx-lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime", version.ref = "androidx-lifecycle" }
+desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidxActivity" }
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "androidxActivity" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
 
 [plugins]
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidKotlinMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "composePlugin" }

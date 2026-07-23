@@ -1,7 +1,41 @@
 [Outis](../README.md) › Sample
 
-# Sample catalogue
+# Sample
 
+A minimal Compose Multiplatform application that plays one stream through `PlayerView`, and the
+catalogue a fuller sample would draw on.
+
+## The application
+
+`:sample` is a Kotlin Multiplatform module deliberately kept to one screen: construct a `VideoPlayer`,
+load a single item, render it with the SDK's own `DefaultControls`. No catalogue browsing, no custom
+chrome, no third-party design system — what a consumer gets out of the box, shown unmodified.
+
+It plays Big Buck Bunny over HLS. That stream is chosen because its master playlist is all `avc1`, with
+no in-band parameter sets, so Media3, AVPlayer and Shaka can all decode it, and it carries no DRM. If it
+does not play, the problem is the integration rather than the content — which is what makes it useful as
+a smoke test.
+
+A status line under the video reports the `PlaybackState`, because "nothing rendered" and "rendered but
+never became ready" look identical on a black surface.
+
+### Running it
+
+The web target is the one that runs today:
+
+```bash
+./gradlew :sample:jsBrowserRun        # local dev server
+./gradlew :sample:jsBrowserDistribution   # the bundle published to /demo/
+```
+
+The production bundle takes several minutes — Compose for web ships skiko, which is large.
+
+Android and iOS targets **compile**, which is what makes this a portability check rather than a
+web-only sample, but neither has a host application yet: Android needs an `com.android.application`
+module and iOS needs an Xcode project. `mainViewController()` in `iosMain` is the entry point an iOS
+host would present.
+
+## The catalogue
 `catalogue.json` is the stream list the sample application plays. It is kept here and published to
 GitHub Pages, so the list can change without rebuilding and redistributing the app:
 
