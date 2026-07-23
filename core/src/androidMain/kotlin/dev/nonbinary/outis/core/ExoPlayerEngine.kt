@@ -8,7 +8,6 @@ package dev.nonbinary.outis.core
 
 import android.content.Context
 import android.media.MediaDrm
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -16,6 +15,7 @@ import android.util.Log
 import android.view.ViewGroup
 import android.view.accessibility.CaptioningManager
 import android.widget.FrameLayout
+import androidx.core.net.toUri
 import androidx.media3.common.AdOverlayInfo
 import androidx.media3.common.AdViewProvider
 import androidx.media3.common.C
@@ -397,6 +397,11 @@ internal class ExoPlayerEngine(
                 Player.STATE_READY ->
                     if (lastPlaybackState == Player.STATE_BUFFERING) emit { p, t -> PlayerEvent.BufferingEnded(p, t) }
                 Player.STATE_ENDED -> emit { p, t -> PlayerEvent.Ended(p, t) }
+                // Idle carries no event of its own: it is reached by release, by a fatal error (which
+                // onPlayerError already reported), or before the first load. The PlaybackStateChanged
+                // below still carries it. Stated explicitly rather than left to fall through, so the
+                // omission reads as a decision — which is also what SwitchIntDef asks for.
+                Player.STATE_IDLE -> Unit
             }
             emit { p, t -> PlayerEvent.PlaybackStateChanged(mapPlaybackState(playbackState), p, t) }
             // A pending seek has settled once the player reaches READY again (after any re-buffer).
@@ -612,7 +617,7 @@ internal class ExoPlayerEngine(
                             override val size: Long get() = raf.length()
                             override fun readAt(offset: Long, length: Int): ByteArray {
                                 val total = raf.length()
-                                if (offset < 0 || offset >= total || length <= 0) return ByteArray(0)
+                                if (offset !in 0 until total || length <= 0) return ByteArray(0)
                                 val n = minOf(length.toLong(), total - offset).toInt()
                                 val buf = ByteArray(n)
                                 raf.seek(offset)
@@ -735,7 +740,7 @@ private fun MediaItem.toExoMediaItem(liveConfig: LiveConfig?): ExoMediaItem {
         .apply { drmConfig?.toExoDrmConfiguration()?.let { setDrmConfiguration(it) } }
         .apply {
             (adConfig as? AdConfig.ClientSide)?.let {
-                setAdsConfiguration(ExoMediaItem.AdsConfiguration.Builder(Uri.parse(it.adTagUri)).build())
+                setAdsConfiguration(ExoMediaItem.AdsConfiguration.Builder(it.adTagUri.toUri()).build())
             }
         }
         .apply {

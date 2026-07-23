@@ -15,8 +15,10 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Rational
 import androidx.activity.ComponentActivity
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +27,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.PictureInPictureModeChangedInfo
 import androidx.core.util.Consumer
 import dev.nonbinary.outis.core.VideoPlayer
+import dev.nonbinary.outis.ui.PlayerSurfaceBounds
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 // Android rejects a picture-in-picture aspect ratio outside 1:2.39 .. 2.39:1, so a source outside
 // that range is entered without an explicit ratio rather than throwing. The bounds are reciprocal,
@@ -61,7 +66,7 @@ fun rememberPlayerWindow(
         if (componentActivity == null) {
             onDispose { }
         } else {
-            // The dedicated listener, not a LifecycleEventObserver reading isInPictureInPictureMode.
+            // The dedicated listener, not a LifecycleEventObserver, reading isInPictureInPictureMode.
             // Entering PIP dispatches ON_PAUSE as well, and the order of that against the mode flag is
             // not guaranteed — so a lifecycle observer can sample the flag before it flips and report
             // the previous mode. This callback carries the new value with it, so there is nothing to
@@ -77,6 +82,21 @@ fun rememberPlayerWindow(
             componentActivity.addOnPictureInPictureModeChangedListener(onPipChanged)
             onDispose { componentActivity.removeOnPictureInPictureModeChangedListener(onPipChanged) }
         }
+    }
+
+    // Auto-enter has to be armed *before* the user leaves, so the Activity's standing params are kept
+    // in-step with playback rather than being built at the moment PIP is requested.
+    //
+    // Collected in an effect rather than read through collectAsState. PlayerState carries the playback
+    // position, which changes on every poll. Observing it as Compose state would therefore recompose
+    // this — and everything reading the returned PlayerWindow — several times a second, to watch one
+    // boolean that rarely changes. distinctUntilChanged reduces it to the transitions that matter.
+    LaunchedEffect(activity, pipSupported) {
+        if (!pipSupported || activity == null) return@LaunchedEffect
+        player.state
+            .map { it.isPlaying }
+            .distinctUntilChanged()
+            .collect { isPlaying -> activity.updatePipParams(player, autoEnter = isPlaying) }
     }
 
     return PlayerWindow(
@@ -109,17 +129,68 @@ private fun Activity.isPipAllowed(): Boolean {
     if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return false
     return try {
         val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            appOps.checkOpNoThrow(AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName)
-        } else {
-            @Suppress("DEPRECATION")
-            appOps.checkOpNoThrow(AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName)
-        }
+        // One unconditional call, deliberately. This used to branch on API 29 to reach
+        // unsafeCheckOpNoThrow, because checkOpNoThrow was deprecated in favour of it — but API 36
+        // reversed that: unsafeCheckOpNoThrow is now the deprecated one and its own docs point back
+        // here. checkOpNoThrow has existed since API 19 and this function has already returned for
+        // anything below API 26, so there is no version left for a branch to serve.
+        val mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName)
         // MODE_DEFAULT means "fall back to the platform default", which for PIP is allowed; only
         // an explicit IGNORED/ERRORED should hide the button.
         mode == AppOpsManager.MODE_ALLOWED || mode == AppOpsManager.MODE_DEFAULT
     } catch (_: Exception) {
         false
+    }
+}
+
+/**
+ * The params describing this player's PIP tile: the video's aspect ratio, and the on-screen rectangle
+ * the system animates *from*.
+ *
+ * Without a `sourceRectHint` the shrink animation starts from the whole window and visibly jumps. The
+ * rectangle comes from the surface itself, recorded by `PlayerSurface` as it is laid out.
+ *
+ * Not an extension on Activity: it reads only the player and the recorded bounds, so a receiver would
+ * be decoration. Annotated rather than version-checked because both callers already gate — [enterPip]
+ * on API 26, [updatePipParams] on API 31 — and re-checking here would only hide a future caller that
+ * does not.
+ */
+@RequiresApi(Build.VERSION_CODES.O)
+private fun pipParams(player: VideoPlayer): PictureInPictureParams.Builder {
+    val builder = PictureInPictureParams.Builder()
+    val size = player.state.value.videoSize
+    if (size != null && size.width > 0 && size.height > 0) {
+        val ratio = size.width.toDouble() / size.height.toDouble()
+        if (ratio in MIN_PIP_ASPECT_RATIO..MAX_PIP_ASPECT_RATIO) {
+            builder.setAspectRatio(Rational(size.width, size.height))
+        }
+    }
+    PlayerSurfaceBounds.of(player)?.let(builder::setSourceRectHint)
+    return builder
+}
+
+/**
+ * Keeps the Activity's standing PIP params current. Turns **auto-enter** on only while something is
+ * actually playing.
+ *
+ * Auto-enter is what makes the home gesture drop a playing video into a PIP tile rather than
+ * backgrounding it. It cannot be requested at the moment of entry, being a property the Activity
+ * carries in advance, which is why this is a standing subscription rather than part of [enterPip].
+ *
+ * Gating it on playback matters. Left permanently on, backgrounding a *paused* player would also open
+ * a PIP tile, which is not what a user leaving a paused video expects.
+ *
+ * API 31+ only. Below that, auto-enter does not exist and PIP stays button-driven.
+ */
+private fun Activity.updatePipParams(player: VideoPlayer, autoEnter: Boolean) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    try {
+        setPictureInPictureParams(pipParams(player).setAutoEnterEnabled(autoEnter).build())
+    } catch (_: IllegalStateException) {
+        // Finishing, or otherwise refusing params. Nothing to recover: PIP simply stays unavailable,
+        // and it is never surfaced to the user because no request was made.
+    } catch (_: IllegalArgumentException) {
+        // Rejected params (an aspect ratio the platform dislikes). Same handling, same reason.
     }
 }
 
@@ -129,17 +200,9 @@ private fun Activity.enterPip(player: VideoPlayer, onUnavailable: (() -> Unit)?)
         return false
     }
     return try {
-        val builder = PictureInPictureParams.Builder()
-        val size = player.state.value.videoSize
-        if (size != null && size.width > 0 && size.height > 0) {
-            val ratio = size.width.toDouble() / size.height.toDouble()
-            if (ratio in MIN_PIP_ASPECT_RATIO..MAX_PIP_ASPECT_RATIO) {
-                builder.setAspectRatio(Rational(size.width, size.height))
-            }
-        }
         // enterPictureInPictureMode returns false when the system silently declines (multi-window,
         // OEM policy, transient state) — honour it instead of always reporting success.
-        val entered = enterPictureInPictureMode(builder.build())
+        val entered = enterPictureInPictureMode(pipParams(player).build())
         if (!entered) onUnavailable?.invoke()
         entered
     } catch (_: IllegalStateException) {

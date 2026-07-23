@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Near-black rather than pure black so the icon reads as a shape on a black launcher wallpaper.
+         Deliberately not purple: that reads as JetBrains/Kotlin branding rather than this project. -->
+    <color name="ic_launcher_background">#14131A</color>
+</resources>

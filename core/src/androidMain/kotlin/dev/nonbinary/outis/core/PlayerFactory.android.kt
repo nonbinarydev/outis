@@ -21,7 +21,7 @@ internal actual fun createPlatformPlayer(context: AppContext, config: PlayerConf
 /**
  * Single construction point for the [ExoPlayer] — **player-level** config only: load-control (buffers),
  * the cold-start bandwidth meter, and audio attributes / focus. Per-item concerns (request headers,
- * retry/timeouts, DRM) are built per [MediaItem] in [ExoPlayerEngine]'s `buildMediaSource`, which is the
+ * retry/timeouts, DRM) are built per [dev.nonbinary.outis.core.source.MediaItem] in [ExoPlayerEngine]'s `buildMediaSource`, which is the
  * seam the roadmap injects through:
  * - **Ads:** an ad-tag `AdsConfiguration` on each `ExoMediaItem` (in `toExoMediaItem`) plus
  *   `DefaultMediaSourceFactory.setLocalAdInsertionComponents(...)` with an `ImaAdsLoader`.
