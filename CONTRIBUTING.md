@@ -80,9 +80,36 @@ Prose documentation lives in `docs/`. Two rules that matter more than style:
   data class changes `copy` and `componentN` arity. Consumers recompile. This is called out in
   [CHANGELOG.md](CHANGELOG.md) whenever it happens.
 
+## Branching
+
+`main` is always releasable and carries the tags. `development` is the integration branch. Work happens
+on short-lived topic branches cut from `development`, and lands back there by pull request;
+`development` merges into `main` when a release is cut.
+
+Name branches `type/number-short-description`, where the number is the issue being addressed and the
+type is a [Conventional Commits](https://www.conventionalcommits.org/) type:
+
+```
+fix/1-core-api-dependencies
+feat/42-offline-download-manager
+build/17-explicit-api-mode
+docs/23-analytics-guide
+ci/8-cache-key
+chore/12-bump-media3
+```
+
+The name drives no automation — issues are closed by `Closes #1` in the pull request body, not by the
+branch. It exists so `git branch` is readable, so keep it short.
+
+There are no `release/` or `hotfix/` branches. They exist to let a team stabilise a release while
+others keep merging, which does not apply here. For an urgent fix against a published version, branch
+from the tag and merge the result into both `main` and `development`.
+
 ## Pull requests
 
-- Branch from `main`.
+- Branch from `development`, and target `development`.
+- Open a pull request even for your own work: the test workflow only runs on `pull_request`, so a
+  commit pushed straight to `development` is never tested.
 - Keep the change focused; a PR that fixes a bug and reformats a file is two PRs.
 - Run `./gradlew build` and the type-resolution detekt tasks locally first.
 - Explain what you observed, not just what you changed — especially for anything touching an engine,

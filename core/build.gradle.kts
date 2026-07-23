@@ -77,8 +77,17 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.collections.immutable)
+                // `api`, not `implementation`: these two appear in this module's PUBLIC signatures, so
+                // consumers need them on their COMPILE classpath. `implementation` publishes into
+                // runtimeElements but not apiElements, so `player.state.collect { }` would fail with
+                // "Cannot access class 'kotlinx.coroutines.flow.StateFlow'" unless the consumer happened
+                // to declare the same library themselves.
+                //   StateFlow / SharedFlow / CoroutineScope  -> VideoPlayer.state, .events, PlayerHost
+                //   ImmutableList / ImmutableMap             -> PlayerState tracks + chapters, MediaItem.headers
+                api(libs.kotlinx.coroutines.core)
+                api(libs.kotlinx.collections.immutable)
+
+                // These three appear in no public signature, so they stay implementation-scoped.
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.napier)
@@ -96,6 +105,13 @@ kotlin {
 
         val androidMain by getting {
             dependencies {
+                // `api` because exactly one public declaration exposes a Media3 type:
+                // `VideoPlayer.setAdViewProvider(provider: AdViewProvider?)` (ExoPlayerEngine.kt), the
+                // documented entry point for hosting the CSAI ad overlay. AdViewProvider lives in
+                // media3-common, so only that artifact is promoted — the exoplayer artifacts below stay
+                // implementation-scoped so the engine itself is not part of this module's API.
+                api(libs.media3.common)
+
                 // Media3 engine only — the Compose surface lives in :ui.
                 implementation(libs.media3.exoplayer)
                 implementation(libs.media3.exoplayer.hls)
