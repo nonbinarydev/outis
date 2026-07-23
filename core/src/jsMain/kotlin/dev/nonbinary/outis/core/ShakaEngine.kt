@@ -362,7 +362,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         val fresh = shaka.Player()
         wireShaka(fresh)
         shakaPlayer = fresh
-        return old.destroy().catch { it }.then<dynamic>({ _ ->
+        return old.destroy().catch { it }.then({ _ ->
             if (released) js("Promise.resolve()") else fresh.attach(video)
         })
     }
@@ -435,7 +435,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         // Reset Shaka before the new source: recreate it if a prior load wedged it (unload() can't
         // recover a Safari DRM failure), otherwise just unload to clear the previous content.
         val reset: dynamic = if (shakaBroken) recreateShaka() else shakaPlayer.unload()
-        return reset.then<dynamic>(
+        return reset.then(
             { _ -> onReset(generation, progressive, item, url) },
             { _ -> onReset(generation, progressive, item, url) }, // proceed even if reset rejected
         )

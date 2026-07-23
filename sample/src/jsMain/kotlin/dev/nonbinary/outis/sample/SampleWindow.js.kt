@@ -64,7 +64,7 @@ actual fun rememberSampleWindow(player: VideoPlayer): PlayerWindow {
     // PiP button stayed hidden until some *unrelated* state change — toggling fullscreen — forced a
     // recomposition that re-read it. Observed through the same event the surface uses, it is correct
     // from the first frame, and it also survives the engine attaching a replacement element.
-    val video by produceState<HTMLVideoElement?>(player.nativePlayerHandle as? HTMLVideoElement, player) {
+    val video by produceState(player.nativePlayerHandle as? HTMLVideoElement, player) {
         value = player.nativePlayerHandle as? HTMLVideoElement
         player.events.collect { event ->
             if (event is PlayerEvent.NativePlayerAttached) value = event.handle as? HTMLVideoElement
@@ -113,7 +113,6 @@ actual fun rememberSampleWindow(player: VideoPlayer): PlayerWindow {
             } else {
                 document.asDynamic().exitFullscreen()
             }
-            Unit
         },
         onEnterPip = { video?.requestPip() == true },
     )

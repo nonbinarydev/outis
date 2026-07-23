@@ -61,7 +61,7 @@ actual fun PlayerSurface(
     surfaceType: SurfaceType,
     showSubtitles: Boolean,
 ) {
-    val video by produceState<HTMLVideoElement?>(player.nativePlayerHandle as? HTMLVideoElement, player) {
+    val video by produceState(player.nativePlayerHandle as? HTMLVideoElement, player) {
         value = player.nativePlayerHandle as? HTMLVideoElement
         player.events.collect { event ->
             if (event is PlayerEvent.NativePlayerAttached) value = event.handle as? HTMLVideoElement

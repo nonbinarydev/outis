@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Launcher icon for API 24-25, which predate adaptive icons. `mipmap-anydpi-v26` is the more specific
+    qualifier, so API 26+ takes the adaptive version and never sees this one.
+
+    Self-contained (background and mark in one vector) because there is no adaptive-icon layering here
+    to composite them; it draws its own rounded-square keyline instead of relying on a launcher mask.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#14131A"
+        android:pathData="M22,4 L86,4 A18,18 0 0 1 104,22 L104,86 A18,18 0 0 1 86,104 L22,104 A18,18 0 0 1 4,86 L4,22 A18,18 0 0 1 22,4 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,28 A26,26 0 1 1 31.48,41"
+        android:strokeColor="#F2EFE9"
+        android:strokeLineCap="round"
+        android:strokeWidth="9" />
+</vector>

@@ -112,6 +112,11 @@ kotlin {
                 // implementation-scoped so the engine itself is not part of this module's API.
                 api(libs.media3.common)
 
+                // KTX extensions (String.toUri). It would arrive transitively via media3, but this
+                // source set imports from it directly, and compiling against another module's
+                // transitive graph is what left :ui reporting MISSING_DEPENDENCY_SUPERCLASS.
+                implementation(libs.androidx.core.ktx)
+
                 // Media3 engine only — the Compose surface lives in :ui.
                 implementation(libs.media3.exoplayer)
                 implementation(libs.media3.exoplayer.hls)
