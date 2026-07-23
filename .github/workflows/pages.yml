@@ -50,8 +50,8 @@ jobs:
           mkdir -p _site
           cp -r site/. _site/
           cp sample/catalogue.json _site/catalogue.json
-          cp docs/img/lockup-light-1273w.png _site/lockup-light.png
-          cp docs/img/lockup-dark-1273w.png  _site/lockup-dark.png
+          cp docs/img/lockup-light.svg _site/lockup-light.svg
+          cp docs/img/lockup-dark.svg  _site/lockup-dark.svg
           # Jekyll would otherwise ignore files and directories beginning with an underscore.
           touch _site/.nojekyll
           echo "--- published files ---"
