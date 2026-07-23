@@ -413,6 +413,14 @@ internal class ExoPlayerEngine(
 
         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) = syncState()
 
+        // setPlaybackSpeed goes straight to ExoPlayer and does not touch _state, so without this the
+        // speed ExoPlayer is actually using never reaches PlayerState. syncState() already reads
+        // playbackParameters.speed; nothing was calling it. Playback changed speed correctly while the
+        // controls stayed pinned to the last synced value — and a seek would belatedly correct them,
+        // because resolveSeek() is the only other path that syncs.
+        override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) =
+            syncState()
+
         override fun onPositionDiscontinuity(
             oldPosition: Player.PositionInfo,
             newPosition: Player.PositionInfo,
