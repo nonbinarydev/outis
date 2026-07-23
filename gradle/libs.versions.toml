@@ -1,5 +1,7 @@
 [versions]
-agp = "9.1.1"
+# Held at 9.0.0 deliberately: the qodana-jvm-android:2026.1 image's bundled IDE refuses to import
+# anything newer, and Qodana gates PRs. See the note in qodana.yaml before raising this.
+agp = "9.0.0"
 kotlin = "2.4.10"
 android-minSdk = "24"
 android-compileSdk = "36"
