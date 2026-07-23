@@ -19,6 +19,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'sample/catalogue.json'
       - 'sample/**'
       - 'site/**'
       - 'docs/img/lockup-*'
