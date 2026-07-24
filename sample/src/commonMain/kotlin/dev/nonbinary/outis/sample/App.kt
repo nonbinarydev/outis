@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -48,6 +50,7 @@ import dev.nonbinary.outis.sample.catalogue.CatalogueRepository
 import dev.nonbinary.outis.sample.catalogue.CatalogueState
 import dev.nonbinary.outis.sample.catalogue.toMediaItem
 import dev.nonbinary.outis.sample.di.sampleModule
+import dev.nonbinary.outis.sample.diagnostics.DiagnosticsLog
 import dev.nonbinary.outis.sample.generated.resources.Res
 import dev.nonbinary.outis.sample.generated.resources.outis_lockup
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
@@ -56,6 +59,7 @@ import dev.nonbinary.outis.ui.controls.DefaultControls
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
+import org.koin.dsl.koinConfiguration
 
 private const val ASPECT_16_9 = 16f / 9f
 private val PLAYER_MAX_WIDTH = 960.dp
@@ -67,7 +71,10 @@ private val STATUS_GAP = 16.dp
 /** Starts Koin around the app. `KoinApplication` remembers the container, so this runs once. */
 @Composable
 fun App(appContext: AppContext, modifier: Modifier = Modifier) {
-    KoinApplication(application = { modules(sampleModule) }) {
+    // koinConfiguration + the KoinConfiguration overload — the KoinAppDeclaration-lambda form is
+    // deprecated in Koin 4.2. Built once via remember so the container is not rebuilt on recomposition.
+    val config = remember { koinConfiguration { modules(sampleModule) } }
+    KoinApplication(config) {
         AppContent(appContext, modifier)
     }
 }
@@ -81,6 +88,13 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
     }
 
     val repository = koinInject<CatalogueRepository>()
+    val diagnostics = koinInject<DiagnosticsLog>()
+
+    // Observe only — every line is a real player event, so the log never affects playback. Kept for the
+    // life of the player so a stall that arrives minutes in is still captured.
+    LaunchedEffect(player) {
+        player.events.collect { diagnostics.record(it) }
+    }
     val catalogue by produceState<CatalogueState>(CatalogueState.Loading, repository) {
         value = repository.load()
     }
@@ -88,6 +102,7 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
     var selected by remember { mutableStateOf<CatalogueItem?>(null) }
     var showSource by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showDiagnostics by remember { mutableStateOf(false) }
 
     // First item of the first rail, once the catalogue arrives. Keyed on the state so it runs on the
     // transition to Ready rather than on every recomposition, and never overrides a user's choice.
@@ -96,7 +111,10 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
         if (selected == null) selected = ready.catalogue.rails.firstOrNull()?.items?.firstOrNull()
     }
     LaunchedEffect(selected) {
-        selected?.let { player.setMediaItem(it.toMediaItem(), autoPlay = true) }
+        selected?.let {
+            diagnostics.note("Stream selected", it.label ?: it.title)
+            player.setMediaItem(it.toMediaItem(), autoPlay = true)
+        }
     }
 
     val state by player.state.collectAsState()
@@ -131,59 +149,98 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
                 }
 
                 if (!immersive) {
-                    // Anchored to the player's edges rather than laid out in a Column, so the player
-                    // stays on the centre line instead of being pushed down by the lockup above it.
-                    val spaceAbove = centreY - halfPlayer
-                    if (spaceAbove >= LOCKUP_HEIGHT + LOCKUP_GAP + EDGE_PADDING) {
-                        Image(
-                            painter = painterResource(Res.drawable.outis_lockup),
-                            contentDescription = "Outis — a Kotlin Multiplatform video player",
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = spaceAbove - LOCKUP_GAP - LOCKUP_HEIGHT)
-                                .height(LOCKUP_HEIGHT),
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .padding(top = centreY + halfPlayer + STATUS_GAP, start = EDGE_PADDING, end = EDGE_PADDING),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            text = statusLine(catalogue, selected, state.playbackState, state.error?.category?.name),
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center,
-                        )
-                        Row(
-                            modifier = Modifier.padding(top = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Button(onClick = { showSource = true }) { Text("Videos") }
-                            OutlinedButton(onClick = { showSettings = true }) { Text("Player settings") }
-                        }
-                    }
+                    OverlayChrome(
+                        lockupSpaceAbove = centreY - halfPlayer,
+                        statusTop = centreY + halfPlayer + STATUS_GAP,
+                        status = statusLine(catalogue, selected, state.playbackState, state.error?.category?.name),
+                        onVideos = { showSource = true },
+                        onSettings = { showSettings = true },
+                        onDiagnostics = { showDiagnostics = true },
+                    )
                 }
             }
         }
 
-        if (showSource && !immersive) {
-            SourceDialog(
-                catalogue = catalogue,
-                selectedId = selected?.id,
-                onSelect = {
-                    selected = it
-                    showSource = false
-                },
-                onDismiss = { showSource = false },
-            )
-        }
+        SourceDialogs(
+            show = DialogFlags(showSource, showSettings, showDiagnostics),
+            immersive = immersive,
+            catalogue = catalogue,
+            diagnostics = diagnostics,
+            selected = selected,
+            onSelect = {
+                selected = it
+                showSource = false
+            },
+            onDismissSource = { showSource = false },
+            onDismissSettings = { showSettings = false },
+            onDismissDiagnostics = { showDiagnostics = false },
+        )
+    }
+}
 
-        if (showSettings && !immersive) {
-            PlayerSettingsDialog(onDismiss = { showSettings = false })
+/** The lockup, status line and the three buttons — the non-player furniture, hidden while immersive. */
+@Composable
+private fun BoxWithConstraintsScope.OverlayChrome(
+    lockupSpaceAbove: Dp,
+    statusTop: Dp,
+    status: String,
+    onVideos: () -> Unit,
+    onSettings: () -> Unit,
+    onDiagnostics: () -> Unit,
+) {
+    if (lockupSpaceAbove >= LOCKUP_HEIGHT + LOCKUP_GAP + EDGE_PADDING) {
+        Image(
+            painter = painterResource(Res.drawable.outis_lockup),
+            contentDescription = "Outis — a Kotlin Multiplatform video player",
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = lockupSpaceAbove - LOCKUP_GAP - LOCKUP_HEIGHT)
+                .height(LOCKUP_HEIGHT),
+        )
+    }
+    Column(
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .fillMaxWidth()
+            .padding(top = statusTop, start = EDGE_PADDING, end = EDGE_PADDING),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(status, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+        Row(
+            modifier = Modifier.padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Button(onClick = onVideos) { Text("Videos") }
+            OutlinedButton(onClick = onSettings) { Text("Player settings") }
+            TextButton(onClick = onDiagnostics) { Text("Diagnostics") }
         }
+    }
+}
+
+private data class DialogFlags(val source: Boolean, val settings: Boolean, val diagnostics: Boolean)
+
+/** The three overlays, lifted out of [AppContent] so its body stays under the complexity threshold. */
+@Composable
+private fun SourceDialogs(
+    show: DialogFlags,
+    immersive: Boolean,
+    catalogue: CatalogueState,
+    diagnostics: DiagnosticsLog,
+    selected: CatalogueItem?,
+    onSelect: (CatalogueItem) -> Unit,
+    onDismissSource: () -> Unit,
+    onDismissSettings: () -> Unit,
+    onDismissDiagnostics: () -> Unit,
+) {
+    if (immersive) return
+    if (show.source) {
+        SourceDialog(catalogue, selected?.id, onSelect, onDismissSource)
+    }
+    if (show.settings) {
+        PlayerSettingsDialog(onDismiss = onDismissSettings)
+    }
+    if (show.diagnostics) {
+        DiagnosticsDialog(diagnostics, selected?.label ?: selected?.title, onDismissDiagnostics)
     }
 }
 
