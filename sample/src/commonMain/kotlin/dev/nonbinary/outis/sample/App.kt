@@ -42,6 +42,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import dev.nonbinary.outis.analytics.mux.MuxAnalytics
+import dev.nonbinary.outis.analytics.mux.MuxConfig
 import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.VideoPlayer
@@ -49,8 +51,11 @@ import dev.nonbinary.outis.sample.catalogue.CatalogueItem
 import dev.nonbinary.outis.sample.catalogue.CatalogueRepository
 import dev.nonbinary.outis.sample.catalogue.CatalogueState
 import dev.nonbinary.outis.sample.catalogue.toMediaItem
+import dev.nonbinary.outis.sample.consent.ConsentCategory
+import dev.nonbinary.outis.sample.consent.ConsentManager
 import dev.nonbinary.outis.sample.di.sampleModule
 import dev.nonbinary.outis.sample.diagnostics.DiagnosticsLog
+import dev.nonbinary.outis.sample.generated.SampleConfig
 import dev.nonbinary.outis.sample.generated.resources.Res
 import dev.nonbinary.outis.sample.generated.resources.outis_lockup
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
@@ -60,6 +65,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 import org.koin.dsl.koinConfiguration
+import org.koin.dsl.module
 
 private const val ASPECT_16_9 = 16f / 9f
 private val PLAYER_MAX_WIDTH = 960.dp
@@ -73,7 +79,13 @@ private val STATUS_GAP = 16.dp
 fun App(appContext: AppContext, modifier: Modifier = Modifier) {
     // koinConfiguration + the KoinConfiguration overload — the KoinAppDeclaration-lambda form is
     // deprecated in Koin 4.2. Built once via remember so the container is not rebuilt on recomposition.
-    val config = remember { koinConfiguration { modules(sampleModule) } }
+    // AppContext is provided into the graph so DI can build things that need it (the consent store's
+    // SharedPreferences on Android). Keyed on appContext so a new context rebuilds the container.
+    val config = remember(appContext) {
+        koinConfiguration {
+            modules(module { single { appContext } }, sampleModule)
+        }
+    }
     KoinApplication(config) {
         AppContent(appContext, modifier)
     }
@@ -103,6 +115,12 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
     var showSource by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
+    var showConsentManage by remember { mutableStateOf(false) }
+
+    val consent = koinInject<ConsentManager>()
+    val consentState by consent.state.collectAsState()
+
+    MuxQosBinding(player, appContext, consentState.isGranted(ConsentCategory.PERFORMANCE))
 
     // First item of the first rail, once the catalogue arrives. Keyed on the state so it runs on the
     // transition to Ready rather than on every recomposition, and never overrides a user's choice.
@@ -111,9 +129,9 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
         if (selected == null) selected = ready.catalogue.rails.firstOrNull()?.items?.firstOrNull()
     }
     LaunchedEffect(selected) {
-        selected?.let {
-            diagnostics.note("Stream selected", it.label ?: it.title)
-            player.setMediaItem(it.toMediaItem(), autoPlay = true)
+        selected?.let { item ->
+            diagnostics.note("Stream selected", item.label ?: item.title)
+            player.setMediaItem(item.toMediaItem(series = seriesOf(catalogue, item)), autoPlay = true)
         }
     }
 
@@ -174,9 +192,47 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
             onDismissSource = { showSource = false },
             onDismissSettings = { showSettings = false },
             onDismissDiagnostics = { showDiagnostics = false },
+            onManagePrivacy = {
+                showSettings = false
+                showConsentManage = true
+            },
         )
+
+        // Shown until a first-run choice is made (non-dismissable), or on demand from Player settings.
+        // Nothing collects before a choice, because the adapters attach only once their category is
+        // granted. Hidden while immersive, like the other dialogs.
+        if ((!consentState.decided || showConsentManage) && !immersive) {
+            ConsentDialog(
+                manager = consent,
+                firstRun = !consentState.decided,
+                onClose = { showConsentManage = false },
+            )
+        }
     }
 }
+
+/**
+ * Binds the Mux QoS adapter to [player] while Performance consent stands. The adapter is built only when
+ * a build supplies an env key (otherwise null and skipped). Revoking consent disposes the effect, which
+ * removes the component and does not re-add — so collection stops live, not on the next launch.
+ */
+@Composable
+private fun MuxQosBinding(player: VideoPlayer, appContext: AppContext, performanceGranted: Boolean) {
+    val mux = remember {
+        SampleConfig.MUX_ENV_KEY.takeIf { it.isNotBlank() }?.let {
+            MuxAnalytics(appContext, MuxConfig(envKey = it, playerName = "outis-sample"))
+        }
+    }
+    DisposableEffect(mux, performanceGranted) {
+        if (mux != null && performanceGranted) player.addComponent(mux)
+        onDispose { mux?.let(player::removeComponent) }
+    }
+}
+
+/** The title of the rail [item] sits in, for QoS grouping — the item alone does not know its rail. */
+private fun seriesOf(catalogue: CatalogueState, item: CatalogueItem): String? =
+    (catalogue as? CatalogueState.Ready)?.catalogue?.rails
+        ?.firstOrNull { rail -> rail.items.any { it.id == item.id } }?.title
 
 /** The lockup, status line and the three buttons — the non-player furniture, hidden while immersive. */
 @Composable
@@ -231,13 +287,14 @@ private fun SourceDialogs(
     onDismissSource: () -> Unit,
     onDismissSettings: () -> Unit,
     onDismissDiagnostics: () -> Unit,
+    onManagePrivacy: () -> Unit,
 ) {
     if (immersive) return
     if (show.source) {
         SourceDialog(catalogue, selected?.id, onSelect, onDismissSource)
     }
     if (show.settings) {
-        PlayerSettingsDialog(onDismiss = onDismissSettings)
+        PlayerSettingsDialog(onDismiss = onDismissSettings, onManagePrivacy = onManagePrivacy)
     }
     if (show.diagnostics) {
         DiagnosticsDialog(diagnostics, selected?.label ?: selected?.title, onDismissDiagnostics)

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,7 +37,7 @@ private val DIALOG_MAX_WIDTH = 560.dp
  * ones that can change live, like volume and speed, are already in the player's own controls.
  */
 @Composable
-fun PlayerSettingsDialog(onDismiss: () -> Unit) {
+fun PlayerSettingsDialog(onDismiss: () -> Unit, onManagePrivacy: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             modifier = Modifier.fillMaxWidth().widthIn(max = DIALOG_MAX_WIDTH).padding(16.dp),
@@ -52,6 +53,12 @@ fun PlayerSettingsDialog(onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 8.dp),
                 )
+                OutlinedButton(
+                    onClick = onManagePrivacy,
+                    modifier = Modifier.padding(top = 16.dp),
+                ) {
+                    Text("Privacy & data")
+                }
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.padding(top = 16.dp).align(Alignment.End),

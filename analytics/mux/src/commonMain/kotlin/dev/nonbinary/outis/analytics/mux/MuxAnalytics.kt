@@ -9,7 +9,10 @@ package dev.nonbinary.outis.analytics.mux
 import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
 /**
@@ -29,7 +32,8 @@ import kotlinx.coroutines.flow.onEach
  *
  * Per-item analytics come from [dev.nonbinary.outis.core.source.MediaItem.analytics], read off the
  * player state at bind time; viewer identity is on [MuxConfig], being session-scoped rather than
- * per-video.
+ * per-video. Binding therefore waits for an item to be present and re-binds on each new one — see
+ * [attach].
  */
 class MuxAnalytics(
     private val appContext: AppContext,
@@ -39,12 +43,20 @@ class MuxAnalytics(
     private var binding: MuxBinding? = null
 
     override fun attach(host: PlayerHost) {
-        // Re-bind on every native (re)construction. A null handle tears the current binding down without
-        // starting a new one — the engine is momentarily without a player.
-        host.nativePlayerHandle
-            .onEach { handle ->
+        // Bind when BOTH a native player and a media item are present, and re-bind when either changes.
+        // bindMux snapshots the item's metadata, so binding on the handle alone would capture whatever
+        // item existed then — and on web the <video> handle exists before the catalogue loads and the
+        // first item is set, snapshotting null and sending no per-video metadata. Re-binding per item
+        // also starts a fresh Mux view for each video, which is the correct QoS semantics. A null handle
+        // (engine momentarily without a player) or null item tears the current binding down.
+        combine(
+            host.nativePlayerHandle,
+            host.state.map { it.mediaItem }.distinctUntilChanged(),
+        ) { handle, item -> handle to item }
+            .distinctUntilChanged()
+            .onEach { (handle, item) ->
                 binding?.dispose()
-                binding = if (handle == null) null else bindMux(handle, appContext, host, config)
+                binding = if (handle != null && item != null) bindMux(handle, appContext, host, config) else null
             }
             .launchIn(host.scope)
     }

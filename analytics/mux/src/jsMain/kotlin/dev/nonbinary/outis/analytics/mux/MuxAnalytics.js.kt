@@ -12,10 +12,19 @@ import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import org.w3c.dom.HTMLVideoElement
 
-/** The mux-embed default export (`mux.monitor` / `mux.destroyMonitor`). Untyped — it is plain JS. */
+/** The raw mux-embed module. Untyped — it is plain JS. */
 @JsModule("mux-embed")
 @JsNonModule
-private external val muxEmbed: dynamic
+private external val muxEmbedModule: dynamic
+
+/**
+ * The mux-embed API object (`monitor` / `destroyMonitor`). mux-embed's CJS and ESM builds — which webpack
+ * resolves for a Kotlin `@JsModule` `require` — export the API under `.default`; only the UMD build
+ * exposes it directly. Unwrap whichever we got: `.default` is `undefined` for UMD, so this falls back to
+ * the module itself. Without this, `monitor` is `undefined` and binding throws at runtime — while still
+ * compiling cleanly, since `dynamic` defers member resolution to runtime.
+ */
+private val muxEmbed: dynamic get() = muxEmbedModule.default ?: muxEmbedModule
 
 /**
  * Binds `mux-embed` to the engine's `<video>` element — which is what the web engine exposes as
