@@ -6,8 +6,25 @@ Outis does not ship an analytics integration. It ships the two things one needs:
 that already carries the fields a QoS backend asks for, and a handle on the native player for vendor
 SDKs that insist on binding to the concrete engine.
 
-Three of the QoS events are Android-only. That is the single most important fact on this page, and it
-is not a temporary gap — see [Which engine emits what](#which-engine-emits-what).
+Three of the QoS events are Android-only. That is the single most important fact for the *roll-your-own*
+path on this page, and it is not a temporary gap — see [Which engine emits what](#which-engine-emits-what).
+
+## Two paths, and which you want
+
+There are two ways to get analytics out of Outis, and they suit different goals:
+
+1. **A ready-made vendor adapter** — for Mux (and, later, others). You add a module and register it;
+   it binds the vendor's own SDK to the native player. Start here if your backend is Mux.
+   → [Mux Data adapter](analytics-mux.md)
+2. **Your own analytics off the event stream** — the rest of this page. Consume `PlayerEvent`s and
+   send them wherever you like.
+
+The distinction is not cosmetic (ADR-[0003](decisions/0003-analytics-adapters-bind-natively.md)): a
+vendor SDK like Mux instruments the **native** player and so collects bitrate, bandwidth and
+dropped-frame data on *every* platform — more than the event stream exposes, where those three are
+Android-only. So do **not** rebuild a Mux integration by hand from the events below; the adapter gets
+better data. The event path is the right tool for *your own* metrics and for anything a vendor does not
+model.
 
 ## Two streams, and which to use
 
