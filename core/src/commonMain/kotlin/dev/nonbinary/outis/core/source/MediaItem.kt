@@ -8,6 +8,7 @@ package dev.nonbinary.outis.core.source
 
 import dev.nonbinary.outis.core.ads.AdBreak
 import dev.nonbinary.outis.core.ads.AdConfig
+import dev.nonbinary.outis.core.analytics.PlaybackMetadata
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentMapOf
 
@@ -87,6 +88,13 @@ data class MediaItem(
      * are unaffected either way. Honoured on Android and iOS (local files); ignored on Web (no chapters there).
      */
     val chapterThumbnails: Boolean = false,
+    /**
+     * Vendor-neutral QoS/analytics metadata, consumed by an analytics adapter (`outis-analytics-mux`).
+     * `null` when nothing is wired — the field costs nothing and the SDK itself never reads it.
+     * Distinct from [metadata], which is *display* metadata (title/artwork); this is what a QoS backend
+     * slices sessions by.
+     */
+    val analytics: PlaybackMetadata? = null,
 )
 
 /** The SSAI ad breaks on this item, or empty if it has none. */

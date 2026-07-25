@@ -32,6 +32,8 @@ kotlinxDatetime = "0.8.0"
 kotlinxSerializationJson = "1.11.0"
 media3 = "1.10.1"
 napier = "2.7.1"
+muxData = "1.13.0"       # Mux Data SDK for AndroidX Media3 (supports Media3 1.10.x)
+muxEmbed = "5.9.0"       # mux-embed, the Mux Data JS SDK for the HTML <video> element
 maven-publish = "0.37.0"
 
 [libraries]
@@ -46,6 +48,9 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 napier = { module = "io.github.aakira:napier", version.ref = "napier" }
+
+# Analytics adapters only (outis-analytics-mux). The SDK core takes no vendor dependency.
+mux-data-media3 = { module = "com.mux.stats.sdk.muxstats:data-media3", version.ref = "muxData" }
 
 # Sample only — the SDK itself ships no DI container and no HTTP client.
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
