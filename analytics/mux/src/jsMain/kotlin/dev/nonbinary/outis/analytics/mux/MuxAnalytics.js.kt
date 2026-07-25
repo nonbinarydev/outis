@@ -12,10 +12,19 @@ import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import org.w3c.dom.HTMLVideoElement
 
-/** The mux-embed default export (`mux.monitor` / `mux.destroyMonitor`). Untyped — it is plain JS. */
+/** The raw mux-embed module. Untyped — it is plain JS. */
 @JsModule("mux-embed")
 @JsNonModule
-private external val muxEmbed: dynamic
+private external val muxEmbedModule: dynamic
+
+/**
+ * The mux-embed API object (`monitor` / `destroyMonitor`). mux-embed's CJS and ESM builds — which webpack
+ * resolves for a Kotlin `@JsModule` `require` — export the API under `.default`; only the UMD build
+ * exposes it directly. Unwrap whichever we got: `.default` is `undefined` for UMD, so this falls back to
+ * the module itself. Without this, `monitor` is `undefined` and binding throws at runtime — while still
+ * compiling cleanly, since `dynamic` defers member resolution to runtime.
+ */
+private val muxEmbed: dynamic get() = muxEmbedModule.default ?: muxEmbedModule
 
 /**
  * Binds `mux-embed` to the engine's `<video>` element — which is what the web engine exposes as
@@ -49,6 +58,8 @@ internal actual fun bindMux(
     analytics?.durationMs?.let { data.video_duration = it }
     analytics?.cdn?.let { data.video_cdn = it }
     data.video_stream_type = if (host.state.value.isLive) "live" else "on-demand"
+    // DRM comes off the source config, not the analytics bundle — it is already on the item.
+    muxDrmType(item?.drmConfig?.scheme)?.let { data.view_drm_type = it }
 
     val options: dynamic = js("{}")
     options.data = data

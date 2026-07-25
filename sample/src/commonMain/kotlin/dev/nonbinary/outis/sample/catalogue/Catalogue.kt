@@ -7,11 +7,13 @@
 package dev.nonbinary.outis.sample.catalogue
 
 import dev.nonbinary.outis.core.ads.AdConfig
+import dev.nonbinary.outis.core.analytics.PlaybackMetadata
 import dev.nonbinary.outis.core.source.DrmConfig
 import dev.nonbinary.outis.core.source.DrmScheme
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
+import dev.nonbinary.outis.sample.CUSTOM_STREAM_ID
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -71,12 +73,13 @@ data class CatalogueDrm(
 data class CatalogueAds(val type: String, val adTagUri: String? = null)
 
 /**
- * Translates a catalogue entry into the SDK's own model.
+ * Translates a catalogue entry into the SDK's own model. [series] is the rail the item was chosen from,
+ * carried into QoS metadata for grouping — the item itself does not know its rail.
  *
  * Only client-side ads are mapped. Server-side entries carry no `adTagUri` and are stitched by the
  * origin, so there is nothing for [AdConfig] to describe.
  */
-fun CatalogueItem.toMediaItem(startMuted: Boolean = true): MediaItem = MediaItem(
+fun CatalogueItem.toMediaItem(startMuted: Boolean = true, series: String? = null): MediaItem = MediaItem(
     MediaSource.Url(url),
     mimeType = mimeType,
     startMuted = startMuted,
@@ -88,4 +91,14 @@ fun CatalogueItem.toMediaItem(startMuted: Boolean = true): MediaItem = MediaItem
         )
     },
     adConfig = ads?.takeIf { it.type == "clientSide" }?.adTagUri?.let { AdConfig.ClientSide(adTagUri = it) },
+    // The descriptive [label] is the human name (the terse [title] is just the card caption, e.g. "AVC").
+    analytics = PlaybackMetadata(videoId = analyticsVideoId(), title = label ?: title, series = series),
 )
+
+/**
+ * A stable QoS id for the stream. Catalogue items key on their own [id]; custom streams all share
+ * [CUSTOM_STREAM_ID], which would collapse every ad-hoc URL into one Mux "video", so those key on the
+ * URL instead — different pastes stay distinct without leaking the full (possibly signed) URL as the id.
+ */
+private fun CatalogueItem.analyticsVideoId(): String =
+    if (id == CUSTOM_STREAM_ID) "custom-${url.trim().hashCode()}" else id
