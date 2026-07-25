@@ -34,6 +34,7 @@ Per-subsystem references. Read them in any order; each is self-contained.
 | [Server-side ads (SSAI)](ads-server-side.md) | `AdController`: the cue-point tracker your app constructs and feeds for stitched streams, with the MediaTailor and SCTE-35 parsers and the beaconing contract. No engine reads `AdConfig.ServerSide` for you. |
 | [Local files and chapters](local-files.md) | `MediaSource.LocalFile`, embedded chapter parsing for mp4 and Matroska, `PlayerState.chapters` (populated asynchronously, after load, on Android and iOS), and chapter thumbnails with their size budget. |
 | [Analytics, QoS and the plugin seam](analytics.md) | `PlayerComponent` and `PlayerHost`, the `nativePlayerHandle` escape hatch and what it actually is per platform, and which QoS events each engine emits — three of them are Android-only. |
+| [Mux Data adapter](analytics-mux.md) | The ready-made Mux QoS adapter: add the module (and Mux's non-Central repo), register `MuxAnalytics`, map per-item metadata, and inject the env key safely. Android and web today; iOS stubbed. |
 
 ## Reference
 

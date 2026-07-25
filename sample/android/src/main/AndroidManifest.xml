@@ -10,6 +10,7 @@
         API 31+, where it — and not allowBackup — is what governs device-to-device transfer.
     -->
     <application
+        tools:ignore="PictureInPictureIssue"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -43,8 +44,7 @@
             android:exported="true"
             android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
-            android:theme="@style/Theme.Outis"
-            tools:ignore="PictureInPictureIssue">
+            android:theme="@style/Theme.Outis">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -7,6 +7,9 @@
 package dev.nonbinary.outis.sample.di
 
 import dev.nonbinary.outis.sample.catalogue.CatalogueRepository
+import dev.nonbinary.outis.sample.consent.ConsentManager
+import dev.nonbinary.outis.sample.consent.consentStore
+import dev.nonbinary.outis.sample.diagnostics.DiagnosticsLog
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
@@ -33,4 +36,6 @@ val sampleModule = module {
         }
     }
     single { CatalogueRepository(get()) }
+    single { DiagnosticsLog() }
+    single { ConsentManager(consentStore(get())) }
 }

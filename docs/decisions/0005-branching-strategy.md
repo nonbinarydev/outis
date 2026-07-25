@@ -20,6 +20,15 @@ the number is the issue: `fix/1-core-api-dependencies`.
 
 No `release/` or `hotfix/` branches.
 
+Pull requests land as **merge commits**. Squash and rebase merging are disabled at both the repository
+and ruleset level, and `required_linear_history` is deliberately off.
+
+Linear history and two long-lived branches do not combine. A squash-merge of `development` into `main`
+writes a commit sharing no ancestry with the commits it replaced, so the next meeting of the two
+branches re-presents the same changes as conflicts — visible in this repo's own history as repeated
+"Merge remote-tracking branch 'origin/main' into development" commits. The cost of that outweighs a
+tidier `git log`. See issue #11, which originally chose the opposite.
+
 ## Consequences
 
 Pull requests are not ceremony here — they are the only place CI runs. Both the test and detekt
