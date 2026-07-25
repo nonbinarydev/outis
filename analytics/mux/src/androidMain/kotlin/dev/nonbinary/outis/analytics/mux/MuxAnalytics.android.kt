@@ -10,6 +10,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.mux.stats.sdk.core.model.CustomerData
 import com.mux.stats.sdk.core.model.CustomerPlayerData
 import com.mux.stats.sdk.core.model.CustomerVideoData
+import com.mux.stats.sdk.core.model.CustomerViewData
 import com.mux.stats.sdk.muxstats.monitorWithMuxData
 import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.analytics.StreamType
@@ -45,11 +46,15 @@ internal actual fun bindMux(
         analytics?.cdn?.let { videoCdn = it }
         videoStreamType = muxStreamType(analytics?.streamType, state.isLive)
     }
+    // DRM is view-level in Mux, and comes off the source config rather than the analytics bundle.
+    val viewData = CustomerViewData().apply {
+        muxDrmType(item?.drmConfig?.scheme)?.let { viewDrmType = it }
+    }
 
     val stats = player.monitorWithMuxData(
         appContext.applicationContext,
         config.envKey,
-        CustomerData(playerData, videoData, null),
+        CustomerData(playerData, videoData, viewData),
     )
     return object : MuxBinding {
         override fun dispose() = stats.release()

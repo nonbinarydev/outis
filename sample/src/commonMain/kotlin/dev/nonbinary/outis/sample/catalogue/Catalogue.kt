@@ -91,7 +91,8 @@ fun CatalogueItem.toMediaItem(startMuted: Boolean = true, series: String? = null
         )
     },
     adConfig = ads?.takeIf { it.type == "clientSide" }?.adTagUri?.let { AdConfig.ClientSide(adTagUri = it) },
-    analytics = PlaybackMetadata(videoId = analyticsVideoId(), title = title, series = series),
+    // The descriptive [label] is the human name (the terse [title] is just the card caption, e.g. "AVC").
+    analytics = PlaybackMetadata(videoId = analyticsVideoId(), title = label ?: title, series = series),
 )
 
 /**

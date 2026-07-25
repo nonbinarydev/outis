@@ -9,6 +9,7 @@ package dev.nonbinary.outis.analytics.mux
 import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
+import dev.nonbinary.outis.core.source.DrmScheme
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
@@ -100,3 +101,11 @@ internal expect fun bindMux(
     host: PlayerHost,
     config: MuxConfig,
 ): MuxBinding?
+
+/** Maps an Outis DRM scheme to Mux's `view_drm_type` vocabulary; `null` for clear content. */
+internal fun muxDrmType(scheme: DrmScheme?): String? = when (scheme) {
+    DrmScheme.WIDEVINE -> "widevine"
+    DrmScheme.PLAYREADY -> "playready"
+    DrmScheme.FAIRPLAY -> "fairplay"
+    null -> null
+}

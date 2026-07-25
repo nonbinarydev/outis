@@ -58,6 +58,8 @@ internal actual fun bindMux(
     analytics?.durationMs?.let { data.video_duration = it }
     analytics?.cdn?.let { data.video_cdn = it }
     data.video_stream_type = if (host.state.value.isLive) "live" else "on-demand"
+    // DRM comes off the source config, not the analytics bundle — it is already on the item.
+    muxDrmType(item?.drmConfig?.scheme)?.let { data.view_drm_type = it }
 
     val options: dynamic = js("{}")
     options.data = data
