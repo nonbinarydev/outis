@@ -32,6 +32,11 @@ lint/outputs/
 lint/tmp/
 
 # ─── Xcode / iOS ─────────────────────────────────────────────────────────────
+# The sample's iOS host is at sample/iosApp/. Its generated output — the Xcode build/
+# dir (covered by `build/` above), DerivedData, and per-user xcuserdata/*.xcuserstate —
+# is ignored here; the project source (pbxproj, Swift, Info.plist, xcconfig, assets) is committed.
+# Local.xcconfig holds each developer's signing team (copied from Local.xcconfig.example) — never commit it.
+Local.xcconfig
 xcuserdata/
 *.xcuserstate
 DerivedData/

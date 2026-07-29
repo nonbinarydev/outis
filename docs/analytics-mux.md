@@ -75,7 +75,8 @@ after a failed load), because it follows `PlayerHost.nativePlayerHandle` — you
 
 ## Per-item metadata
 
-What Mux slices sessions by comes from [`MediaItem.analytics`](analytics.md), read at bind time:
+What Mux slices sessions by comes from [`MediaItem.analytics`](analytics.md). The adapter reads it when
+it binds and again on every media-item change, so each item is its own Mux view:
 
 ```kotlin
 MediaItem(
@@ -99,24 +100,30 @@ identity lives on `MuxConfig`, not the item — it is session-scoped, not per-vi
 single asset. This matters for a "paste your own URL" surface: derive the id from the URL (or a hash of
 it), not a constant, or every custom stream reports as the same video.
 
+**DRM is picked up automatically.** The adapter reads `MediaItem.drmConfig.scheme` and reports it to Mux
+as the view-level DRM type — `widevine`, `playready` or `fairplay`; clear content reports nothing. It is
+not part of `PlaybackMetadata`, because it already rides on the item.
+
 ## The env key
 
 A Mux **env key** is a *client-side* key. It ships in your APK and is **plainly visible in the web JS
 bundle** — it is an environment identifier, not a credential. So keep it out of source control for
 **rotation and so forks don't report to your dashboard**, not because you can hide it on web (you can't).
 
-The idiomatic plumbing, mirroring how this repo injects its signing key:
+How the sample plumbs it (see [`sample/README.md`](../sample/README.md)):
 
-- **Locally:** put `outisMuxEnvKey=…` in `~/.gradle/gradle.properties` (never the project's), or in a
-  gitignored `local.properties`.
-- **CI:** a repository secret exposed as `ORG_GRADLE_PROJECT_outisMuxEnvKey`.
-- Read it in the host's build with `project.findProperty("outisMuxEnvKey")`, default it to empty, and
-  surface it through `BuildConfig` (Android) or a generated constant.
+- **Locally:** a `mux.key=…` line in the repo-root, gitignored `local.properties`.
+- **CI:** the `MUX_ENVIRONMENT` repository *variable* — a variable, not a secret, since the key is public
+  in the bundle — passed to the build as `-Pmux.key=…`. (A dotted property name can't go through the
+  `ORG_GRADLE_PROJECT_*` env-var form, whose names must be valid env vars, so CI passes it on the command
+  line.)
+- A generated constant bakes the value in: a KMP library has no `BuildConfig`, so the sample's build
+  writes `SampleConfig.MUX_ENV_KEY` from the Gradle property, defaulting to empty.
 - **Skip the adapter when it is blank**, so a clone with no key still plays video — the adapter is
   opt-in, not load-bearing.
 
 ```kotlin
-val muxKey = BuildConfig.MUX_ENV_KEY
+val muxKey = SampleConfig.MUX_ENV_KEY   // BuildConfig.MUX_ENV_KEY in a plain Android app
 if (muxKey.isNotBlank()) {
     player.addComponent(MuxAnalytics(appContext, MuxConfig(envKey = muxKey)))
 }
@@ -132,7 +139,7 @@ after.
 
 The iOS actual returns `null` — attaching the adapter does nothing there yet. The real Mux AVPlayer SDK
 is CocoaPods/SPM and cannot be built or verified on a Linux CI runner, and this repository has no iOS
-host to test against. Wiring it is tracked in [#21](https://github.com/nonbinarydev/outis/issues/21).
+host to test against. It is a known limitation, tracked in [#42](https://github.com/nonbinarydev/outis/issues/42).
 
 ## See also
 

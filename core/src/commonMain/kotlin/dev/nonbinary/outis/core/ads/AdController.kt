@@ -32,7 +32,7 @@ private val QUARTILE_THRESHOLDS = listOf(
  * …); this controller just tracks whatever [breaks] it's given.
  *
  * **Not thread-safe** — drive [onPosition] and call [resolveSeek]/[skipCurrentBreak] from one thread
- * (e.g. the main dispatcher, as the sample does). Re-watching an as-yet-unwatched break (seeking back
+ * (e.g. the main dispatcher). Re-watching an as-yet-unwatched break (seeking back
  * into it) re-emits its start/quartile events; an analytics adapter that bills on them should dedupe by
  * ad id.
  *

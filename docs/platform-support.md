@@ -23,7 +23,7 @@ stated otherwise.
 | Android Gradle Plugin | 9.1.1 | Both modules use the `com.android.kotlin.multiplatform.library` plugin. |
 | Gradle | 9.6.1 | `gradle/wrapper/gradle-wrapper.properties`; only relevant if you build Outis from source. |
 | Android `minSdk` | 24 | `core/build.gradle.kts:38-41`, `ui/build.gradle.kts:33-36`. |
-| Android `compileSdk` | 36 | `core/build.gradle.kts:34-37`, `ui/build.gradle.kts:29-32`. |
+| Android `compileSdk` | 37 | `core/build.gradle.kts:34-37`, `ui/build.gradle.kts:29-32`. |
 | Android JVM bytecode target | 11 | Set on the Android compilations of both modules (`core/build.gradle.kts:43-49`, `ui/build.gradle.kts:38-44`). No project-wide Java toolchain is declared, so the plain `jvm()` target of `:core` uses the Kotlin compiler default. |
 | Compose Multiplatform | 1.11.1 | `:ui` only. `:core` has no Compose dependency of any kind (`core/build.gradle.kts:79-88`). |
 | AndroidX Media3 | 1.10.1 | The Android engine (`exoplayer`, `-hls`, `-dash`, `-ima`), plus `media3-ui` in `:ui`. |

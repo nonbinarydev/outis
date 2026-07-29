@@ -11,7 +11,7 @@ better to hear that before writing it.
 You need:
 
 - **JDK 21.** Gradle 9.6.1 will not run on an older one.
-- **Android SDK** with `compileSdk` 36, for the Android targets.
+- **Android SDK** with `compileSdk` 37, for the Android targets.
 - **macOS with Xcode**, for the Apple targets. `iosArm64` and `iosSimulatorArm64` cannot be built on
   Linux or Windows — there is no `iosX64`, so an Intel Mac cannot build the simulator target either.
 
