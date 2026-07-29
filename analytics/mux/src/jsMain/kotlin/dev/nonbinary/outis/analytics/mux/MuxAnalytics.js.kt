@@ -49,6 +49,7 @@ internal actual fun bindMux(
     // mux-embed's data keys are snake_case; unset keys are simply omitted.
     val data: dynamic = js("{}")
     data.env_key = config.envKey
+    data.player_software_name = config.playerSoftware()
     config.playerName?.let { data.player_name = it }
     config.viewerId?.let { data.viewer_user_id = it }
     analytics?.videoId?.let { data.video_id = it }
@@ -72,3 +73,5 @@ internal actual fun bindMux(
 }
 
 private var monitorCounter = 0
+
+internal actual val nativePlayerLabel: String = "Shaka Player"

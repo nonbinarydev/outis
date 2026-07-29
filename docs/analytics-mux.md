@@ -52,12 +52,13 @@ bindings). Add it to your `Podfile` and build the workspace:
 ```ruby
 target 'YourApp' do
   use_frameworks!
-  pod 'Mux-Stats-AVPlayer', '~> 4.15'
+  pod 'Mux-Stats-AVPlayer', '~> 4.15'   # keep the major aligned with the adapter's binding
 end
 ```
 
 Run `pod install`, then open **`YourApp.xcworkspace`** — not the `.xcodeproj`, or the linker won't find
-`MUXSDKStats`.
+`MUXSDKStats`. The pod version should stay compatible with what the adapter's cinterop was built against
+(`~> 4.15`); a different **major** can change the Objective-C API the bindings expect and break linking.
 
 ## Register it
 
@@ -82,6 +83,18 @@ player.addComponent(
 That is all. The adapter re-binds itself whenever an engine rebuilds its native player (Shaka does this
 after a failed load), because it follows `PlayerHost.nativePlayerHandle` — you do not manage that.
 `removeComponent`, or releasing the player, tears the Mux monitor down.
+
+## Player software name
+
+Mux's `player_software_name` (the "Software Name" on a view) defaults to `Outis (<engine>)` — `Outis
+(AVPlayer)`, `Outis (ExoPlayer)`, `Outis (Shaka Player)` — so views read as Outis rather than the raw
+engine. Override it with `MuxConfig(playerSoftwareName = "…")`.
+
+The three platforms expose this differently: iOS and web take it directly, but Android's Mux SDK sources
+it from `IDevice.getPlayerSoftware()`, not the customer data — so the adapter hands the Media3 SDK its own
+device (the reason the Android actual uses the `MuxStatsSdkMedia3(…)` constructor rather than the
+`monitorWithMuxData` shortcut). The one string to keep current there is `MUX_PLUGIN_VERSION`, tracked to
+the `data-media3` dependency; it feeds only the `player_mux_plugin_version` dimension.
 
 ## Per-item metadata
 

@@ -18,6 +18,8 @@ import platform.AVKit.AVPlayerViewController
 
 private var monitorCounter = 0
 
+internal actual val nativePlayerLabel: String = "AVPlayer"
+
 /**
  * Binds Mux's iOS Data SDK to the `:ui` [AVPlayerViewController], read off
  * [PlayerHost.nativePresentationHandle] — Mux monitors the view controller, not the bare `AVPlayer`.
@@ -37,6 +39,7 @@ internal actual fun bindMux(
     val playerData = MUXSDKCustomerPlayerData(config.envKey).apply {
         config.playerName?.let { setPlayerName(it) }
         config.viewerId?.let { setViewerUserId(it) }
+        setPlayerSoftwareName(config.playerSoftware())
     }
     val videoData = MUXSDKCustomerVideoData().apply {
         analytics?.videoId?.let { setVideoId(it) }

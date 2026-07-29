@@ -6,12 +6,17 @@
 
 package dev.nonbinary.outis.analytics.mux
 
+import androidx.media3.common.MediaLibraryInfo
 import androidx.media3.exoplayer.ExoPlayer
+import com.mux.stats.sdk.core.CustomOptions
 import com.mux.stats.sdk.core.model.CustomerData
 import com.mux.stats.sdk.core.model.CustomerPlayerData
 import com.mux.stats.sdk.core.model.CustomerVideoData
 import com.mux.stats.sdk.core.model.CustomerViewData
-import com.mux.stats.sdk.muxstats.monitorWithMuxData
+import com.mux.stats.sdk.muxstats.ExoPlayerBinding
+import com.mux.stats.sdk.muxstats.MuxDataSdk
+import com.mux.stats.sdk.muxstats.MuxNetwork
+import com.mux.stats.sdk.muxstats.MuxStatsSdkMedia3
 import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.analytics.StreamType
 import dev.nonbinary.outis.core.plugin.PlayerHost
@@ -50,15 +55,41 @@ internal actual fun bindMux(
         muxDrmType(item?.drmConfig?.scheme)?.let { viewDrmType = it }
     }
 
-    val stats = player.monitorWithMuxData(
-        appContext.applicationContext,
+    // player_software_name is sourced from IDevice.getPlayerSoftware(), not CustomerData, so brand it by
+    // handing the low-level constructor our own device rather than using the monitorWithMuxData() shortcut.
+    // The other AndroidDevice fields mirror what data-media3 reports for itself.
+    val ctx = appContext.applicationContext
+    val device = MuxDataSdk.AndroidDevice(
+        ctx,
+        MediaLibraryInfo.VERSION,
+        MUX_PLUGIN_NAME,
+        MUX_PLUGIN_VERSION,
+        config.playerSoftware(),
+    )
+    val stats = MuxStatsSdkMedia3(
+        ctx,
         config.envKey,
         CustomerData(playerData, videoData, viewData),
+        player,
+        null,
+        CustomOptions(),
+        MuxNetwork(device),
+        device,
+        MuxDataSdk.LogcatLevel.NONE,
+        ExoPlayerBinding(),
     )
     return object : MuxBinding {
         override fun dispose() = stats.release()
     }
 }
+
+internal actual val nativePlayerLabel: String = "ExoPlayer"
+
+// data-media3 reports player_software_name via IDevice, not CustomerData. These mirror the identifiers it
+// uses for itself; keep MUX_PLUGIN_VERSION in step with the data-media3 dependency (it only feeds the
+// player_mux_plugin_version dimension). player_software_name is the field we actually override.
+private const val MUX_PLUGIN_NAME = "mux-media3"
+private const val MUX_PLUGIN_VERSION = "1.13.0"
 
 /** Mux's stream-type vocabulary. When the item does not declare it, fall back to the player's live signal. */
 private fun muxStreamType(type: StreamType?, isLive: Boolean): String = when {

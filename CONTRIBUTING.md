@@ -14,6 +14,9 @@ You need:
 - **Android SDK** with `compileSdk` 37, for the Android targets.
 - **macOS with Xcode**, for the Apple targets. `iosArm64` and `iosSimulatorArm64` cannot be built on
   Linux or Windows — there is no `iosX64`, so an Intel Mac cannot build the simulator target either.
+- **CocoaPods** (`brew install cocoapods`), needed only for the Apple targets of `:analytics:mux` — it
+  binds Mux's iOS SDK through the Kotlin CocoaPods plugin. No other module uses pods; this is also why
+  iOS Mux QoS is not exercised in CI (the runner has no CocoaPods).
 
 Everything else comes from the Gradle wrapper.
 

@@ -79,7 +79,9 @@ data class CatalogueAds(val type: String, val adTagUri: String? = null)
  * Only client-side ads are mapped. Server-side entries carry no `adTagUri` and are stitched by the
  * origin, so there is nothing for [AdConfig] to describe.
  */
-fun CatalogueItem.toMediaItem(startMuted: Boolean = true, series: String? = null): MediaItem = MediaItem(
+// Starts with sound; the web engine falls back to muted only if the browser blocks unmuted autoplay,
+// and native players have no such restriction — so no platform is needlessly silenced.
+fun CatalogueItem.toMediaItem(startMuted: Boolean = false, series: String? = null): MediaItem = MediaItem(
     MediaSource.Url(url),
     mimeType = mimeType,
     startMuted = startMuted,

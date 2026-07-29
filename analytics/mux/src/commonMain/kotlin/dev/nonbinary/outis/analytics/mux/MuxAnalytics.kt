@@ -81,6 +81,11 @@ data class MuxConfig(
     val viewerId: String? = null,
     /** A name for this player integration, shown in Mux to distinguish surfaces (e.g. "web-demo"). */
     val playerName: String? = null,
+    /**
+     * Overrides Mux's `player_software_name`. Defaults to `"Outis (<engine>)"` — the underlying player
+     * per platform (`AVPlayer`, `ExoPlayer`, `Shaka Player`).
+     */
+    val playerSoftwareName: String? = null,
 )
 
 /**
@@ -102,6 +107,15 @@ internal expect fun bindMux(
     host: PlayerHost,
     config: MuxConfig,
 ): MuxBinding?
+
+/**
+ * The native player each platform drives — `AVPlayer`, `ExoPlayer`, `Shaka Player`. Used to build the
+ * default Mux `player_software_name` when [MuxConfig.playerSoftwareName] is unset.
+ */
+internal expect val nativePlayerLabel: String
+
+/** The Mux `player_software_name` to report: the caller's override, else `"Outis (<engine>)"`. */
+internal fun MuxConfig.playerSoftware(): String = playerSoftwareName ?: "Outis ($nativePlayerLabel)"
 
 /** Maps an Outis DRM scheme to Mux's `view_drm_type` vocabulary; `null` for clear content. */
 internal fun muxDrmType(scheme: DrmScheme?): String? = when (scheme) {
