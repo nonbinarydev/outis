@@ -152,7 +152,8 @@ private fun DrmSection(
     needsCertificate: Boolean,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        DrmScheme.entries.forEach { entry ->
+        // ClearKey is omitted: it takes inline keys, not a license URL, so this URL-based form can't drive it.
+        DrmScheme.entries.filter { it != DrmScheme.CLEARKEY }.forEach { entry ->
             FilterChip(
                 selected = scheme == entry,
                 onClick = { onScheme(entry) },

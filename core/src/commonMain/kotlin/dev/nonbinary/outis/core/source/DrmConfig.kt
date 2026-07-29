@@ -17,6 +17,9 @@ import kotlinx.collections.immutable.persistentMapOf
  *   [MimeType.DASH] source.
  * - [DrmScheme.FAIRPLAY] — **Web (Shaka, Safari)** and **iOS (AVPlayer / `AVContentKeySession`)**; an
  *   HLS source plus a [certificateUrl] (the FPS application certificate).
+ * - [DrmScheme.CLEARKEY] — **Android (Media3)**, **Web (Shaka)** and **iOS (AVPlayer /
+ *   `AVContentKeySession`, HLS only)**; keys supplied inline via [clearKeys] (no license server). A
+ *   demo/test scheme.
  *
  * A scheme that the current engine/browser can't satisfy (e.g. Widevine in Safari, or FairPlay
  * without a certificate) surfaces a DRM source error rather than playing.
@@ -35,13 +38,24 @@ data class DrmConfig(
      * DRM source error rather than falling back to another scheme.
      */
     val scheme: DrmScheme,
-    /** License (key) server URL the CDM posts its challenge to. */
-    val licenseServerUrl: String,
+    /**
+     * License (key) server URL the CDM posts its challenge to. Null for [DrmScheme.CLEARKEY], which
+     * carries its keys inline in [clearKeys] rather than fetching them from a server.
+     */
+    val licenseServerUrl: String? = null,
     /**
      * Application certificate URL — **required for [DrmScheme.FAIRPLAY]** (Apple's FPS server
      * certificate), ignored by Widevine/PlayReady.
      */
     val certificateUrl: String? = null,
+    /**
+     * Clear Key content keys as `keyId` → `key`, both **hex**. Used only by [DrmScheme.CLEARKEY]: the keys
+     * are handed to the CDM directly with no license exchange, so it's "encryption without secrecy" — a
+     * demo/test scheme, not real protection. Honoured on **Android** (Media3 local ClearKey), **Web**
+     * (Shaka `clearKeys`) and **iOS** (`AVContentKeySystemClearKey`, **HLS only** — AVPlayer has no DASH,
+     * so an iOS Clear Key item must be an HLS source).
+     */
+    val clearKeys: ImmutableMap<String, String> = persistentMapOf(),
     /**
      * Extra headers on the license request (e.g. an auth token). Honoured on Android, Web and
      * iOS (FairPlay SPC POST).
@@ -121,7 +135,7 @@ data class LicenseRequest(
     override fun hashCode(): Int = (url.hashCode() * 31 + body.hashCode()) * 31 + headers.hashCode()
 }
 
-/** DRM key system. WIDEVINE / PLAYREADY — Android + Web; FAIRPLAY — Web (Safari) + iOS. */
+/** DRM key system. WIDEVINE / PLAYREADY / CLEARKEY — Android + Web; FAIRPLAY — Web (Safari) + iOS. */
 enum class DrmScheme {
     /** Google Widevine (`com.widevine.alpha`) — Android (Media3) and Web; typically DASH content. */
     WIDEVINE,
@@ -137,6 +151,14 @@ enum class DrmScheme {
      * [DrmConfig.certificateUrl]; without one, playback fails with a DRM error.
      */
     FAIRPLAY,
+
+    /**
+     * W3C Clear Key (`org.w3.clearkey`) — Android (Media3), Web (Shaka) and iOS (AVPlayer via
+     * `AVContentKeySystemClearKey`, **HLS only**). Keys are supplied inline via [DrmConfig.clearKeys] with
+     * no license server, so it's really "encryption without secrecy": a demo/test scheme, not content
+     * protection.
+     */
+    CLEARKEY,
 }
 
 /**

@@ -108,3 +108,6 @@ Thumbs.db
 
 # Qodana local analysis output
 .qodana/
+
+# Generated demo media (build-demo-media.sh output — regenerate, do not commit)
+demo-media-out/

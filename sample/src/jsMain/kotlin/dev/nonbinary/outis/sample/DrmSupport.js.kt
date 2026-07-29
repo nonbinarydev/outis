@@ -31,4 +31,6 @@ actual fun drmSchemeCaveat(scheme: DrmScheme): String? = when (scheme) {
         if (isWebKit) "Safari has no Widevine CDM — this is not expected to play here." else null
     DrmScheme.PLAYREADY ->
         "PlayReady is only expected on Edge/Windows builds that ship the CDM."
+    DrmScheme.CLEARKEY ->
+        if (isWebKit) "Safari has no Clear Key CDM — this is not expected to play here." else null
 }

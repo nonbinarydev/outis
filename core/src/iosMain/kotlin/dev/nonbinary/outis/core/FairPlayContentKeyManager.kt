@@ -145,7 +145,7 @@ internal class FairPlayContentKeyManager(
                 //    the URL/body/headers (here `body` is the SPC); a response interceptor can unwrap the
                 //    CKC from a JSON envelope before AVFoundation sees it.
                 val initialReq =
-                    LicenseRequest(config.licenseServerUrl, spc.toByteArray(), config.licenseRequestHeaders)
+                    LicenseRequest(config.licenseServerUrl.orEmpty(), spc.toByteArray(), config.licenseRequestHeaders)
                 val licReq = config.licenseRequestInterceptor?.invoke(initialReq) ?: initialReq
                 httpPost(licReq.url, licReq.body.toNSData(), licReq.headers) { rawCkc, licErr ->
                     if (released) return@httpPost
