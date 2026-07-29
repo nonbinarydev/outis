@@ -53,9 +53,7 @@ private val liveClearKeyManagers = mutableSetOf<ClearKeyContentKeyManager>()
  * main queue, the delegate weak-refs this manager, [liveClearKeyManagers] keeps it alive until [release],
  * and **callers MUST call release().**
  */
-internal class ClearKeyContentKeyManager(
-    private val onError: (PlayerError) -> Unit,
-) {
+internal class ClearKeyContentKeyManager(private val onError: (PlayerError) -> Unit) {
     private val session =
         AVContentKeySession.contentKeySessionWithKeySystem(AVContentKeySystemClearKey)
     private val delegate = ClearKeyDelegate(this)
@@ -98,10 +96,10 @@ internal class ClearKeyContentKeyManager(
     // the hex keyId carried in the request identifier — `skd://<hex>`, a bare hex id, or the trailing
     // token of a URI. A multi-key stream whose identifier is a base64 `data:` URI isn't resolved here.
     private fun resolveKey(identifier: Any?): NSData? {
-        keys.values.singleOrNull()?.let { return it }
-        val id = (identifier as? String) ?: (identifier as? NSURL)?.absoluteString ?: return null
-        val kid = id.substringAfterLast('/').substringAfterLast(',').lowercase()
-        return keys[kid]
+        val single = keys.values.singleOrNull()
+        if (single != null) return single
+        val id = (identifier as? String) ?: (identifier as? NSURL)?.absoluteString
+        return id?.let { keys[it.substringAfterLast('/').substringAfterLast(',').lowercase()] }
     }
 
     private fun fail(keyRequest: AVContentKeyRequest, message: String) {
@@ -112,7 +110,8 @@ internal class ClearKeyContentKeyManager(
 
 /** Delegate kept ObjC-retained by the session; weak-refs the manager to avoid a retain cycle. */
 private class ClearKeyDelegate(manager: ClearKeyContentKeyManager) :
-    NSObject(), AVContentKeySessionDelegateProtocol {
+    NSObject(),
+    AVContentKeySessionDelegateProtocol {
     private val ref = WeakReference(manager)
 
     override fun contentKeySession(session: AVContentKeySession, didProvideContentKeyRequest: AVContentKeyRequest) {
@@ -120,17 +119,16 @@ private class ClearKeyDelegate(manager: ClearKeyContentKeyManager) :
     }
 }
 
+private const val HEX_RADIX = 16
+
 private fun hexToNSData(hex: String): NSData {
-    val bytes = ByteArray(hex.length / 2) {
-        ((hex[it * 2].digitToInt(16) shl 4) or hex[it * 2 + 1].digitToInt(16)).toByte()
-    }
+    val bytes = hex.chunked(2).map { it.toInt(HEX_RADIX).toByte() }.toByteArray()
     if (bytes.isEmpty()) return NSData()
     return bytes.usePinned { NSData.create(bytes = it.addressOf(0), length = bytes.size.toULong()) }
 }
 
-private fun nsError(message: String): NSError =
-    NSError.errorWithDomain(
-        "dev.nonbinary.outis.clearkey",
-        code = -1,
-        userInfo = mapOf<Any?, Any?>(NSLocalizedDescriptionKey to message),
-    )
+private fun nsError(message: String): NSError = NSError.errorWithDomain(
+    "dev.nonbinary.outis.clearkey",
+    code = -1,
+    userInfo = mapOf<Any?, Any?>(NSLocalizedDescriptionKey to message),
+)
