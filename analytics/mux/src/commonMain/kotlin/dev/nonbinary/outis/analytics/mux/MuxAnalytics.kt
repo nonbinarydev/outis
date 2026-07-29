@@ -44,20 +44,22 @@ class MuxAnalytics(
     private var binding: MuxBinding? = null
 
     override fun attach(host: PlayerHost) {
-        // Bind when BOTH a native player and a media item are present, and re-bind when either changes.
-        // bindMux snapshots the item's metadata, so binding on the handle alone would capture whatever
-        // item existed then — and on web the <video> handle exists before the catalogue loads and the
-        // first item is set, snapshotting null and sending no per-video metadata. Re-binding per item
-        // also starts a fresh Mux view for each video, which is the correct QoS semantics. A null handle
-        // (engine momentarily without a player) or null item tears the current binding down.
+        // Re-bind whenever the native player, the view-level presentation object (iOS's
+        // AVPlayerViewController), or the media item changes. bindMux reads whichever object its platform
+        // monitors off the host — the ExoPlayer / <video> handle, or the presentation VC on iOS — together
+        // with the item's metadata, so it must re-run when any of them appears or is recreated. Re-binding
+        // per item also starts a fresh Mux view for each video (the correct QoS semantics); binding only
+        // once an item exists avoids a first view with no per-video metadata (on web the <video> exists
+        // before the catalogue loads). bindMux returns null when its object isn't available yet.
         combine(
             host.nativePlayerHandle,
+            host.nativePresentationHandle,
             host.state.map { it.mediaItem }.distinctUntilChanged(),
-        ) { handle, item -> handle to item }
+        ) { player, presentation, item -> Triple(player, presentation, item) }
             .distinctUntilChanged()
-            .onEach { (handle, item) ->
+            .onEach { (_, _, item) ->
                 binding?.dispose()
-                binding = if (handle != null && item != null) bindMux(handle, appContext, host, config) else null
+                binding = if (item == null) null else bindMux(appContext, host, config)
             }
             .launchIn(host.scope)
     }
@@ -79,6 +81,11 @@ data class MuxConfig(
     val viewerId: String? = null,
     /** A name for this player integration, shown in Mux to distinguish surfaces (e.g. "web-demo"). */
     val playerName: String? = null,
+    /**
+     * Overrides Mux's `player_software_name`. Defaults to `"Outis (<engine>)"` — the underlying player
+     * per platform (`AVPlayer`, `ExoPlayer`, `Shaka Player`).
+     */
+    val playerSoftwareName: String? = null,
 )
 
 /**
@@ -90,17 +97,25 @@ internal interface MuxBinding {
 }
 
 /**
- * Starts a Mux monitor on the platform's native player [handle].
- *
- * `null` when this platform cannot bind — the iOS actual, until its CocoaPods SDK is wired — so the
- * caller simply records no binding rather than failing.
+ * Starts a Mux monitor on the object this platform binds to, read off [host]: the native
+ * [PlayerHost.nativePlayerHandle] (Android ExoPlayer, web `<video>`) or the
+ * [PlayerHost.nativePresentationHandle] (iOS `AVPlayerViewController`). Returns `null` when that object is
+ * not yet available, so the caller simply records no binding rather than failing.
  */
 internal expect fun bindMux(
-    handle: Any,
     appContext: AppContext,
     host: PlayerHost,
     config: MuxConfig,
 ): MuxBinding?
+
+/**
+ * The native player each platform drives — `AVPlayer`, `ExoPlayer`, `Shaka Player`. Used to build the
+ * default Mux `player_software_name` when [MuxConfig.playerSoftwareName] is unset.
+ */
+internal expect val nativePlayerLabel: String
+
+/** The Mux `player_software_name` to report: the caller's override, else `"Outis (<engine>)"`. */
+internal fun MuxConfig.playerSoftware(): String = playerSoftwareName ?: "Outis ($nativePlayerLabel)"
 
 /** Maps an Outis DRM scheme to Mux's `view_drm_type` vocabulary; `null` for clear content. */
 internal fun muxDrmType(scheme: DrmScheme?): String? = when (scheme) {

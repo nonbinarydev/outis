@@ -6,7 +6,10 @@
 
 package dev.nonbinary.outis.ui.controls
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
@@ -18,6 +21,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -32,6 +36,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -96,6 +103,7 @@ fun BigPlayButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
  * composition mid-drag the scrub is abandoned without seeking, so the auto-hide latch is not stuck on.
  * The slider is disabled (but still drawn) while [PlayerControlsState.isSeekable] is `false`.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @ExperimentalPlayerUiApi
 @Composable
 fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
@@ -107,18 +115,51 @@ fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
     DisposableEffect(Unit) {
         onDispose { if (state.isScrubbing) state.cancelScrub() }
     }
-    Slider(
-        value = state.scrubPositionMs.coerceIn(0L, duration).toFloat(),
-        onValueChange = { state.onScrubMove(it.toLong()) },
-        onValueChangeFinished = state::onScrubCommit,
-        valueRange = 0f..duration.toFloat(),
-        enabled = state.isSeekable,
-        modifier = modifier.semantics {
-            contentDescription = "Seek bar"
-            stateDescription = "${formatTime(state.scrubPositionMs)} of ${formatTime(duration)}"
-        },
-    )
+    val colors = MaterialTheme.colorScheme
+    val played = (state.scrubPositionMs.toFloat() / duration).coerceIn(0f, 1f)
+    val buffered = (state.bufferedPositionMs.toFloat() / duration).coerceIn(0f, 1f)
+    // Track, buffered layer, played layer and the dot are all drawn in one canvas, so they share a
+    // coordinate space and can't drift apart vertically. The Slider on top is invisible — it carries
+    // only the drag, keyboard and accessibility behaviour.
+    Box(modifier.height(ScrubberThumbSize)) {
+        Canvas(Modifier.fillMaxWidth().height(ScrubberThumbSize)) {
+            val cy = size.height / 2f
+            val r = ScrubberThumbSize.toPx() / 2f
+            val startX = r
+            val span = (size.width - r * 2f).coerceAtLeast(0f)
+            val stroke = ScrubberTrackHeight.toPx()
+            fun line(fraction: Float, color: Color) = drawLine(
+                color = color,
+                start = Offset(startX, cy),
+                end = Offset(startX + span * fraction, cy),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
+            line(1f, colors.onSurface.copy(alpha = 0.2f)) // base
+            if (buffered > 0f) line(buffered, colors.onSurface.copy(alpha = 0.45f)) // buffered-ahead
+            if (played > 0f) line(played, colors.primary) // played
+            drawCircle(colors.primary, radius = r, center = Offset(startX + span * played, cy))
+        }
+        Slider(
+            value = state.scrubPositionMs.coerceIn(0L, duration).toFloat(),
+            onValueChange = { state.onScrubMove(it.toLong()) },
+            onValueChangeFinished = state::onScrubCommit,
+            valueRange = 0f..duration.toFloat(),
+            enabled = state.isSeekable,
+            // Invisible: the canvas above is the visual. The ScrubberThumbSize thumb keeps the value→x
+            // mapping matched to the drawn dot; the full-width track box gives the drag area its height.
+            thumb = { Box(Modifier.size(ScrubberThumbSize)) },
+            track = { Box(Modifier.fillMaxWidth().height(ScrubberThumbSize)) },
+            modifier = Modifier.fillMaxWidth().semantics {
+                contentDescription = "Seek bar"
+                stateDescription = "${formatTime(state.scrubPositionMs)} of ${formatTime(duration)}"
+            },
+        )
+    }
 }
+
+private val ScrubberThumbSize = 12.dp
+private val ScrubberTrackHeight = 4.dp
 
 /**
  * Elapsed-time readout, formatted `mm:ss` or `h:mm:ss` once the hour mark is passed.

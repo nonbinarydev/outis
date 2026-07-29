@@ -35,12 +35,11 @@ private val muxEmbed: dynamic get() = muxEmbedModule.default ?: muxEmbedModule
  * keys its monitor by element id, and `destroyMonitor` needs the same key to tear the right one down.
  */
 internal actual fun bindMux(
-    handle: Any,
     appContext: AppContext,
     host: PlayerHost,
     config: MuxConfig,
 ): MuxBinding? {
-    val video = handle as? HTMLVideoElement ?: return null
+    val video = host.nativePlayerHandle.value as? HTMLVideoElement ?: return null
     if (video.id.isEmpty()) video.id = "outis-mux-${monitorCounter++}"
     val elementId = video.id
 
@@ -50,6 +49,7 @@ internal actual fun bindMux(
     // mux-embed's data keys are snake_case; unset keys are simply omitted.
     val data: dynamic = js("{}")
     data.env_key = config.envKey
+    data.player_software_name = config.playerSoftware()
     config.playerName?.let { data.player_name = it }
     config.viewerId?.let { data.viewer_user_id = it }
     analytics?.videoId?.let { data.video_id = it }
@@ -73,3 +73,5 @@ internal actual fun bindMux(
 }
 
 private var monitorCounter = 0
+
+internal actual val nativePlayerLabel: String = "Shaka Player"

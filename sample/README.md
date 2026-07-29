@@ -8,38 +8,90 @@ stream you paste in. It runs on Android, iOS and the web from one shared `App()`
 The **Videos** dialog holds two ways of choosing what to play: the catalogue, fetched at runtime from
 `catalogue.json` so the stream list changes without a rebuild, and a custom-stream form that builds a
 `MediaItem` by hand — URL, container, DRM scheme, licence server and FairPlay certificate. **Player
-settings** is a placeholder; `PlayerConfig` is fixed at construction, so changing it means rebuilding
-the player and restoring position.
+settings** holds the privacy & consent controls (the player's `PlayerConfig` is otherwise fixed at
+construction). **Diagnostics** shows the live player event log — startup, buffering, track changes and
+errors — read straight off the SDK's event stream.
 
 ## The application
 
-`:sample` is a Kotlin Multiplatform module deliberately kept to one screen: construct a `VideoPlayer`,
-load a single item, render it with the SDK's own `DefaultControls`. No catalogue browsing, no custom
-chrome, no third-party design system — what a consumer gets out of the box, shown unmodified.
+`:sample` is a Kotlin Multiplatform module with a single screen shared across all three platforms: a
+`VideoPlayer` rendered through the SDK's own `PlayerView` and `DefaultControls`, the Outis lockup above
+it, a status line below, and the three overlay dialogs described above. Fullscreen and Picture-in-Picture
+are wired through `rememberSampleWindow`. On first launch it plays the first catalogue item.
 
-It plays Big Buck Bunny over HLS. That stream is chosen because its master playlist is all `avc1`, with
-no in-band parameter sets, so Media3, AVPlayer and Shaka can all decode it, and it carries no DRM. If it
-does not play, the problem is the integration rather than the content — which is what makes it useful as
-a smoke test.
+When the catalogue cannot be fetched the sample falls back to Big Buck Bunny over HLS — a master playlist
+that is all `avc1`, with no in-band parameter sets and no DRM, so Media3, AVPlayer and Shaka can all
+decode it. That makes the fallback a smoke test: if it does not play, the problem is the integration
+rather than the content.
 
 A status line under the video reports the `PlaybackState`, because "nothing rendered" and "rendered but
 never became ready" look identical on a black surface.
 
 ### Running it
 
-The web target is the one that runs today:
+**Web** — the shared UI in a browser:
 
 ```bash
-./gradlew :sample:jsBrowserRun        # local dev server
-./gradlew :sample:jsBrowserDistribution   # the bundle published to /demo/
+./gradlew :sample:jsBrowserDevelopmentRun   # local dev server (hot reload)
+./gradlew :sample:jsBrowserDistribution     # the production bundle published to /demo/
 ```
 
 The production bundle takes several minutes — Compose for web ships skiko, which is large.
 
-Android and iOS targets **compile**, which is what makes this a portability check rather than a
-web-only sample, but neither has a host application yet: Android needs an `com.android.application`
-module and iOS needs an Xcode project. `mainViewController()` in `iosMain` is the entry point an iOS
-host would present.
+**Android** — `:sample:android` is a thin `com.android.application` host whose `MainActivity` presents
+the shared `App()`; install it on a device or emulator:
+
+```bash
+./gradlew :sample:android:installDebug
+```
+
+**iOS** — `sample/iosApp` is an Xcode host that presents the shared `App()` through
+`mainViewController()`. It links Mux's iOS SDK via CocoaPods, so run `pod install` in `sample/iosApp`
+once, then open **`iosApp.xcworkspace`** (not the `.xcodeproj`) and Run (simulator or device). The Kotlin
+framework is built and embedded by a run-script phase (`:sample:embedAndSignAppleFrameworkForXcode`), so
+there is no manual Gradle step. For a **real device**,
+copy `sample/iosApp/Configuration/Local.xcconfig.example` to `Local.xcconfig` and set `DEVELOPMENT_TEAM`
+to your Apple Team ID, then sign into Xcode — signing is Automatic. `Local.xcconfig` is git-ignored, so
+your team ID is never committed.
+
+## Analytics and consent
+
+The sample doubles as the reference wiring for the optional [Mux Data](../docs/analytics-mux.md) QoS
+adapter (`:analytics:mux`) and for the consent gate any analytics SDK needs. Neither is part of the SDK —
+`:core` and `:ui` ship no analytics dependency; this is the app's own integration.
+
+### Enabling Mux
+
+The adapter is off unless a build supplies a Mux env key, so a plain checkout runs with analytics
+disabled. Supply the key — the client-side *environment* key, not a Mux API token — by precedence:
+
+- **Local:** a `mux.key=…` line in the repo-root `local.properties` (git-ignored).
+- **Command line / CI:** `-Pmux.key=…`. [`pages.yml`](../.github/workflows/pages.yml) reads it from the
+  `MUX_ENVIRONMENT` repository **variable** — a variable, not a secret, because the key ships in the web
+  bundle and is public by design.
+
+An empty key bakes an empty constant and the adapter is simply never attached.
+
+### Consent
+
+The demo reports to third-party analytics, so it carries the consent gate a public deployment needs —
+and, being a reference, it demonstrates the *mechanism* rather than hardcoding a legal judgement. Consent
+is modelled as **purpose categories**, not per-SDK:
+
+- **Essential** — always on: playback, and the on-device diagnostics log (which never leaves the device).
+- **Performance** — Mux QoS. Gated by default.
+- **Marketing** — usage analytics (e.g. GA4). Always gated.
+
+An adapter attaches only while its category is granted (`addComponent` on grant, `removeComponent` on
+revoke), and nothing collects before a first-run choice. The choice persists per platform (localStorage /
+SharedPreferences / `NSUserDefaults`) so it survives a reload, and is revisitable from **Player settings →
+Privacy & data**.
+
+Whether Performance *requires* consent is a single, documented, flippable line
+(`ConsentCategory.PERFORMANCE.requiresConsent`). It ships `true` — the safe default, since Mux Data stores
+a viewer id, which ePrivacy governs — and an operator whose legal basis treats QoS as legitimate interest
+can flip it. **This is the sample's posture, not legal guidance:** the classification is the operator's
+and their counsel's call.
 
 ## The catalogue
 `catalogue.json` is the stream list the sample application plays. It is kept here and published to
@@ -61,10 +113,9 @@ Publishing runs from [`.github/workflows/pages.yml`](../.github/workflows/pages.
 python3 sample/validate-catalogue.py
 ```
 
-The application itself does not exist yet — see
-[#2](https://github.com/nonbinarydev/outis/issues/2). This file is here because the catalogue is the
-part that was expensive to assemble and cheap to lose: every entry has been checked against the claim it
-makes, and several widely-cited streams turned out to be mislabelled or dead.
+This file lives here because the catalogue is the part that was expensive to assemble and cheap to lose:
+every entry has been checked against the claim it makes, and several widely-cited streams turned out to
+be mislabelled or dead.
 
 ## What it is for
 

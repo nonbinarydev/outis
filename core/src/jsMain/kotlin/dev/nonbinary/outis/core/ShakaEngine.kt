@@ -456,7 +456,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         return shakaPlayer.load(url, item.startPositionMs?.let { it / 1000.0 }).then<dynamic>(
             { _ ->
                 if (!released && generation == loadGeneration) {
-                    if (playWhenReady) video.play()
+                    if (playWhenReady) playWithAutoplayFallback()
                     loadTracks()
                     applyCaptionsDefault(item) // after loadTracks so its textchanged re-read sees the visibility
                     reconcile()
@@ -490,13 +490,32 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
             video.addEventListener("loadedmetadata", listener)
         }
         video.load()
-        if (playWhenReady) video.play()
+        if (playWhenReady) playWithAutoplayFallback()
     }
 
     /** Remove any pending one-shot native start-position listener so it can't fire against a later item. */
     private fun clearPendingStartListener() {
         pendingStartListener?.let { video.removeEventListener("loadedmetadata", it) }
         pendingStartListener = null
+    }
+
+    /**
+     * Autoplay that keeps sound where the browser allows it. A programmatic `play()` that is neither
+     * muted nor from a user gesture is rejected (`NotAllowedError`); the web-standard response is to mute
+     * and retry, so a start plays with sound where permitted and mutes only where it must — the SDK
+     * handles the browser policy so the app need not force every start muted. An already-muted start
+     * (`MediaItem.startMuted`, or a user mute) never reaches the fallback. Only autoplay uses this;
+     * user-driven [play] carries a gesture and cannot be blocked.
+     */
+    private fun playWithAutoplayFallback() {
+        video.asDynamic().play().catch({ _: dynamic ->
+            if (!video.muted) {
+                video.muted = true
+                _state.update { it.copy(isMuted = true) }
+                video.asDynamic().play()
+            }
+            Unit
+        })
     }
 
     override fun play() {

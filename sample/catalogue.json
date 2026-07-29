@@ -9,19 +9,6 @@
   },
   "rails": [
     {
-      "id": "bbc-testcard",
-      "title": "BBC Test Card",
-      "note": "The same one-hour reference content as VOD and as a simulcast, across DASH and HLS, AVC and HEVC. iOS cannot play any of these: the test card's HLS uses in-band parameter sets (avc3), and AVPlayer has no DASH.",
-      "items": [
-        { "id": "bbc-vod-dash-avc",   "title": "AVC",  "label": "BBC Test Card · VOD · DASH (AVC)",   "url": "https://rdmedia.bbc.co.uk/testcard/vod/manifests/avc-full.mpd",        "mimeType": "DASH", "poster": "bbcTestcard", "tags": ["VOD", "DASH"] },
-        { "id": "bbc-vod-hls-avc",    "title": "AVC",  "label": "BBC Test Card · VOD · HLS (AVC)",    "url": "https://rdmedia.bbc.co.uk/testcard/vod/manifests/avc-full.m3u8",       "mimeType": "HLS",  "poster": "bbcTestcard", "tags": ["VOD", "HLS"] },
-        { "id": "bbc-live-dash-avc",  "title": "AVC",  "label": "BBC Test Card · Live · DASH (AVC)",  "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/avc-full.mpd",  "mimeType": "DASH", "poster": "bbcTestcard", "tags": ["LIVE", "DASH"] },
-        { "id": "bbc-live-hls-avc",   "title": "AVC",  "label": "BBC Test Card · Live · HLS (AVC)",   "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/avc-full.m3u8", "mimeType": "HLS",  "poster": "bbcTestcard", "tags": ["LIVE", "HLS"] },
-        { "id": "bbc-live-dash-hevc", "title": "HEVC", "label": "BBC Test Card · Live · DASH (HEVC)", "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/hevc-ctv.mpd",  "mimeType": "DASH", "poster": "bbcTestcard", "tags": ["LIVE", "DASH"], "note": "HEVC: no Chrome decoder." },
-        { "id": "bbc-live-hls-hevc",  "title": "HEVC", "label": "BBC Test Card · Live · HLS (HEVC)",  "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/hevc-ctv.m3u8", "mimeType": "HLS",  "poster": "bbcTestcard", "tags": ["LIVE", "HLS"],  "note": "HEVC: no Chrome decoder." }
-      ]
-    },
-    {
       "id": "big-buck-bunny",
       "title": "Big Buck Bunny",
       "note": "The same film across delivery formats and codecs. No clean public Widevine or FairPlay Big Buck Bunny stream exists — every one is clear except Microsoft's PlayReady-only asset — so general DRM is demonstrated on the Streams rail instead.",
@@ -33,6 +20,19 @@
         { "id": "bbb-playready", "title": "PlayReady", "label": "Big Buck Bunny · DASH · PlayReady DRM",           "url": "https://test.playready.microsoft.com/media/dash/APPLEENC_CBCS_BBB_1080p/1080p.mpd",        "mimeType": "DASH", "poster": "bigBuckBunny", "tags": ["DASH", "DRM"],
           "drm": { "scheme": "PLAYREADY", "licenseServerUrl": "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:150)" },
           "note": "The only DRM-protected Big Buck Bunny asset that exists. PlayReady decrypts only on Edge/Windows and PlayReady-capable Android; everywhere else this surfaces a clean DRM error, which is itself worth demonstrating." }
+      ]
+    },
+    {
+      "id": "bbc-testcard",
+      "title": "BBC Test Card",
+      "note": "The same one-hour reference content as VOD and as a simulcast, across DASH and HLS, AVC and HEVC. iOS cannot play any of these: the test card's HLS uses in-band parameter sets (avc3), and AVPlayer has no DASH.",
+      "items": [
+        { "id": "bbc-vod-dash-avc",   "title": "AVC",  "label": "BBC Test Card · VOD · DASH (AVC)",   "url": "https://rdmedia.bbc.co.uk/testcard/vod/manifests/avc-full.mpd",        "mimeType": "DASH", "poster": "bbcTestcard", "tags": ["VOD", "DASH"] },
+        { "id": "bbc-vod-hls-avc",    "title": "AVC",  "label": "BBC Test Card · VOD · HLS (AVC)",    "url": "https://rdmedia.bbc.co.uk/testcard/vod/manifests/avc-full.m3u8",       "mimeType": "HLS",  "poster": "bbcTestcard", "tags": ["VOD", "HLS"] },
+        { "id": "bbc-live-dash-avc",  "title": "AVC",  "label": "BBC Test Card · Live · DASH (AVC)",  "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/avc-full.mpd",  "mimeType": "DASH", "poster": "bbcTestcard", "tags": ["LIVE", "DASH"] },
+        { "id": "bbc-live-hls-avc",   "title": "AVC",  "label": "BBC Test Card · Live · HLS (AVC)",   "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/avc-full.m3u8", "mimeType": "HLS",  "poster": "bbcTestcard", "tags": ["LIVE", "HLS"] },
+        { "id": "bbc-live-dash-hevc", "title": "HEVC", "label": "BBC Test Card · Live · DASH (HEVC)", "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/hevc-ctv.mpd",  "mimeType": "DASH", "poster": "bbcTestcard", "tags": ["LIVE", "DASH"], "note": "HEVC: no Chrome decoder." },
+        { "id": "bbc-live-hls-hevc",  "title": "HEVC", "label": "BBC Test Card · Live · HLS (HEVC)",  "url": "https://rdmedia.bbc.co.uk/testcard/simulcast/manifests/hevc-ctv.m3u8", "mimeType": "HLS",  "poster": "bbcTestcard", "tags": ["LIVE", "HLS"],  "note": "HEVC: no Chrome decoder." }
       ]
     },
     {

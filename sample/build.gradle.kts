@@ -85,8 +85,13 @@ kotlin {
         }
     }
 
-    iosArm64()
-    iosSimulatorArm64()
+    // A static framework the iOS host (sample/iosApp) links and presents via mainViewController().
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+        target.binaries.framework {
+            baseName = "OutisSample"
+            isStatic = true
+        }
+    }
 
     // `binaries.executable()`, unlike :core and :ui which publish libraries — this target produces the
     // web demo bundle that the Pages workflow publishes.
