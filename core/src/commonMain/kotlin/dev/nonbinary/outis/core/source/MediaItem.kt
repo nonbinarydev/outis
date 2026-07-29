@@ -62,8 +62,9 @@ data class MediaItem(
     val startPositionMs: Long? = null,
     /**
      * Begin playback muted regardless of the player's current volume — the autoplay-muted pattern for
-     * feeds/reels (and a hard requirement for browsers that block unmuted autoplay). Only ever forces
-     * mute **on**; it never unmutes. Honoured on Android, iOS and Web.
+     * feeds/reels. Not needed merely to autoplay on the web: the web engine already retries muted when a
+     * browser blocks unmuted autoplay, so leave this off unless a muted start is the intended experience.
+     * Only ever forces mute **on**; it never unmutes. Honoured on Android, iOS and Web.
      */
     val startMuted: Boolean = false,
     /**

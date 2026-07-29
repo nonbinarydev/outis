@@ -1,0 +1,17 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Copy this file to Local.xcconfig (same folder) and set your Apple Developer Team
+// ID to run on a real device. Local.xcconfig is git-ignored, so your team ID is
+// never committed. Simulator builds don't need any of this.
+//
+//   cp Local.xcconfig.example Local.xcconfig
+//
+// Find your Team ID in Xcode ▸ Settings ▸ Accounts (select your team — it's the
+// 10-character ID), or at developer.apple.com ▸ Membership. Signing is Automatic,
+// so this plus being signed into Xcode is all a device build needs.
+// ─────────────────────────────────────────────────────────────────────────────
+
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+
+// Optional — only if dev.nonbinary.outis.sample is already registered to another
+// team. Appended to the bundle id to make it unique to you.
+// TEAM_ID = .yourname

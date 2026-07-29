@@ -71,6 +71,7 @@ private const val ASPECT_16_9 = 16f / 9f
 private val PLAYER_MAX_WIDTH = 960.dp
 private val EDGE_PADDING = 16.dp
 private val LOCKUP_HEIGHT = 128.dp
+private val LOCKUP_MIN_HEIGHT = 48.dp
 private val LOCKUP_GAP = 24.dp
 private val STATUS_GAP = 16.dp
 
@@ -244,14 +245,18 @@ private fun BoxWithConstraintsScope.OverlayChrome(
     onSettings: () -> Unit,
     onDiagnostics: () -> Unit,
 ) {
-    if (lockupSpaceAbove >= LOCKUP_HEIGHT + LOCKUP_GAP + EDGE_PADDING) {
+    // Fit the lockup to the room above the player — full size in portrait, scaled down in a short
+    // landscape window (e.g. iPad landscape, where the centred player leaves less than the full lockup
+    // height above it) — and hide it only when there is genuinely no room.
+    val lockupHeight = (lockupSpaceAbove - LOCKUP_GAP - EDGE_PADDING).coerceAtMost(LOCKUP_HEIGHT)
+    if (lockupHeight >= LOCKUP_MIN_HEIGHT) {
         Image(
             painter = painterResource(Res.drawable.outis_lockup),
             contentDescription = "Outis — a Kotlin Multiplatform video player",
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = lockupSpaceAbove - LOCKUP_GAP - LOCKUP_HEIGHT)
-                .height(LOCKUP_HEIGHT),
+                .padding(top = lockupSpaceAbove - LOCKUP_GAP - lockupHeight)
+                .height(lockupHeight),
         )
     }
     Column(

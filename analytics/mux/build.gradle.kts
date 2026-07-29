@@ -14,6 +14,7 @@ plugins {
     alias(libs.plugins.vanniktech.mavenPublish)
     alias(libs.plugins.dokka)
     alias(libs.plugins.detekt)
+    kotlin("native.cocoapods")
 }
 
 group = "io.github.nonbinarydev"
@@ -42,6 +43,22 @@ kotlin {
 
     iosArm64()
     iosSimulatorArm64()
+
+    // Consumes Mux's iOS AVPlayer SDK for the iOS actual's cinterop bindings only. The Mux binary is
+    // linked by the consuming app (the sample's iosApp), not embedded here — this module is a Gradle
+    // dependency of :sample, whose framework does the final link.
+    cocoapods {
+        version = project.version.toString()
+        summary = "Outis Mux analytics adapter"
+        homepage = "https://github.com/nonbinarydev/outis"
+        ios.deploymentTarget = "15.3"
+        pod("Mux-Stats-AVPlayer") {
+            version = "~> 4.15"
+            // The pod's clang module is MUXSDKStats (what you `import` in Swift), not the sanitised
+            // pod name the cinterop would otherwise look for.
+            moduleName = "MUXSDKStats"
+        }
+    }
 
     js(IR) {
         browser()

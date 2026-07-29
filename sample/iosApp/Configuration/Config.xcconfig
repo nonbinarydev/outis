@@ -1,0 +1,11 @@
+BUNDLE_ID=dev.nonbinary.outis.sample
+APP_NAME=Outis
+
+// Bundle-id suffix, usually empty. Set it in Local.xcconfig to make the id unique to you if
+// dev.nonbinary.outis.sample is already registered to another team.
+TEAM_ID=
+
+// Personal signing (DEVELOPMENT_TEAM) lives in Local.xcconfig, which is git-ignored so a team ID is
+// never committed. Copy Local.xcconfig.example → Local.xcconfig and fill it in for device builds. The
+// `?` makes the include optional, so simulator builds — which need no team — work without the file.
+#include? "Local.xcconfig"

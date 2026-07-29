@@ -19,7 +19,10 @@ platform runs its native engine underneath — so there is no single player here
 <td><img src="docs/img/demo-android.png" alt="The same sample on an Android phone, playing an adaptive DASH ladder"></td>
 </tr>
 <tr>
-<td colspan="2" align="center"><em>The same Compose UI on both, with Shaka Player and Media3 underneath. 
+<td colspan="2"><img src="docs/img/demo-ios.jpg" alt="The same sample on iPad in landscape, playing Tears of Steel over HLS through AVFoundation's AVPlayer"></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><em>The same Compose UI on all three, with Shaka Player, Media3 and AVFoundation underneath. 
 
 Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo</a>, or read the <a href="sample/">sample</a>.<br></em></td>
 </tr>
@@ -59,7 +62,7 @@ ladder with `MediaItem.videoConstraints`. Full per-platform behaviour, gaps and 
 
 ## Requirements
 
-Android `minSdk` 24 and `compileSdk` 36; JVM target 11; Kotlin 2.4.10; Compose Multiplatform 1.11.1 for `:ui`. Apple
+Android `minSdk` 24 and `compileSdk` 37; JVM target 11; Kotlin 2.4.10; Compose Multiplatform 1.11.1 for `:ui`. Apple
 targets build on macOS only, and `iosArm64` / `iosSimulatorArm64` are the only ones published — there is no `iosX64`, so
 Intel Macs cannot run the simulator build.
 
