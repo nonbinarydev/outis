@@ -17,10 +17,7 @@ are Android-only, but Mux's native monitors are not.
 |---|:---:|---|
 | **Android** | full | `data-media3` hooks the ExoPlayer instance |
 | **Web** | full | `mux-embed` hooks the `<video>` element |
-| **iOS** | **none yet** | the actual is a stub — see [iOS](#ios) |
-
-On iOS, attaching the adapter is a safe no-op today: it reports nothing rather than crashing. Do not
-promise iOS Mux data until the CocoaPods SDK is wired.
+| **iOS** | full | `Mux-Stats-AVPlayer` hooks the `AVPlayerViewController` — see [iOS](#ios) |
 
 ## Add the dependency
 
@@ -45,9 +42,22 @@ Then depend on the adapter:
 implementation("io.github.nonbinarydev:outis-analytics-mux:0.1.0-alpha01")
 ```
 
-You do **not** add the Mux SDK yourself — the adapter pulls the right artifact (`data-media3` on
-Android, `mux-embed` on web) transitively. The repository above is still required, because that is where
-those transitive artifacts live.
+On **Android and web** you do **not** add the Mux SDK yourself — the adapter pulls the right artifact
+(`data-media3` on Android, `mux-embed` on web) transitively. The repository above is still required,
+because that is where the Android artifact lives.
+
+On **iOS** the Mux SDK is CocoaPods, so your app links it directly (the adapter carries only the Kotlin
+bindings). Add it to your `Podfile` and build the workspace:
+
+```ruby
+target 'YourApp' do
+  use_frameworks!
+  pod 'Mux-Stats-AVPlayer', '~> 4.15'
+end
+```
+
+Run `pod install`, then open **`YourApp.xcworkspace`** — not the `.xcodeproj`, or the linker won't find
+`MUXSDKStats`.
 
 ## Register it
 
@@ -137,9 +147,12 @@ after.
 
 ## iOS
 
-The iOS actual returns `null` — attaching the adapter does nothing there yet. The real Mux AVPlayer SDK
-is CocoaPods/SPM and cannot be built or verified on a Linux CI runner, and this repository has no iOS
-host to test against. It is a known limitation, tracked in [#42](https://github.com/nonbinarydev/outis/issues/42).
+The iOS actual binds Mux's AVPlayer SDK (`Mux-Stats-AVPlayer`, pulled in via the Kotlin CocoaPods plugin)
+to the `AVPlayerViewController` that `:ui` renders — read off `PlayerHost.nativePresentationHandle`,
+because Mux monitors the **view controller**, not the bare `AVPlayer` the handle otherwise exposes. A
+consuming iOS app links the Mux pod itself (the sample's `iosApp` does so with a one-line `Podfile`);
+this module carries only the cinterop bindings. It builds on macOS only — CocoaPods is not on the CI
+runner — so iOS QoS is not exercised in CI, but it is verified locally (beacons to `litix.io`).
 
 ## See also
 

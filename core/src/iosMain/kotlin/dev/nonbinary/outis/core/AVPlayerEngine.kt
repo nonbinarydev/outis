@@ -171,8 +171,9 @@ internal class AVPlayerEngine(
     private val trackOptions = mutableMapOf<String, Pair<AVMediaSelectionGroup, AVMediaSelectionOption>>()
     private var fairPlay: FairPlayContentKeyManager? = null // lazily created for the first FairPlay item
 
-    // CSAI: the :ui AVPlayerViewController, anchors an IMA ad-display container
-    private var imaAdContainer: UIViewController? = null
+    // The :ui AVPlayerViewController: anchors CSAI IMA's ad-display container, and is the view-level
+    // object Mux's iOS SDK monitors — surfaced to analytics components as nativePresentationHandle.
+    private val _presentation = MutableStateFlow<UIViewController?>(null)
 
     private val components = mutableListOf<PlayerComponent>()
     private val host = object : PlayerHost {
@@ -180,6 +181,7 @@ internal class AVPlayerEngine(
         override val events: SharedFlow<PlayerEvent> get() = this@AVPlayerEngine.events
         override val scope: CoroutineScope get() = this@AVPlayerEngine.scope
         override val nativePlayerHandle: StateFlow<Any?> get() = _native
+        override val nativePresentationHandle: StateFlow<Any?> get() = _presentation
     }
 
     init {
@@ -368,10 +370,10 @@ internal class AVPlayerEngine(
     }
 
     /** Register/clear the :ui ad-container view controller (the AVPlayerViewController). Main-thread only. */
-    internal fun setAdContainer(controller: UIViewController?) = onMain { imaAdContainer = controller }
+    internal fun setAdContainer(controller: UIViewController?) = onMain { _presentation.value = controller }
 
     /** The registered ad-container view controller, for an iOS IMA adapter's IMAAdDisplayContainer. */
-    internal fun adContainer(): UIViewController? = imaAdContainer
+    internal fun adContainer(): UIViewController? = _presentation.value
 
     override fun stop() = onMain {
         val avPlayer = player ?: return@onMain
@@ -424,7 +426,7 @@ internal class AVPlayerEngine(
         components.clear()
         fairPlay?.release()
         fairPlay = null
-        imaAdContainer = null
+        _presentation.value = null
         val avPlayer = player
         if (avPlayer != null) {
             timeObserver?.let { avPlayer.removeTimeObserver(it) }

@@ -9,6 +9,7 @@ package dev.nonbinary.outis.core.plugin
 import dev.nonbinary.outis.core.PlayerEvent
 import dev.nonbinary.outis.core.PlayerState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -54,4 +55,16 @@ interface PlayerHost {
 
     /** The current native player (or `null`), emitting again on every (re)construction. */
     val nativePlayerHandle: StateFlow<Any?>
+
+    /**
+     * The platform's view-level presentation object, for vendor SDKs that bind to the **view** rather
+     * than the engine — on iOS the `AVPlayerViewController` that renders the video, which is what Mux's
+     * iOS SDK monitors (not the bare `AVPlayer`). `null` where the native handle is already what such an
+     * SDK binds to (Android `ExoPlayer`, web `<video>`). Emits again on (re)mount, so an adapter can bind
+     * once the surface appears and re-bind if it is recreated.
+     */
+    val nativePresentationHandle: StateFlow<Any?> get() = NoPresentationHandle
 }
+
+/** Shared empty handle so hosts without a distinct presentation object need not override the getter. */
+private val NoPresentationHandle: StateFlow<Any?> = MutableStateFlow(null)

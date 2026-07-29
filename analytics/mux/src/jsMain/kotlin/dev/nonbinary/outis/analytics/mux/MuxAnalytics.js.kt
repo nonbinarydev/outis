@@ -35,12 +35,11 @@ private val muxEmbed: dynamic get() = muxEmbedModule.default ?: muxEmbedModule
  * keys its monitor by element id, and `destroyMonitor` needs the same key to tear the right one down.
  */
 internal actual fun bindMux(
-    handle: Any,
     appContext: AppContext,
     host: PlayerHost,
     config: MuxConfig,
 ): MuxBinding? {
-    val video = handle as? HTMLVideoElement ?: return null
+    val video = host.nativePlayerHandle.value as? HTMLVideoElement ?: return null
     if (video.id.isEmpty()) video.id = "outis-mux-${monitorCounter++}"
     val elementId = video.id
 

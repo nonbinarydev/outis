@@ -46,9 +46,10 @@ the shared `App()`; install it on a device or emulator:
 ```
 
 **iOS** — `sample/iosApp` is an Xcode host that presents the shared `App()` through
-`mainViewController()`. Open `sample/iosApp/iosApp.xcodeproj` in Xcode and Run (simulator or device);
-the Kotlin framework is built and embedded by a run-script phase
-(`:sample:embedAndSignAppleFrameworkForXcode`), so there is no manual Gradle step. For a **real device**,
+`mainViewController()`. It links Mux's iOS SDK via CocoaPods, so run `pod install` in `sample/iosApp`
+once, then open **`iosApp.xcworkspace`** (not the `.xcodeproj`) and Run (simulator or device). The Kotlin
+framework is built and embedded by a run-script phase (`:sample:embedAndSignAppleFrameworkForXcode`), so
+there is no manual Gradle step. For a **real device**,
 copy `sample/iosApp/Configuration/Local.xcconfig.example` to `Local.xcconfig` and set `DEVELOPMENT_TEAM`
 to your Apple Team ID, then sign into Xcode — signing is Automatic. `Local.xcconfig` is git-ignored, so
 your team ID is never committed.

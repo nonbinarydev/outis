@@ -22,12 +22,11 @@ import dev.nonbinary.outis.core.plugin.PlayerHost
  * natively, not via `PlayerEvent` (ADR-0003).
  */
 internal actual fun bindMux(
-    handle: Any,
     appContext: AppContext,
     host: PlayerHost,
     config: MuxConfig,
 ): MuxBinding? {
-    val player = handle as? ExoPlayer ?: return null
+    val player = host.nativePlayerHandle.value as? ExoPlayer ?: return null
     val state = host.state.value
     val item = state.mediaItem
     val analytics = item?.analytics
