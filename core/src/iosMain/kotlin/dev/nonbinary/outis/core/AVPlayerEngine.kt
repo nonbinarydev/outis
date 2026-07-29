@@ -170,6 +170,7 @@ internal class AVPlayerEngine(
     private var textGroup: AVMediaSelectionGroup? = null
     private val trackOptions = mutableMapOf<String, Pair<AVMediaSelectionGroup, AVMediaSelectionOption>>()
     private var fairPlay: FairPlayContentKeyManager? = null // lazily created for the first FairPlay item
+    private var clearKey: ClearKeyContentKeyManager? = null // lazily created for the first Clear Key item
 
     // The :ui AVPlayerViewController: anchors CSAI IMA's ad-display container, and is the view-level
     // object Mux's iOS SDK monitors — surfaced to analytics components as nativePresentationHandle.
@@ -237,18 +238,25 @@ internal class AVPlayerEngine(
                 mapOf<Any?, Any?>("AVURLAssetHTTPHeaderFieldsKey" to item.headers.toMap())
             }
         val asset = AVURLAsset(uRL = url, options = assetOptions)
-        // FairPlay: a fresh key manager per item — releasing the previous one drops any stale in-flight
-        // key work, so a slow license failure for the old asset can't be misattributed to this one.
-        // Register the asset for content-key delivery before the item starts loading. (iOS has no
-        // Widevine/PlayReady CDM, so other schemes aren't applied and will fail to play.)
+        // FairPlay / Clear Key: a fresh key manager per item — releasing the previous one drops any stale
+        // in-flight key work, so a slow license failure for the old asset can't be misattributed to this
+        // one. Register the asset for content-key delivery before the item starts loading. (iOS has no
+        // Widevine/PlayReady CDM, so those schemes aren't applied and fail to play; Clear Key is served
+        // over HLS via AVContentKeySystemClearKey.)
         // DrmConfig.widevineLevel is intentionally ignored: FairPlay exposes no client-settable security
         // level (the device + license server decide), and there's no in-app Widevine to force a level on.
         fairPlay?.release()
         fairPlay = null
+        clearKey?.release()
+        clearKey = null
         val drm = item.drmConfig
         if (drm?.scheme == DrmScheme.FAIRPLAY && drm.certificateUrl != null) {
             val manager = FairPlayContentKeyManager { err -> onMain { emitErrorOnce(err) } }
             fairPlay = manager
+            manager.prepare(asset, drm)
+        } else if (drm?.scheme == DrmScheme.CLEARKEY && drm.clearKeys.isNotEmpty()) {
+            val manager = ClearKeyContentKeyManager { err -> onMain { emitErrorOnce(err) } }
+            clearKey = manager
             manager.prepare(asset, drm)
         }
         val playerItem = AVPlayerItem(asset = asset)
@@ -426,6 +434,8 @@ internal class AVPlayerEngine(
         components.clear()
         fairPlay?.release()
         fairPlay = null
+        clearKey?.release()
+        clearKey = null
         _presentation.value = null
         val avPlayer = player
         if (avPlayer != null) {

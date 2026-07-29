@@ -13,4 +13,5 @@ actual fun drmSchemeCaveat(scheme: DrmScheme): String? = when (scheme) {
     DrmScheme.FAIRPLAY -> null
     DrmScheme.WIDEVINE -> "AVFoundation has no Widevine CDM — FairPlay is the only scheme on iOS."
     DrmScheme.PLAYREADY -> "AVFoundation has no PlayReady CDM — FairPlay is the only scheme on iOS."
+    DrmScheme.CLEARKEY -> "Clear Key plays over HLS only on iOS (AVPlayer has no DASH)."
 }

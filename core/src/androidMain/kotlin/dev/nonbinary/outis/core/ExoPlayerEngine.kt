@@ -11,6 +11,7 @@ import android.media.MediaDrm
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Base64
 import android.util.Log
 import android.view.ViewGroup
 import android.view.accessibility.CaptioningManager
@@ -35,6 +36,7 @@ import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
 import androidx.media3.exoplayer.drm.ExoMediaDrm
 import androidx.media3.exoplayer.drm.FrameworkMediaDrm
 import androidx.media3.exoplayer.drm.HttpMediaDrmCallback
+import androidx.media3.exoplayer.drm.LocalMediaDrmCallback
 import androidx.media3.exoplayer.drm.MediaDrmCallback
 import androidx.media3.exoplayer.ima.ImaAdsLoader
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -761,18 +763,21 @@ private fun MimeType.toExoMimeType(): String = when (this) {
     MimeType.MP4 -> MimeTypes.VIDEO_MP4
     MimeType.HLS -> MimeTypes.APPLICATION_M3U8
     MimeType.DASH -> MimeTypes.APPLICATION_MPD
+    MimeType.WEBM -> MimeTypes.VIDEO_WEBM
 }
 
 /**
  * Map [DrmConfig] onto a Media3 [ExoMediaItem.DrmConfiguration]; ExoPlayer's default media-source
  * factory turns it into a `DefaultDrmSessionManager` automatically. FairPlay is an Apple key system,
- * not an Android one, so it produces no configuration here.
+ * not an Android one, so it produces no configuration here. ClearKey also returns null — its keys are
+ * local, so it goes through [customDrmSessionManagerProvider] instead of the declarative path.
  */
 private fun DrmConfig.toExoDrmConfiguration(): ExoMediaItem.DrmConfiguration? {
     val uuid = when (scheme) {
         DrmScheme.WIDEVINE -> C.WIDEVINE_UUID
         DrmScheme.PLAYREADY -> C.PLAYREADY_UUID
         DrmScheme.FAIRPLAY -> return null
+        DrmScheme.CLEARKEY -> return null
     }
     return ExoMediaItem.DrmConfiguration.Builder(uuid)
         .setLicenseUri(licenseServerUrl)
@@ -783,26 +788,37 @@ private fun DrmConfig.toExoDrmConfiguration(): ExoMediaItem.DrmConfiguration? {
 
 /**
  * The display name of [drm]'s scheme if this device can't satisfy it (so the caller can fail fast with a
- * clear error), or null when it's playable. FairPlay has no Android CDM at all; Widevine and PlayReady
- * are queried against the platform via [MediaDrm.isCryptoSchemeSupported].
+ * clear error), or null when it's playable. FairPlay has no Android CDM at all; Widevine, PlayReady and
+ * ClearKey are queried against the platform via [MediaDrm.isCryptoSchemeSupported].
  */
 private fun unsupportedDrmLabel(drm: DrmConfig?): String? = when (drm?.scheme) {
     null -> null
     DrmScheme.FAIRPLAY -> "FairPlay"
     DrmScheme.WIDEVINE -> if (MediaDrm.isCryptoSchemeSupported(C.WIDEVINE_UUID)) null else "Widevine"
     DrmScheme.PLAYREADY -> if (MediaDrm.isCryptoSchemeSupported(C.PLAYREADY_UUID)) null else "PlayReady"
+    DrmScheme.CLEARKEY -> if (MediaDrm.isCryptoSchemeSupported(C.CLEARKEY_UUID)) null else "ClearKey"
 }
 
 /**
  * Build a [DrmSessionManagerProvider] when the declarative `DrmConfiguration` can't express what's
- * needed — i.e. a license request/response interceptor is set, **or** Widevine [WidevineLevel.L3] is
- * forced. Set on the per-item media-source factory it overrides the MediaItem's `DrmConfiguration`, so
- * once we take this path we own the whole exchange (license URL, headers, multiSession, CDM provider).
- * Returns null for FairPlay (no Android FPS) or when neither override is needed (the declarative path is
- * correct).
+ * needed — i.e. **ClearKey** (local keys, no server), a license request/response interceptor is set,
+ * **or** Widevine [WidevineLevel.L3] is forced. Set on the per-item media-source factory it overrides
+ * the MediaItem's `DrmConfiguration`, so once we take this path we own the whole exchange (license URL,
+ * headers, multiSession, CDM provider). Returns null for FairPlay (no Android FPS) or when no override is
+ * needed (the declarative path is correct).
  */
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 private fun DrmConfig.customDrmSessionManagerProvider(): DrmSessionManagerProvider? {
+    // ClearKey: the keys are supplied inline, so there is no server exchange — feed the CDM a static
+    // JWK-set license via a LocalMediaDrmCallback. Always this path (the declarative one has no slot for
+    // local keys).
+    if (scheme == DrmScheme.CLEARKEY) {
+        val sessionManager = DefaultDrmSessionManager.Builder()
+            .setUuidAndExoMediaDrmProvider(C.CLEARKEY_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+            .setMultiSession(multiSession)
+            .build(LocalMediaDrmCallback(clearKeyLicense(clearKeys)))
+        return DrmSessionManagerProvider { sessionManager }
+    }
     val hasInterceptor = licenseRequestInterceptor != null || licenseResponseInterceptor != null
     // Only L3 is software-forceable; AUTO/L1 leave the CDM to negotiate (see exoMediaDrmProvider).
     val forcesLevel = scheme == DrmScheme.WIDEVINE && widevineLevel == WidevineLevel.L3
@@ -811,19 +827,20 @@ private fun DrmConfig.customDrmSessionManagerProvider(): DrmSessionManagerProvid
         DrmScheme.WIDEVINE -> C.WIDEVINE_UUID
         DrmScheme.PLAYREADY -> C.PLAYREADY_UUID
         DrmScheme.FAIRPLAY -> return null
+        DrmScheme.CLEARKEY -> return null // handled above
     }
     // With an interceptor we drive the license exchange ourselves; otherwise (L3-only) keep Media3's
     // stock HTTP callback so the exchange the declarative path used is preserved verbatim.
     val callback: MediaDrmCallback =
         if (hasInterceptor) {
             InterceptingMediaDrmCallback(
-                licenseServerUrl,
+                licenseServerUrl.orEmpty(),
                 licenseRequestHeaders,
                 licenseRequestInterceptor,
                 licenseResponseInterceptor
             )
         } else {
-            HttpMediaDrmCallback(licenseServerUrl, false, DefaultHttpDataSource.Factory())
+            HttpMediaDrmCallback(licenseServerUrl.orEmpty(), false, DefaultHttpDataSource.Factory())
                 .apply { licenseRequestHeaders.forEach { (k, v) -> setKeyRequestProperty(k, v) } }
         }
     val sessionManager = DefaultDrmSessionManager.Builder()
@@ -831,6 +848,24 @@ private fun DrmConfig.customDrmSessionManagerProvider(): DrmSessionManagerProvid
         .setMultiSession(multiSession)
         .build(callback)
     return DrmSessionManagerProvider { sessionManager }
+}
+
+/**
+ * The W3C "Clear Key" license for [keys] (`keyId` → `key`, both hex) as a JWK Set — the response body a
+ * [LocalMediaDrmCallback] hands the ClearKey CDM. Each entry becomes a symmetric (`oct`) JWK whose `kid`
+ * and `k` are the base64url (unpadded) forms of the raw key-id and key bytes.
+ */
+private fun clearKeyLicense(keys: Map<String, String>): ByteArray {
+    fun hexToBase64Url(hex: String): String {
+        val bytes = ByteArray(hex.length / 2) {
+            ((hex[it * 2].digitToInt(16) shl 4) or hex[it * 2 + 1].digitToInt(16)).toByte()
+        }
+        return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+    }
+    val jwks = keys.entries.joinToString(",") { (keyId, key) ->
+        """{"kty":"oct","kid":"${hexToBase64Url(keyId)}","k":"${hexToBase64Url(key)}"}"""
+    }
+    return """{"keys":[$jwks],"type":"temporary"}""".encodeToByteArray()
 }
 
 /**

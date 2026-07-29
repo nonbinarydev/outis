@@ -751,7 +751,8 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
      * for AUTO) rather than relying on the rebuilt-each-call `servers`/`advanced` locals to clear them.
      * Entries for key systems the current item doesn't use linger in the merged config but are inert (no
      * matching content). FairPlay (Safari) additionally needs the application certificate, which Shaka
-     * fetches from `serverCertificateUri`. A Widevine [DrmConfig.widevineLevel] maps to EME video/audio
+     * fetches from `serverCertificateUri`; [DrmScheme.CLEARKEY] instead carries its keys inline via
+     * `clearKeys` (no server). A Widevine [DrmConfig.widevineLevel] maps to EME video/audio
      * robustness on the key system's `advanced` entry. (`multiSession` is an Android-only flag — not
      * applied here.)
      */
@@ -761,11 +762,16 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         licenseResponseInterceptor = drm?.licenseResponseInterceptor
         val servers: dynamic = js("({})")
         val advanced: dynamic = js("({})")
-        if (drm != null) {
+        val clearKeys: dynamic = js("({})")
+        if (drm != null && drm.scheme == DrmScheme.CLEARKEY) {
+            // Keys supplied inline (hex keyId:key) — no license server. Shaka takes them via `clearKeys`.
+            drm.clearKeys.forEach { (keyId, key) -> clearKeys[keyId] = key }
+        } else if (drm != null) {
             val keySystem = when (drm.scheme) {
                 DrmScheme.WIDEVINE -> "com.widevine.alpha"
                 DrmScheme.PLAYREADY -> "com.microsoft.playready"
                 DrmScheme.FAIRPLAY -> "com.apple.fps"
+                DrmScheme.CLEARKEY -> error("ClearKey is handled above")
             }
             servers[keySystem] = drm.licenseServerUrl
             // FairPlay requires the FPS application certificate; let Shaka fetch it.
@@ -790,6 +796,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         val drmConfig: dynamic = js("({})")
         drmConfig.servers = servers
         drmConfig.advanced = advanced
+        drmConfig.clearKeys = clearKeys
         val config: dynamic = js("({})")
         config.drm = drmConfig
         shakaPlayer.configure(config)
@@ -1021,7 +1028,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
 
 /** Adaptive (Shaka) vs progressive (native `video.src`) — Shaka can't play single-file mp4/webm. */
 private fun isProgressive(item: MediaItem, url: String): Boolean = when (item.mimeType) {
-    MimeType.MP4 -> true
+    MimeType.MP4, MimeType.WEBM -> true
 
     MimeType.HLS, MimeType.DASH -> false
 

@@ -122,5 +122,6 @@ internal fun muxDrmType(scheme: DrmScheme?): String? = when (scheme) {
     DrmScheme.WIDEVINE -> "widevine"
     DrmScheme.PLAYREADY -> "playready"
     DrmScheme.FAIRPLAY -> "fairplay"
+    DrmScheme.CLEARKEY -> "clearkey"
     null -> null
 }

@@ -1,7 +1,7 @@
 {
   "$comment": "Sample-app stream catalogue. See README.md in this directory for the schema contract.",
   "version": 1,
-  "updated": "2026-07-23",
+  "updated": "2026-07-29",
   "posters": {
     "bbcTestcard": "https://ichef.bbci.co.uk/images/ic/1920x1080/p0cmk788.jpg",
     "bigBuckBunny": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg",
@@ -11,15 +11,13 @@
     {
       "id": "big-buck-bunny",
       "title": "Big Buck Bunny",
-      "note": "The same film across delivery formats and codecs. No clean public Widevine or FairPlay Big Buck Bunny stream exists — every one is clear except Microsoft's PlayReady-only asset — so general DRM is demonstrated on the Streams rail instead.",
+      "note": "The same film across delivery formats and codecs — our own encode, self-hosted on Cloudflare R2, each rendition carrying a burned-in info board (resolution, codec, bitrate, timecode). DRM is demonstrated on the Streams rail.",
       "items": [
-        { "id": "bbb-hls",  "title": "Adaptive",    "label": "Big Buck Bunny · HLS (adaptive, up to 1080p)",       "url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",                                        "mimeType": "HLS",  "poster": "bigBuckBunny", "tags": ["VOD", "HLS"],               "note": "All-avc1 master, so it plays on every engine including iOS." },
-        { "id": "bbb-4k",   "title": "Adaptive",    "label": "Big Buck Bunny · DASH · 4K (H.264, up to 2160p)",    "url": "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",                                "mimeType": "DASH", "poster": "bigBuckBunny", "tags": ["VOD", "DASH", "4K"],        "note": "Genuine 3840x2160 H.264 ladder — verified, unlike many listings that label 1080p as 4K. Android and web only; AVPlayer has no DASH." },
-        { "id": "bbb-mp4",  "title": "Progressive", "label": "Big Buck Bunny · MP4 (progressive, 360p)",           "url": "https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_640x360.m4v",          "mimeType": "MP4",  "poster": "bigBuckBunny", "tags": ["VOD", "MP4"],               "note": "MimeType.MP4 routes this to the native <video> element on web. The old commondatastorage.googleapis.com BBB mp4 is now 403 — do not use it." },
-        { "id": "bbb-av1",  "title": "AV1",         "label": "Big Buck Bunny · AV1 (MP4, progressive)",            "url": "https://storage.googleapis.com/downloads.webmproject.org/av1/exoplayer/bbb-av1-480p.mp4",  "mimeType": "MP4",  "poster": "bigBuckBunny", "tags": ["VOD", "MP4", "AV1"],        "note": "Chrome and Android decode AV1; iOS and Safari surface a graceful codec error." },
-        { "id": "bbb-playready", "title": "PlayReady", "label": "Big Buck Bunny · DASH · PlayReady DRM",           "url": "https://test.playready.microsoft.com/media/dash/APPLEENC_CBCS_BBB_1080p/1080p.mpd",        "mimeType": "DASH", "poster": "bigBuckBunny", "tags": ["DASH", "DRM"],
-          "drm": { "scheme": "PLAYREADY", "licenseServerUrl": "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:150)" },
-          "note": "The only DRM-protected Big Buck Bunny asset that exists. PlayReady decrypts only on Edge/Windows and PlayReady-capable Android; everywhere else this surfaces a clean DRM error, which is itself worth demonstrating." }
+        {"id": "bbb-hls", "title": "Adaptive", "label": "Big Buck Bunny · HLS · 240p–2160p (H.264 + HEVC)", "url": "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/hls/master.m3u8", "mimeType": "HLS", "poster": "bigBuckBunny", "tags": ["VOD", "HLS", "4K"], "note": "Our own encode, self-hosted on R2: a 240p–2160p H.264 ladder with an HEVC rung, English/Commentary/Surround audio, en/es/ar/ja subtitles, and a burned-in info board."},
+        {"id": "bbb-dash", "title": "Adaptive", "label": "Big Buck Bunny · DASH · 240p–2160p (H.264 + HEVC)", "url": "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/dash/manifest.mpd", "mimeType": "DASH", "poster": "bigBuckBunny", "tags": ["VOD", "DASH", "4K"], "note": "The same CMAF segments as the HLS stream, via DASH. Android and web only — AVPlayer has no DASH."},
+        {"id": "bbb-mp4", "title": "Progressive", "label": "Big Buck Bunny · MP4 · H.264 1080p", "url": "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/progressive/bbb-1080p.mp4", "mimeType": "MP4", "poster": "bigBuckBunny", "tags": ["VOD", "MP4"], "note": "Single-file H.264/AAC with faststart and embedded chapters — routes to the native <video> element on web and plays on every engine."},
+        {"id": "bbb-av1", "title": "AV1", "label": "Big Buck Bunny · AV1 720p (MP4)", "url": "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/progressive/bbb-720p-av1.mp4", "mimeType": "MP4", "poster": "bigBuckBunny", "tags": ["VOD", "MP4", "AV1"], "note": "AV1 in MP4: Chrome, Firefox, Android and Safari 17+ decode it; older engines surface a graceful codec error."},
+        {"id": "bbb-webm", "title": "VP9", "label": "Big Buck Bunny · VP9 1080p (WebM)", "url": "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/progressive/bbb-1080p.webm", "mimeType": "WEBM", "poster": "bigBuckBunny", "tags": ["VOD", "WebM", "VP9"], "note": "VP9 in WebM: Chrome, Firefox and Android play it via the media element / ExoPlayer; AVPlayer can't decode WebM, so iOS surfaces a clean codec error."}
       ]
     },
     {
@@ -55,7 +53,16 @@
         { "id": "elephants-dream","title": "Elephants Dream","label": "Elephants Dream · DASH",   "url": "https://rdmedia.bbc.co.uk/elephants_dream/1/client_manifest-all.mpd",                                "mimeType": "DASH","tint": "#4B5563", "tags": ["DASH"] },
         { "id": "fairplay",       "title": "FairPlay",       "label": "FairPlay DRM · HLS",       "url": "https://fps.ezdrm.com/demo/video/ezdrm.m3u8",                                                        "mimeType": "HLS", "tint": "#5B21B6", "tags": ["HLS", "DRM"],
           "drm": { "scheme": "FAIRPLAY", "licenseServerUrl": "https://fps.ezdrm.com/api/licenses/09cc0377-6dd4-40cb-b09d-b582236e70fe", "certificateUrl": "https://fps.ezdrm.com/demo/video/eleisure.cer" },
-          "note": "FairPlay requires certificateUrl; without it the key session cannot start." }
+          "note": "FairPlay requires certificateUrl; without it the key session cannot start." },
+        { "id": "bbb-playready",  "title": "PlayReady",      "label": "Big Buck Bunny · PlayReady DRM · DASH", "url": "https://test.playready.microsoft.com/media/dash/APPLEENC_CBCS_BBB_1080p/1080p.mpd",                "mimeType": "DASH", "tint": "#155E75", "tags": ["DASH", "DRM"],
+          "drm": { "scheme": "PLAYREADY", "licenseServerUrl": "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:150)" },
+          "note": "Microsoft's public PlayReady test asset (cbcs, 1080p). Decrypts on Edge/Windows and PlayReady-capable Android; everywhere else it surfaces a clean DRM error — itself worth demonstrating." },
+        { "id": "bbb-clearkey",     "title": "Clear Key · DASH", "label": "Big Buck Bunny · Clear Key DRM · DASH", "url": "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/clearkey/dash/manifest.mpd", "mimeType": "DASH", "tint": "#0F766E", "tags": ["DASH", "DRM"],
+          "drm": { "scheme": "CLEARKEY", "keys": { "13742cd4a943728a3e4af034a49baa2c": "d790ab0fe42fc7abcce2e31878a3115c" } },
+          "note": "W3C Clear Key over our own encrypted DASH — keys delivered inline, no license server, so it's a demo of the DRM path rather than real protection. Android and web decrypt it; iOS needs the HLS sibling below (AVPlayer has no DASH)." },
+        { "id": "bbb-clearkey-hls", "title": "Clear Key · HLS",  "label": "Big Buck Bunny · Clear Key DRM · HLS",  "url": "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/clearkey/hls/master.m3u8", "mimeType": "HLS", "tint": "#0E7490", "tags": ["HLS", "DRM"],
+          "drm": { "scheme": "CLEARKEY", "keys": { "13742cd4a943728a3e4af034a49baa2c": "d790ab0fe42fc7abcce2e31878a3115c" } },
+          "note": "The same Clear Key content as HLS (SAMPLE-AES, fMP4) — the container iOS needs, since AVPlayer has no DASH. Exercises the new iOS AVContentKeySession Clear Key path; the DASH sibling is the proven Android/web demo." }
       ]
     },
     {

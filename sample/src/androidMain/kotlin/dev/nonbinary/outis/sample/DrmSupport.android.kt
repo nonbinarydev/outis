@@ -14,6 +14,7 @@ import java.util.UUID
 // not reach into the engine's dependencies for two constants.
 private val WIDEVINE_UUID = UUID.fromString("edef8ba9-79d6-4ace-a3c8-27dcd51d21ed")
 private val PLAYREADY_UUID = UUID.fromString("9a04f079-9840-4286-ab92-e65be0885f95")
+private val CLEARKEY_UUID = UUID.fromString("1077efec-c0b2-4d02-ace3-3c1e52e2fb4b")
 
 /**
  * The only platform here that can answer honestly: support is a property of the *device*, not the OS
@@ -25,5 +26,7 @@ actual fun drmSchemeCaveat(scheme: DrmScheme): String? = when (scheme) {
         if (MediaDrm.isCryptoSchemeSupported(WIDEVINE_UUID)) null else "This device reports no Widevine CDM."
     DrmScheme.PLAYREADY ->
         if (MediaDrm.isCryptoSchemeSupported(PLAYREADY_UUID)) null else "This device reports no PlayReady CDM."
+    DrmScheme.CLEARKEY ->
+        if (MediaDrm.isCryptoSchemeSupported(CLEARKEY_UUID)) null else "This device reports no Clear Key CDM."
     DrmScheme.FAIRPLAY -> "FairPlay is an Apple key system — not available on Android."
 }

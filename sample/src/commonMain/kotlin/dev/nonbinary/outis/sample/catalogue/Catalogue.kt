@@ -14,6 +14,8 @@ import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
 import dev.nonbinary.outis.sample.CUSTOM_STREAM_ID
+import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -64,9 +66,12 @@ data class CatalogueItem(
 @Serializable
 data class CatalogueDrm(
     val scheme: DrmScheme,
-    val licenseServerUrl: String,
+    /** Null for CLEARKEY, which carries its keys inline in [keys] rather than fetching them from a server. */
+    val licenseServerUrl: String? = null,
     /** FairPlay only, and mandatory there — without the FPS application certificate no key session starts. */
     val certificateUrl: String? = null,
+    /** CLEARKEY only: content keys as hex `keyId` → hex `key`. */
+    val keys: Map<String, String>? = null,
 )
 
 @Serializable
@@ -90,6 +95,7 @@ fun CatalogueItem.toMediaItem(startMuted: Boolean = false, series: String? = nul
             scheme = it.scheme,
             licenseServerUrl = it.licenseServerUrl,
             certificateUrl = it.certificateUrl,
+            clearKeys = it.keys?.toImmutableMap() ?: persistentMapOf(),
         )
     },
     adConfig = ads?.takeIf { it.type == "clientSide" }?.adTagUri?.let { AdConfig.ClientSide(adTagUri = it) },

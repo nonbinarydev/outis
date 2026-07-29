@@ -11,8 +11,8 @@ import pathlib
 import sys
 
 CATALOGUE = pathlib.Path(__file__).with_name("catalogue.json")
-MIME_TYPES = {"HLS", "DASH", "MP4"}
-DRM_SCHEMES = {"WIDEVINE", "PLAYREADY", "FAIRPLAY"}
+MIME_TYPES = {"HLS", "DASH", "MP4", "WEBM"}
+DRM_SCHEMES = {"WIDEVINE", "PLAYREADY", "FAIRPLAY", "CLEARKEY"}
 REQUIRED_ITEM_FIELDS = ("id", "title", "label", "url", "mimeType")
 
 
@@ -67,12 +67,17 @@ def main() -> int:
 
             drm = item.get("drm")
             if drm is not None:
-                if drm.get("scheme") not in DRM_SCHEMES:
+                scheme = drm.get("scheme")
+                if scheme not in DRM_SCHEMES:
                     errors.append(f"{at}: drm.scheme must be one of {sorted(DRM_SCHEMES)}")
-                if not drm.get("licenseServerUrl"):
+                if scheme == "CLEARKEY":
+                    # Clear Key carries its keys inline (hex keyId -> hex key); there is no license server.
+                    if not drm.get("keys"):
+                        errors.append(f"{at}: ClearKey requires drm.keys")
+                elif not drm.get("licenseServerUrl"):
                     errors.append(f"{at}: drm.licenseServerUrl is required")
                 # FairPlay cannot start a key session without the application certificate.
-                if drm.get("scheme") == "FAIRPLAY" and not drm.get("certificateUrl"):
+                if scheme == "FAIRPLAY" and not drm.get("certificateUrl"):
                     errors.append(f"{at}: FairPlay requires drm.certificateUrl")
 
             ads = item.get("ads")
