@@ -53,8 +53,11 @@ object VttThumbnails {
     }
 
     private fun resolveUrl(base: String, ref: String): String =
-        if (ref.startsWith("http://") || ref.startsWith("https://")) ref
-        else base.substringBeforeLast('/', "") + "/" + ref
+        if (ref.startsWith("http://") || ref.startsWith("https://")) {
+            ref
+        } else {
+            base.substringBeforeLast('/', "") + "/" + ref
+        }
 
     private fun parseTimestamp(raw: String?): Long? {
         val s = raw?.trim().orEmpty()
@@ -65,8 +68,16 @@ object VttThumbnails {
             val minutes: Long
             val secondsField: String
             when (parts.size) {
-                THREE_PART -> { hours = parts[0].toLong(); minutes = parts[1].toLong(); secondsField = parts[2] }
-                TWO_PART -> { hours = 0; minutes = parts[0].toLong(); secondsField = parts[1] }
+                THREE_PART -> {
+                    hours = parts[0].toLong()
+                    minutes = parts[1].toLong()
+                    secondsField = parts[2]
+                }
+                TWO_PART -> {
+                    hours = 0
+                    minutes = parts[0].toLong()
+                    secondsField = parts[1]
+                }
                 else -> return null
             }
             val seconds = secondsField.substringBefore('.').toLong()

@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.PlayerError
 import dev.nonbinary.outis.core.VideoPlayer
+import dev.nonbinary.outis.core.VideoRange
 import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.track.MediaTrack
@@ -145,6 +146,9 @@ class PlayerControlsState internal constructor(
 
     /** Trickplay seek-preview thumbnails, sorted by start; empty when the asset carries none. */
     val thumbnails: ImmutableList<ThumbnailCue> get() = snapshot.thumbnails
+
+    /** Colour/dynamic range of the current video rendition; [VideoRange.SDR] until an HDR track is selected. */
+    val videoRange: VideoRange get() = snapshot.videoRange
 
     /** Id of the active audio track, or `null` when nothing has been resolved yet. */
     val selectedAudioTrackId: String? get() = snapshot.selectedAudioTrackId

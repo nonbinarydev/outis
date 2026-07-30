@@ -22,6 +22,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.PlayerEvent
 import dev.nonbinary.outis.core.VideoPlayer
 import dev.nonbinary.outis.core.setAdViewProvider
@@ -59,6 +60,19 @@ actual fun PlayerSurface(
         }
     }
 
+    // Keep the display awake while the user is actually watching — intending playback (playWhenReady) and
+    // not idle/ended — so the screen doesn't time out mid-video. Released when paused/ended so a paused
+    // player sleeps normally. `keepScreenOn` on the surface View scopes the flag to this view's lifetime
+    // (auto-cleared on detach), so nothing leaks the wake-lock. produceState only re-emits on a real
+    // change, so the frequent position updates on `player.state` don't churn this.
+    val keepAwake by produceState(false, player) {
+        player.state.collect { s ->
+            value = s.playWhenReady &&
+                s.playbackState != PlaybackState.IDLE &&
+                s.playbackState != PlaybackState.ENDED
+        }
+    }
+
     // Picture-in-picture animates from a source rectangle, and this composable *is* that rectangle —
     // nothing else knows where the video sits on screen. Recorded here so `rememberPlayerWindow` can
     // pass it as a sourceRectHint without every host having to measure its own layout and plumb it in.
@@ -80,6 +94,7 @@ actual fun PlayerSurface(
         },
         update = { view ->
             view.player = media3Player
+            view.keepScreenOn = keepAwake
             // This Media3 PlayerView is an AdViewProvider — hand it to the engine so IMA renders its ad
             // UI (skip/countdown/click-through) into this surface for client-side ads.
             player.setAdViewProvider(view)

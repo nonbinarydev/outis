@@ -42,8 +42,16 @@ object VttChapters {
             val minutes: Long
             val secondsField: String
             when (parts.size) {
-                3 -> { hours = parts[0].toLong(); minutes = parts[1].toLong(); secondsField = parts[2] }
-                2 -> { hours = 0; minutes = parts[0].toLong(); secondsField = parts[1] }
+                3 -> {
+                    hours = parts[0].toLong()
+                    minutes = parts[1].toLong()
+                    secondsField = parts[2]
+                }
+                2 -> {
+                    hours = 0
+                    minutes = parts[0].toLong()
+                    secondsField = parts[1]
+                }
                 else -> return null
             }
             val seconds = secondsField.substringBefore('.').toLong()

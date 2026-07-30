@@ -8,8 +8,8 @@ package dev.nonbinary.outis.core
 
 import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.Chapter
-import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.source.MediaItem
+import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.track.MediaTrack
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -84,6 +84,17 @@ data class PlayerState(
      * only** at present — the iOS and web engines leave this `null`, so never gate layout on it.
      */
     val videoSize: VideoSize? = null,
+    /**
+     * Colour/dynamic range of the current video rendition. Changes mid-playback as adaptive streaming or the
+     * device negotiates between an HDR and an SDR rendition. [VideoRange.DOLBY_VISION] means Dolby Vision is
+     * engaged (its base is always PQ). Defaults to [VideoRange.SDR]; each engine upgrades it once a track is
+     * selected.
+     *
+     * Platform note: on iOS, [VideoRange.DOLBY_VISION] is reported only for progressive/local assets (from the
+     * track's format description). Over **HLS** a Dolby Vision stream reads as [VideoRange.HDR10] — AVFoundation
+     * exposes no per-variant codec, so the range comes from the decoded frame's transfer function, which is PQ.
+     */
+    val videoRange: VideoRange = VideoRange.SDR,
     /** What is currently loaded, so late subscribers can read "what's playing" without replaying events. */
     val mediaItem: MediaItem? = null,
     /**
@@ -170,6 +181,24 @@ data class VideoSize(
     /** Frame height in pixels. */
     val height: Int,
 )
+
+/**
+ * Colour/dynamic range of a video rendition. Flat rather than a "range + separate DV flag": at the app level
+ * the meaningful distinction is the label to surface, and [DOLBY_VISION] already implies a PQ (HDR) base.
+ */
+enum class VideoRange {
+    /** Standard dynamic range (Rec.709 / gamma). */
+    SDR,
+
+    /** HDR10 — PQ (SMPTE ST 2084) transfer with static metadata. */
+    HDR10,
+
+    /** Hybrid Log-Gamma HDR. */
+    HLG,
+
+    /** Dolby Vision is engaged. Its base layer is PQ, so this is also HDR. */
+    DOLBY_VISION,
+}
 
 /** A selectable/active rendition. Reserved — populated when track selection ships. */
 data class VideoFormat(

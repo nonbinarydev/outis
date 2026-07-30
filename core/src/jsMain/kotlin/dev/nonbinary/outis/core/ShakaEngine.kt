@@ -10,7 +10,6 @@ import dev.nonbinary.outis.core.ads.Ad
 import dev.nonbinary.outis.core.ads.AdConfig
 import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
-import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
@@ -22,6 +21,7 @@ import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
 import dev.nonbinary.outis.core.source.VideoConstraints
 import dev.nonbinary.outis.core.source.WidevineLevel
+import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
 import kotlinx.browser.document
@@ -29,7 +29,6 @@ import kotlinx.browser.window
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -39,6 +38,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import org.khronos.webgl.get
@@ -216,6 +216,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     private var loadChain: dynamic = js("Promise.resolve()") // serializes loads so switches never overlap
 
     private val textTrackById = mutableMapOf<String, Any?>() // shaka text-track objects (dynamic can't be a type arg)
+
     /** How to re-select an audio stream when same-language streams must be told apart (label first). */
     private class ShakaAudioSelection(val language: String, val label: String?)
 
@@ -732,8 +733,11 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
             TrackType.AUDIO -> audioSelectionById[track.id]?.let { sel ->
                 // Label picks the exact stream when languages collide (stereo vs 5.1 vs commentary) and
                 // keeps video ABR, unlike selectVariantTrack; fall back to language when there's no label.
-                if (sel.label != null) shakaPlayer.selectVariantsByLabel(sel.label)
-                else shakaPlayer.selectAudioLanguage(sel.language)
+                if (sel.label != null) {
+                    shakaPlayer.selectVariantsByLabel(sel.label)
+                } else {
+                    shakaPlayer.selectAudioLanguage(sel.language)
+                }
                 // On HLS, selecting audio can re-enable text visibility; re-assert "off" if subtitles are off.
                 if (_state.value.selectedTextTrackId == null) shakaPlayer.setTextTrackVisibility(false)
                 _state.update { st ->
@@ -935,6 +939,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 durationMs = durationMs,
                 isLive = isLive,
                 isSeekable = video.seekable.length > 0,
+                videoRange = currentVideoRange(it.videoRange),
             )
         }
 
@@ -953,6 +958,18 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
             if (playbackState == PlaybackState.ENDED) emit { p, t -> PlayerEvent.Ended(p, t) }
             emit { p, t -> PlayerEvent.PlaybackStateChanged(playbackState, p, t) }
             lastPlaybackState = playbackState
+        }
+    }
+
+    /** Colour range of Shaka's active variant — DV from the codec, HDR from Shaka's `hdr` field ('PQ'/'HLG'). */
+    private fun currentVideoRange(fallback: VideoRange): VideoRange {
+        val active = shakaPlayer.getVariantTracks().firstOrNull { it.active == true } ?: return fallback
+        val codec = (active.videoCodec as? String).orEmpty()
+        return when {
+            codec.startsWith("dvh1") || codec.startsWith("dvhe") -> VideoRange.DOLBY_VISION
+            (active.hdr as? String) == "PQ" -> VideoRange.HDR10
+            (active.hdr as? String) == "HLG" -> VideoRange.HLG
+            else -> VideoRange.SDR
         }
     }
 

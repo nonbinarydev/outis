@@ -13,18 +13,21 @@ import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
-import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
 import dev.nonbinary.outis.core.source.DrmScheme
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
+import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
 import kotlinx.cinterop.BetaInteropApi
+import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
@@ -44,10 +47,12 @@ import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryOptionMixWithOthers
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.setActive
+import platform.AVFoundation.AVAssetTrack
 import platform.AVFoundation.AVMediaCharacteristicAudible
 import platform.AVFoundation.AVMediaCharacteristicLegible
 import platform.AVFoundation.AVMediaSelectionGroup
 import platform.AVFoundation.AVMediaSelectionOption
+import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVPlayerItemDidPlayToEndTimeNotification
@@ -55,9 +60,11 @@ import platform.AVFoundation.AVPlayerItemFailedToPlayToEndTimeErrorKey
 import platform.AVFoundation.AVPlayerItemFailedToPlayToEndTimeNotification
 import platform.AVFoundation.AVPlayerItemStatusFailed
 import platform.AVFoundation.AVPlayerItemStatusReadyToPlay
+import platform.AVFoundation.AVPlayerItemVideoOutput
 import platform.AVFoundation.AVPlayerTimeControlStatusPlaying
 import platform.AVFoundation.AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate
 import platform.AVFoundation.AVURLAsset
+import platform.AVFoundation.addOutput
 import platform.AVFoundation.addPeriodicTimeObserverForInterval
 import platform.AVFoundation.asset
 import platform.AVFoundation.currentItem
@@ -65,6 +72,7 @@ import platform.AVFoundation.currentTime
 import platform.AVFoundation.duration
 import platform.AVFoundation.error
 import platform.AVFoundation.extendedLanguageTag
+import platform.AVFoundation.formatDescriptions
 import platform.AVFoundation.mediaSelectionGroupForMediaCharacteristic
 import platform.AVFoundation.muted
 import platform.AVFoundation.playbackBufferEmpty
@@ -84,11 +92,21 @@ import platform.AVFoundation.setRate
 import platform.AVFoundation.setVolume
 import platform.AVFoundation.status
 import platform.AVFoundation.timeControlStatus
+import platform.AVFoundation.tracksWithMediaType
 import platform.AVFoundation.volume
+import platform.CoreFoundation.CFStringGetCStringPtr
+import platform.CoreFoundation.kCFStringEncodingUTF8
 import platform.CoreGraphics.CGSizeMake
+import platform.CoreMedia.CMFormatDescriptionGetExtension
+import platform.CoreMedia.CMFormatDescriptionGetMediaSubType
+import platform.CoreMedia.CMFormatDescriptionRef
 import platform.CoreMedia.CMTimeGetSeconds
 import platform.CoreMedia.CMTimeMake
 import platform.CoreMedia.CMTimeMakeWithSeconds
+import platform.CoreMedia.kCMFormatDescriptionExtension_TransferFunction
+import platform.CoreVideo.CVBufferGetAttachment
+import platform.CoreVideo.CVBufferRelease
+import platform.CoreVideo.kCVImageBufferTransferFunctionKey
 import platform.Foundation.NSError
 import platform.Foundation.NSNotification
 import platform.Foundation.NSNotificationCenter
@@ -262,6 +280,11 @@ internal class AVPlayerEngine(
             manager.prepare(asset, drm)
         }
         val playerItem = AVPlayerItem(asset = asset)
+        // A video-output tap: HLS exposes no video AVAssetTrack, so the only way to read the playing range is
+        // off the decoded frame's transfer function. Separate decode target — coexists with the AVPlayerLayer.
+        val output = AVPlayerItemVideoOutput(pixelBufferAttributes = null)
+        playerItem.addOutput(output)
+        videoOutput = output
         // Per-item video ceiling (defaults are unbounded; a fresh item each time, so no reset needed).
         item.videoConstraints?.let { c ->
             if (c.maxWidth != null && c.maxHeight != null) {
@@ -400,6 +423,7 @@ internal class AVPlayerEngine(
         trackOptions.clear()
         audioGroup = null
         textGroup = null
+        videoOutput = null
         startSeekTargetMs = null
         stallStartedElapsedMs = 0L
         wasPlaying = false
@@ -418,6 +442,7 @@ internal class AVPlayerEngine(
                 isSeekable = false,
                 pendingSeekTargetMs = null,
                 videoSize = null,
+                videoRange = VideoRange.SDR,
                 error = null,
                 audioTracks = persistentListOf(),
                 textTracks = persistentListOf(),
@@ -440,6 +465,7 @@ internal class AVPlayerEngine(
         fairPlay = null
         clearKey?.release()
         clearKey = null
+        videoOutput = null
         _presentation.value = null
         val avPlayer = player
         if (avPlayer != null) {
@@ -750,6 +776,60 @@ internal class AVPlayerEngine(
     // ShakaEngine.reconcile is deliberately the line-for-line mirror of this one, so refactor both
     // together or not at all.
     @Suppress("CyclomaticComplexMethod")
+    // 'dvh1' / 'dvhe' as FourCharCode — the Dolby Vision HEVC sample-entry codec types.
+    private val fourCcDvh1: UInt = 0x64766831u
+    private val fourCcDvhe: UInt = 0x64766865u
+
+    // A per-item AVPlayerItemVideoOutput used only to sample the decoded frame's colour range for HLS.
+    private var videoOutput: AVPlayerItemVideoOutput? = null
+
+    /**
+     * Colour range of the current video. Two sources, because AVFoundation surfaces this differently by
+     * container:
+     *  1. Progressive / local — the asset's video track has a [CMFormatDescription]: Dolby Vision from the
+     *     codec sub-type, HDR10/HLG from the transfer-function extension. Exact, incl. DV.
+     *  2. HLS — the asset exposes **no** video track (HLS uses internal variants), so we read the decoded
+     *     frame's transfer function off the [videoOutput] tap. This tells HDR10/HLG/SDR but **cannot** tell
+     *     Dolby Vision apart from HDR10 (DV decodes to a PQ buffer). Apple surfaces no per-variant codec.
+     * Pointer identity against the interned transfer constants throughout — CFEqual isn't importable in K/N.
+     */
+    @OptIn(ExperimentalForeignApi::class)
+    private fun currentVideoRange(item: AVPlayerItem?, fallback: VideoRange): VideoRange {
+        val tracks = item?.asset?.tracksWithMediaType(AVMediaTypeVideo)
+        val track = tracks?.firstOrNull() as? AVAssetTrack
+        val desc = track?.formatDescriptions?.firstOrNull() as? CMFormatDescriptionRef
+        if (desc != null) {
+            val sub = CMFormatDescriptionGetMediaSubType(desc)
+            if (sub == fourCcDvh1 || sub == fourCcDvhe) return VideoRange.DOLBY_VISION
+            val ext = CMFormatDescriptionGetExtension(desc, kCMFormatDescriptionExtension_TransferFunction)
+            return transferToRange(ext) ?: VideoRange.SDR
+        }
+        // HLS: no video AVAssetTrack — read the decoded frame's transfer function off the video-output tap.
+        val output = videoOutput
+        val time = item?.currentTime()
+        val hasNew = output != null && time != null && output.hasNewPixelBufferForItemTime(time)
+        val buffer = when {
+            !hasNew || output == null || time == null -> null
+            else -> output.copyPixelBufferForItemTime(time, null)
+        }
+        val tf = buffer?.let { CVBufferGetAttachment(it, kCVImageBufferTransferFunctionKey, null) }
+        val range = if (buffer == null) fallback else (transferToRange(tf) ?: VideoRange.SDR)
+        buffer?.let { CVBufferRelease(it) }
+        return range
+    }
+
+    /** HDR range from a CoreVideo/CoreMedia transfer-function value, matched by string — pointer identity fails. */
+    private fun transferToRange(cf: COpaquePointer?): VideoRange? = when (cfStringValue(cf)) {
+        "SMPTE_ST_2084_PQ" -> VideoRange.HDR10
+        "ITU_R_2100_HLG" -> VideoRange.HLG
+        null -> null
+        else -> VideoRange.SDR
+    }
+
+    /** A CFString's value as a Kotlin string, or null. */
+    private fun cfStringValue(cf: COpaquePointer?): String? =
+        cf?.let { CFStringGetCStringPtr(it.reinterpret(), kCFStringEncodingUTF8)?.toKString() }
+
     private fun reconcile() {
         val avPlayer = player ?: return
         val item = avPlayer.currentItem
@@ -807,6 +887,7 @@ internal class AVPlayerEngine(
                 // which would otherwise flicker isLive=true for a tick.
                 isLive = itemReady && durationMs == null && item?.seekableTimeRanges?.isNotEmpty() == true,
                 isSeekable = itemReady,
+                videoRange = currentVideoRange(item, it.videoRange),
             )
         }
 

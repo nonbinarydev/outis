@@ -1,10 +1,11 @@
 {
   "$comment" : "Sample-app stream catalogue. See README.md in this directory for the schema contract.",
   "version" : 1,
-  "updated" : "2026-07-29",
+  "updated" : "2026-07-30",
   "posters" : {
     "bbcTestcard" : "https://ichef.bbci.co.uk/images/ic/1920x1080/p0cmk788.jpg",
     "bigBuckBunny" : "https://nonbinarydev.github.io/outis/posters/big-buck-bunny.jpg",
+    "solLevante" : "https://nonbinarydev.github.io/outis/posters/sol-levante.jpg",
     "tearsOfSteel" : "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Tos-poster.png/1280px-Tos-poster.png"
   },
   "rails" : [ {
@@ -66,6 +67,29 @@
       "chaptersUrl" : "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/text/chapters.vtt",
       "thumbnailsUrl" : "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/thumbnails/thumbnails.vtt",
       "note" : "VP9 in WebM: Chrome, Firefox and Android play it via the media element / ExoPlayer; AVPlayer can't decode WebM, so iOS surfaces a clean codec error."
+    } ]
+  }, {
+    "id" : "sol-levante",
+    "title" : "Sol Levante",
+    "note" : "Netflix's 4K HDR anime short — our own Dolby Vision Profile 8.1 encode: DV devices play Dolby Vision, HDR10 devices play HDR10 from the same HEVC track, and everyone else gets an SDR H.264 fallback. Credit: Sol Levante / Netflix, CC BY 4.0.",
+    "items" : [ {
+      "id" : "sol-levante-hls",
+      "title" : "Adaptive",
+      "label" : "Sol Levante · HLS · Dolby Vision 8.1 / HDR10 / SDR",
+      "url" : "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/sollevante/hls/master.m3u8",
+      "mimeType" : "HLS",
+      "poster" : "solLevante",
+      "tags" : [ "VOD", "HLS", "HDR", "Dolby Vision", "4K" ],
+      "note" : "Dolby Vision (Profile 8.1) with a built-in HDR10 fallback in the same HEVC track, plus an SDR H.264 ladder. Safari/iOS and DV-capable Android play Dolby Vision; other HDR10 devices play HDR10; everyone else gets SDR. Netflix Open Content, CC BY 4.0."
+    }, {
+      "id" : "sol-levante-dash",
+      "title" : "Adaptive",
+      "label" : "Sol Levante · DASH · HDR10 / SDR",
+      "url" : "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/sollevante/dash/manifest.mpd",
+      "mimeType" : "DASH",
+      "poster" : "solLevante",
+      "tags" : [ "VOD", "DASH", "HDR", "4K" ],
+      "note" : "The same CMAF renditions via DASH — Android and web (AVPlayer has no DASH). Dolby Vision / HDR10 on capable devices, SDR otherwise."
     } ]
   }, {
     "id" : "bbc-testcard",

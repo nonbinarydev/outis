@@ -47,7 +47,6 @@ import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
-import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
@@ -58,6 +57,7 @@ import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
 import dev.nonbinary.outis.core.source.WidevineLevel
+import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
 import kotlinx.collections.immutable.persistentListOf
@@ -599,8 +599,18 @@ internal class ExoPlayerEngine(
                 videoSize = exo.videoSize.let {
                     if (it.width > 0 && it.height > 0) VideoSize(it.width, it.height) else prev.videoSize
                 },
+                videoRange = exo.videoFormat?.toVideoRange() ?: prev.videoRange,
             )
         }
+    }
+
+    /** Colour range of the selected video [androidx.media3.common.Format] (DV from the codec, HDR from the transfer). */
+    private fun androidx.media3.common.Format.toVideoRange(): VideoRange = when {
+        androidx.media3.common.MimeTypes.VIDEO_DOLBY_VISION.equals(sampleMimeType, ignoreCase = true) ||
+            codecs?.let { it.startsWith("dvh1") || it.startsWith("dvhe") } == true -> VideoRange.DOLBY_VISION
+        colorInfo?.colorTransfer == C.COLOR_TRANSFER_ST2084 -> VideoRange.HDR10
+        colorInfo?.colorTransfer == C.COLOR_TRANSFER_HLG -> VideoRange.HLG
+        else -> VideoRange.SDR
     }
 
     /** Stamp an event with the last-known content position + a monotonic clock. Never touches the player. */

@@ -254,6 +254,7 @@ private fun ThumbnailPreview(
 
 private val ScrubberThumbSize = 12.dp
 private val ScrubberTrackHeight = 4.dp
+
 // The whole scrubber row is this tall so the drag target is a comfortable ~40.dp band; the thin track and
 // dot are drawn centred within it. 12.dp (the old height) made the seek bar fiddly to grab, esp. on Android.
 private val ScrubberTouchHeight = 40.dp
