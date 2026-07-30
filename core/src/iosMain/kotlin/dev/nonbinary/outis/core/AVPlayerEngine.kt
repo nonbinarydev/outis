@@ -13,6 +13,7 @@ import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
+import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
@@ -303,11 +304,13 @@ internal class AVPlayerEngine(
                 selectedAudioTrackId = null,
                 selectedTextTrackId = null,
                 chapters = persistentListOf(),
+                thumbnails = persistentListOf(),
             )
         }
         emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
         emit { p, t -> PlayerEvent.BufferingStarted(p, t) }
         extractChaptersFor(item)
+        loadThumbnailsFor(item)
     }
 
     override fun play() = onMain {
@@ -592,6 +595,19 @@ internal class AVPlayerEngine(
      * [ChapterExtractor] over the local file, and publish them. AVFoundation can't open mkv, so there are
      * never mkv chapters to read here. No-op for remote sources.
      */
+    private fun loadThumbnailsFor(item: MediaItem) {
+        val url = item.thumbnailsUrl ?: return
+        scope.launch(Dispatchers.Default) {
+            val thumbs = loadThumbnails(url)
+            if (thumbs.isEmpty()) return@launch
+            onMain {
+                if (!released && _state.value.mediaItem === item) {
+                    _state.update { it.copy(thumbnails = thumbs.toPersistentList()) }
+                }
+            }
+        }
+    }
+
     private fun extractChaptersFor(item: MediaItem) {
         // A WebVTT sidecar wins over embedded chapters and is the only source that works for remote/HLS.
         item.chaptersUrl?.let { sidecar ->

@@ -24,11 +24,32 @@ import dev.nonbinary.outis.ui.window.PlayerWindow
  * Picture-in-picture stays unwired: `AVPlayerViewController` with controls disabled exposes no public way
  * to start PIP from a custom button, so [PlayerWindow.isPipSupported] is left false and the button hides.
  */
+/**
+ * Bridges the shared UI's fullscreen state to the SwiftUI host (`ContentView`). Hiding the iOS status bar
+ * in a scene-based SwiftUI app is done with SwiftUI's `.statusBar(hidden:)` — not reachable from Kotlin —
+ * so the host reads [isFullscreen] whenever [onChange] fires. The callback is arg-less on purpose: a
+ * `(Boolean) -> Unit` would arrive in Swift as a boxed `KotlinBoolean`; a plain read of [isFullscreen]
+ * (a `Bool` property) avoids that.
+ */
+object FullscreenBridge {
+    var isFullscreen: Boolean = false
+        private set
+    var onChange: (() -> Unit)? = null
+
+    internal fun update(value: Boolean) {
+        isFullscreen = value
+        onChange?.invoke()
+    }
+}
+
 @Composable
 actual fun rememberSampleWindow(player: VideoPlayer): PlayerWindow {
     var fullscreen by remember { mutableStateOf(false) }
     return PlayerWindow(
         isFullscreen = fullscreen,
-        onToggleFullscreen = { fullscreen = it },
+        onToggleFullscreen = {
+            fullscreen = it
+            FullscreenBridge.update(it)
+        },
     )
 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -28,7 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import coil3.compose.AsyncImage
 import androidx.compose.ui.unit.dp
 import dev.nonbinary.outis.sample.containerCaveat
 import dev.nonbinary.outis.sample.drmSchemeCaveat
@@ -79,7 +82,12 @@ fun CatalogueRails(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(rail.items, key = { it.id }) { item ->
-                        CatalogueCard(item, selected = item.id == selectedId, onClick = { onSelect(item) })
+                        CatalogueCard(
+                            item,
+                            selected = item.id == selectedId,
+                            posterUrl = item.poster?.let { catalogue.posters[it] },
+                            onClick = { onSelect(item) },
+                        )
                     }
                 }
             }
@@ -88,7 +96,7 @@ fun CatalogueRails(
 }
 
 @Composable
-private fun CatalogueCard(item: CatalogueItem, selected: Boolean, onClick: () -> Unit) {
+private fun CatalogueCard(item: CatalogueItem, selected: Boolean, posterUrl: String?, onClick: () -> Unit) {
     val accent = MaterialTheme.colorScheme.primary
     Column(modifier = Modifier.width(CARD_WIDTH)) {
         Box(
@@ -107,6 +115,15 @@ private fun CatalogueCard(item: CatalogueItem, selected: Boolean, onClick: () ->
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.BottomStart,
         ) {
+            // Poster over the fallback colour; while it loads or if it fails, cardColour() shows through.
+            posterUrl?.let {
+                AsyncImage(
+                    model = it,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             if (item.tags.isNotEmpty()) {
                 Text(
                     item.tags.joinToString(" · "),

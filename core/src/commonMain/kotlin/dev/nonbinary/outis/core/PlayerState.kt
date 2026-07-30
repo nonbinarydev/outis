@@ -8,6 +8,7 @@ package dev.nonbinary.outis.core
 
 import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.Chapter
+import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.track.MediaTrack
 import kotlinx.collections.immutable.ImmutableList
@@ -130,6 +131,12 @@ data class PlayerState(
      * [dev.nonbinary.outis.core.chapters.ChapterExtractor].
      */
     val chapters: ImmutableList<Chapter> = persistentListOf(),
+    /**
+     * Trickplay seek-preview thumbnails, sorted by start; empty unless
+     * [dev.nonbinary.outis.core.source.MediaItem.thumbnailsUrl] is set. Loaded from the WebVTT sidecar on
+     * every engine (streams included) — see [dev.nonbinary.outis.core.thumbnails.VttThumbnails].
+     */
+    val thumbnails: ImmutableList<ThumbnailCue> = persistentListOf(),
 )
 
 /**

@@ -47,6 +47,7 @@ import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
+import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
@@ -184,11 +185,13 @@ internal class ExoPlayerEngine(
                 selectedAudioTrackId = null,
                 selectedTextTrackId = null,
                 chapters = persistentListOf(),
+                thumbnails = persistentListOf(),
             )
         }
         // Media3 surfaces no chapter API, so parse embedded chapters from the local container off-thread
         // (mp4/m4v QuickTime+Nero, mkv Matroska) and publish them to PlayerState. Remote sources skip this.
         extractChaptersAsync(item)
+        loadThumbnailsAsync(item)
         // Fail fast on a DRM scheme this device can't satisfy, rather than handing ExoPlayer an
         // undecryptable source that limps along as black/silent playback. FairPlay is Apple-only (no
         // Android CDM at all); Widevine/PlayReady need a device CDM that many phones lack.
@@ -209,6 +212,10 @@ internal class ExoPlayerEngine(
                 clearVideoSizeConstraints()
             }
             setMaxVideoBitrate(c?.maxBitrateBps ?: Int.MAX_VALUE)
+            // ExoPlayer's context-default track selector caps video to the display's *viewport* size, which
+            // silently filters out a 4K rung on a sub-4K screen (a phone/tablet). The SDK shouldn't hide a
+            // rung the app didn't ask to hide — capping is the app's call via videoConstraints. Clear it.
+            clearViewportSizeConstraints()
             // Load-time language preferences. buildUpon() inherits the prior item's params, so we MUST
             // pass these every item (null included) — Media3's setPreferred*Language(null) is what clears
             // a previous preference.
@@ -610,6 +617,15 @@ internal class ExoPlayerEngine(
     // ---- chapters (Media3 has no chapter API; parse the local container ourselves) ----
 
     /** Parse embedded chapters from a local file off-thread and publish them — no-op for remote sources. */
+    private fun loadThumbnailsAsync(item: MediaItem) {
+        val url = item.thumbnailsUrl ?: return
+        scope.launch(ioDispatcher) {
+            val thumbs = loadThumbnails(url)
+            if (thumbs.isEmpty() || released) return@launch
+            _state.update { if (it.mediaItem === item) it.copy(thumbnails = thumbs.toPersistentList()) else it }
+        }
+    }
+
     private fun extractChaptersAsync(item: MediaItem) {
         // A WebVTT sidecar wins over embedded chapters and is the only source that works for remote/streams.
         item.chaptersUrl?.let { sidecar ->

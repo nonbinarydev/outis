@@ -63,6 +63,7 @@ data class CatalogueItem(
     @SerialName("scte35MasterUrl") val scte35MasterUrl: String? = null,
     /** WebVTT chapters sidecar URL — populates chapter markers (works for streamed sources too). */
     val chaptersUrl: String? = null,
+    val thumbnailsUrl: String? = null,
 )
 
 @Serializable
@@ -101,6 +102,7 @@ fun CatalogueItem.toMediaItem(startMuted: Boolean = false, series: String? = nul
         )
     },
     chaptersUrl = chaptersUrl,
+    thumbnailsUrl = thumbnailsUrl,
     adConfig = ads?.takeIf { it.type == "clientSide" }?.adTagUri?.let { AdConfig.ClientSide(adTagUri = it) },
     // The descriptive [label] is the human name (the terse [title] is just the card caption, e.g. "AVC").
     analytics = PlaybackMetadata(videoId = analyticsVideoId(), title = label ?: title, series = series),

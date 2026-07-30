@@ -7,10 +7,17 @@
 package dev.nonbinary.outis.ui.controls
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -36,17 +43,32 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import coil3.compose.LocalPlatformContext
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
+import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
+import dev.nonbinary.outis.core.thumbnails.thumbnailAt
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import dev.nonbinary.outis.ui.formatTime
+import kotlinx.collections.immutable.ImmutableList
+import kotlin.math.roundToInt
 
 /** Default rates offered by [PlaybackSpeedButton], as multipliers of normal speed. */
 private val DefaultPlaybackSpeeds = listOf(0.5f, 1f, 1.25f, 1.5f, 2f)
@@ -121,8 +143,8 @@ fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
     // Track, buffered layer, played layer and the dot are all drawn in one canvas, so they share a
     // coordinate space and can't drift apart vertically. The Slider on top is invisible — it carries
     // only the drag, keyboard and accessibility behaviour.
-    Box(modifier.height(ScrubberThumbSize)) {
-        Canvas(Modifier.fillMaxWidth().height(ScrubberThumbSize)) {
+    BoxWithConstraints(modifier.height(ScrubberTouchHeight)) {
+        Canvas(Modifier.fillMaxSize()) {
             val cy = size.height / 2f
             val r = ScrubberThumbSize.toPx() / 2f
             val startX = r
@@ -154,19 +176,87 @@ fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
             valueRange = 0f..duration.toFloat(),
             enabled = state.isSeekable,
             // Invisible: the canvas above is the visual. The ScrubberThumbSize thumb keeps the value→x
-            // mapping matched to the drawn dot; the full-width track box gives the drag area its height.
+            // mapping matched to the drawn dot; the full-height track box makes the whole ScrubberTouchHeight
+            // band draggable, so the thin visual line isn't a pixel-precise target (was hard to grab).
             thumb = { Box(Modifier.size(ScrubberThumbSize)) },
-            track = { Box(Modifier.fillMaxWidth().height(ScrubberThumbSize)) },
+            track = { Box(Modifier.fillMaxWidth().height(ScrubberTouchHeight)) },
             modifier = Modifier.fillMaxWidth().semantics {
                 contentDescription = "Seek bar"
                 stateDescription = "${formatTime(state.scrubPositionMs)} of ${formatTime(duration)}"
             },
         )
+        // Trickplay preview: a cropped sprite tile floats above the thumb while scrubbing.
+        val cue = state.thumbnails.thumbnailAt(state.scrubPositionMs)
+        if (state.isScrubbing && cue != null) {
+            ThumbnailPreview(cue, state.thumbnails, fraction = played, trackWidth = maxWidth)
+        }
+    }
+}
+
+/**
+ * A single trickplay tile, cropped out of its sprite sheet and floated above the scrubber thumb.
+ *
+ * The crop is drawn by hand in a [Canvas]: the whole sheet is painted at a scale that makes the cue's
+ * ([ThumbnailCue.width]×[ThumbnailCue.height]) tile fill the box, then [translate]d by the tile's origin so
+ * only that tile shows through the box's clip. Everything is explicit — no [ContentScale]/alignment and no
+ * reliance on the async painter's `intrinsicSize` (which is unspecified until the bitmap loads and then
+ * platform-dependent; letting the paint layer choose the scale/anchor is what made the crop snap to the
+ * sheet centre). [sheetSize] is the sheet's true *padded* pixel extent, taken across **all** cues so the
+ * last sheet — only partially filled — is still drawn at full size. Coil caches the sheet, so scrubbing
+ * across tiles of one sheet is a single download.
+ */
+@Composable
+private fun ThumbnailPreview(
+    cue: ThumbnailCue,
+    all: ImmutableList<ThumbnailCue>,
+    fraction: Float,
+    trackWidth: Dp,
+) {
+    val density = LocalDensity.current
+    val previewWidth = 160.dp
+    val previewHeight = previewWidth * (cue.height.toFloat() / cue.width.toFloat())
+    // The sheet's full pixel size. Every sheet in a set is padded to the same grid, so the max over ALL
+    // cues gives the true image size; a partially-filled final sheet would under-report on its own cues.
+    val sheetSize = remember(all) {
+        IntSize(all.maxOf { it.x + it.width }, all.maxOf { it.y + it.height })
+    }
+    val painter = rememberAsyncImagePainter(
+        ImageRequest.Builder(LocalPlatformContext.current).data(cue.url).size(coil3.size.Size.ORIGINAL).build(),
+    )
+    val leftPx = with(density) {
+        val w = previewWidth.toPx()
+        (trackWidth.toPx() * fraction - w / 2f).coerceIn(0f, (trackWidth.toPx() - w).coerceAtLeast(0f))
+    }
+    val liftPx = with(density) { (previewHeight + 10.dp).toPx() }
+    Box(
+        Modifier
+            .offset { IntOffset(leftPx.roundToInt(), -liftPx.roundToInt()) }
+            // requiredSize, NOT size: the scrubber this floats over is only ScrubberThumbSize (12.dp) tall,
+            // and size() coerces to the parent's constraints — which would flatten the preview to 12.dp.
+            // requiredSize ignores them so the box keeps its true height and overflows the track upward.
+            .requiredSize(previewWidth, previewHeight)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.Black)
+            .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(6.dp)),
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            if (cue.width <= 0 || cue.height <= 0) return@Canvas
+            val sx = size.width / cue.width // canvas-px per sheet-px so the tile fills the box
+            val sy = size.height / cue.height
+            clipRect {
+                translate(left = -cue.x * sx, top = -cue.y * sy) {
+                    with(painter) { draw(Size(sheetSize.width * sx, sheetSize.height * sy)) }
+                }
+            }
+        }
     }
 }
 
 private val ScrubberThumbSize = 12.dp
 private val ScrubberTrackHeight = 4.dp
+// The whole scrubber row is this tall so the drag target is a comfortable ~40.dp band; the thin track and
+// dot are drawn centred within it. 12.dp (the old height) made the seek bar fiddly to grab, esp. on Android.
+private val ScrubberTouchHeight = 40.dp
 
 /**
  * Elapsed-time readout, formatted `mm:ss` or `h:mm:ss` once the hour mark is passed.

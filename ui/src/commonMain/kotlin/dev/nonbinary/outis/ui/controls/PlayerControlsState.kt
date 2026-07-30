@@ -19,6 +19,7 @@ import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.PlayerError
 import dev.nonbinary.outis.core.VideoPlayer
 import dev.nonbinary.outis.core.chapters.Chapter
+import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.track.MediaTrack
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -141,6 +142,9 @@ class PlayerControlsState internal constructor(
 
     /** Chapter markers for the current media, sorted by start; empty when the asset carries none. */
     val chapters: ImmutableList<Chapter> get() = snapshot.chapters
+
+    /** Trickplay seek-preview thumbnails, sorted by start; empty when the asset carries none. */
+    val thumbnails: ImmutableList<ThumbnailCue> get() = snapshot.thumbnails
 
     /** Id of the active audio track, or `null` when nothing has been resolved yet. */
     val selectedAudioTrackId: String? get() = snapshot.selectedAudioTrackId

@@ -10,6 +10,7 @@ import dev.nonbinary.outis.core.ads.Ad
 import dev.nonbinary.outis.core.ads.AdConfig
 import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
+import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
@@ -415,6 +416,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 audioTracks = persistentListOf(), textTracks = persistentListOf(),
                 selectedAudioTrackId = null, selectedTextTrackId = null,
                 chapters = persistentListOf(),
+                thumbnails = persistentListOf(),
             )
         }
         emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
@@ -426,6 +428,15 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 val chapters = loadSidecarChapters(sidecar)
                 if (!released && generation == loadGeneration && chapters.isNotEmpty()) {
                     _state.update { it.copy(chapters = chapters.toPersistentList()) }
+                }
+            }
+        }
+        // WebVTT trickplay-thumbnails sidecar.
+        item.thumbnailsUrl?.let { sidecar ->
+            scope.launch {
+                val thumbs = loadThumbnails(sidecar)
+                if (!released && generation == loadGeneration && thumbs.isNotEmpty()) {
+                    _state.update { it.copy(thumbnails = thumbs.toPersistentList()) }
                 }
             }
         }

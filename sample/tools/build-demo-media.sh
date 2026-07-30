@@ -163,6 +163,9 @@ KF=(-force_key_frames "expr:gte(t,n_forced*$SEGDUR)")
 encode_all(){
   step "Encoding labelled renditions (AVC ladder + HEVC/VP9/AV1)"
   local row name wh br mr bs w h fg
+  # HEVC_ONLY=1 re-encodes just the HEVC rungs (e.g. to re-tune their VBV) without redoing the slow AVC 2160
+  # and AV1 passes; package globs whatever v.* files exist, so the untouched rungs carry through unchanged.
+  if [[ -z "${HEVC_ONLY:-}" ]]; then
   for row in "${AVC_LADDER[@]}"; do
     read -r name wh br mr bs <<<"$row"; w=${wh%x*}; h=${wh#*x}
     if (( h > MH )); then echo "  skip AVC $name — master is only ${MH}p (no upscaling)"; continue; fi
@@ -172,18 +175,26 @@ encode_all(){
       -c:v libx264 -profile:v high -preset "$PRESET" -b:v "$br" -maxrate "$mr" -bufsize "$bs" \
       -pix_fmt yuv420p "${KF[@]}" -an -movflags +faststart "$WORK/v.avc.$h.mp4"
   done
-  # HEVC 1080 (hvc1 tag for Apple)
+  fi
+  # HEVC 1080 (hvc1 tag for Apple). VBV-capped like the AVC ladder: without -maxrate/-bufsize, x265's peak
+  # runs ~3x the average, and AVPlayer's ABR reads the HLS BANDWIDTH (peak) attribute — an unbounded peak
+  # makes it refuse to climb. Keep peak < 2x average (Apple HLS Authoring Spec).
   fg=$(make_fg 1920 1080 HEVC 4000k); echo "  HEVC 1080p"
   enc -y -v error -i "$MASTER" -filter_script:v "$fg" -c:v libx265 -tag:v hvc1 -preset "$PRESET" \
-    -x265-params "keyint=$KEYINT:min-keyint=$KEYINT:scenecut=0" -b:v 4000k -pix_fmt yuv420p -an "$WORK/v.hevc.1080.mp4"
+    -x265-params "keyint=$KEYINT:min-keyint=$KEYINT:scenecut=0" \
+    -b:v 4000k -maxrate 5000k -bufsize 8000k -pix_fmt yuv420p -an "$WORK/v.hevc.1080.mp4"
   # HEVC 2160 — 4K for Apple devices, which decode 4K HEVC but NOT our 4K60 AVC rung. Guarded like the AVC
   # ladder so a 1080p master doesn't upscale. Chrome (no HEVC) still gets 4K from the AVC 2160 rung in the
   # same master, so each engine picks its decodable 4K.
+  # Peak is held to 10M (not the ~15M the content would take) so the jump from the 1080p rung is ~2x, not 3x:
+  # native ABRs (AVPlayer especially) won't climb a 3x gap, so a friendlier peak is what lets iOS reach 4K.
   if (( MH >= 2160 )); then
-    fg=$(make_fg 3840 2160 HEVC 12000k); echo "  HEVC 2160p"
+    fg=$(make_fg 3840 2160 HEVC 8000k); echo "  HEVC 2160p"
     enc -y -v error -i "$MASTER" -filter_script:v "$fg" -c:v libx265 -tag:v hvc1 -preset "$PRESET" \
-      -x265-params "keyint=$KEYINT:min-keyint=$KEYINT:scenecut=0" -b:v 12000k -pix_fmt yuv420p -an "$WORK/v.hevc.2160.mp4"
+      -x265-params "keyint=$KEYINT:min-keyint=$KEYINT:scenecut=0" \
+      -b:v 8000k -maxrate 10000k -bufsize 16000k -pix_fmt yuv420p -an "$WORK/v.hevc.2160.mp4"
   fi
+  if [[ -z "${HEVC_ONLY:-}" ]]; then
   # VP9 1080 -> webm
   fg=$(make_fg 1920 1080 VP9 3500k); echo "  VP9 1080p"
   # constrained quality (-crf caps size, -b:v caps rate); -row-mt/-cpu-used keep libvpx-vp9 from crawling
@@ -193,6 +204,7 @@ encode_all(){
   fg=$(make_fg 1280 720 AV1 1800k); echo "  AV1 720p (slow)"
   enc -y -v error -i "$MASTER" -filter_script:v "$fg" -c:v libsvtav1 -preset 8 -crf 32 \
     -svtav1-params "keyint=$KEYINT" -g $KEYINT -pix_fmt yuv420p -an "$WORK/v.av1.720.mp4"
+  fi
 }
 has_stage encode && encode_all
 
