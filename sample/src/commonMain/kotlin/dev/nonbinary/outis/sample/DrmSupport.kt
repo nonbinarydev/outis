@@ -7,6 +7,7 @@
 package dev.nonbinary.outis.sample
 
 import dev.nonbinary.outis.core.source.DrmScheme
+import dev.nonbinary.outis.core.source.MimeType
 
 /**
  * A short warning when [scheme] is not expected to work on the host, or `null` when it should.
@@ -21,3 +22,11 @@ import dev.nonbinary.outis.core.source.DrmScheme
  * actually know.
  */
 expect fun drmSchemeCaveat(scheme: DrmScheme): String?
+
+/**
+ * A short warning when [mimeType]'s container isn't expected to play on the host, or `null` when it
+ * should. Same "hint, not a gate" contract as [drmSchemeCaveat]: it covers container support only (DASH,
+ * WebM), which is static per platform — a per-*codec* caveat (e.g. AV1, which is device-dependent on
+ * Apple hardware) would need a runtime capability probe and is out of scope here.
+ */
+expect fun containerCaveat(mimeType: MimeType): String?

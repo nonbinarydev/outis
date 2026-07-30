@@ -7,6 +7,7 @@
 package dev.nonbinary.outis.sample
 
 import dev.nonbinary.outis.core.source.DrmScheme
+import dev.nonbinary.outis.core.source.MimeType
 import kotlinx.browser.window
 
 /**
@@ -33,4 +34,10 @@ actual fun drmSchemeCaveat(scheme: DrmScheme): String? = when (scheme) {
         "PlayReady is only expected on Edge/Windows builds that ship the CDM."
     DrmScheme.CLEARKEY ->
         if (isWebKit) "Safari has no Clear Key CDM — this is not expected to play here." else null
+}
+
+/** Shaka plays DASH/HLS/MP4 on every engine via MSE; WebM/VP9 is the gap — WebKit (Safari) has no VP9. */
+actual fun containerCaveat(mimeType: MimeType): String? = when (mimeType) {
+    MimeType.WEBM -> if (isWebKit) "Safari has no VP9/WebM decoder — this is not expected to play here." else null
+    MimeType.MP4, MimeType.HLS, MimeType.DASH -> null
 }

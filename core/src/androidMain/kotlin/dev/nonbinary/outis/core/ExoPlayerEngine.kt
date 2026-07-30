@@ -46,6 +46,7 @@ import dev.nonbinary.outis.core.ads.AdConfig
 import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
+import dev.nonbinary.outis.core.chapters.loadSidecarChapters
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
@@ -610,6 +611,15 @@ internal class ExoPlayerEngine(
 
     /** Parse embedded chapters from a local file off-thread and publish them — no-op for remote sources. */
     private fun extractChaptersAsync(item: MediaItem) {
+        // A WebVTT sidecar wins over embedded chapters and is the only source that works for remote/streams.
+        item.chaptersUrl?.let { sidecar ->
+            scope.launch(ioDispatcher) {
+                val chapters = loadSidecarChapters(sidecar)
+                if (chapters.isEmpty() || released) return@launch
+                _state.update { if (it.mediaItem === item) it.copy(chapters = chapters.toPersistentList()) else it }
+            }
+            return
+        }
         val path = localFilePath(item) ?: return
         scope.launch(ioDispatcher) {
             val chapters = runCatching {

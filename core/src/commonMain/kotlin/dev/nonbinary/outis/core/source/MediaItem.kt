@@ -90,6 +90,14 @@ data class MediaItem(
      */
     val chapterThumbnails: Boolean = false,
     /**
+     * WebVTT **chapters sidecar** URL. When set, its cues populate
+     * [dev.nonbinary.outis.core.PlayerState.chapters] — the only chapter source that works for streamed
+     * sources (HLS/DASH) and on Web, since it needs no local container. When null, the engine falls back
+     * to chapters embedded in a local MP4/M4V/MKV (Android + iOS local files only). A `.vtt` here takes
+     * precedence over any embedded chapters.
+     */
+    val chaptersUrl: String? = null,
+    /**
      * Vendor-neutral QoS/analytics metadata, consumed by an analytics adapter (`outis-analytics-mux`).
      * `null` when nothing is wired — the field costs nothing and the SDK itself never reads it.
      * Distinct from [metadata], which is *display* metadata (title/artwork); this is what a QoS backend

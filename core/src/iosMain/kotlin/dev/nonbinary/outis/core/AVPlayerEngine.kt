@@ -12,6 +12,7 @@ import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
+import dev.nonbinary.outis.core.chapters.loadSidecarChapters
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
@@ -592,6 +593,19 @@ internal class AVPlayerEngine(
      * never mkv chapters to read here. No-op for remote sources.
      */
     private fun extractChaptersFor(item: MediaItem) {
+        // A WebVTT sidecar wins over embedded chapters and is the only source that works for remote/HLS.
+        item.chaptersUrl?.let { sidecar ->
+            scope.launch(Dispatchers.Default) {
+                val chapters = loadSidecarChapters(sidecar)
+                if (chapters.isEmpty()) return@launch
+                onMain {
+                    if (!released && _state.value.mediaItem === item) {
+                        _state.update { it.copy(chapters = chapters.toPersistentList()) }
+                    }
+                }
+            }
+            return
+        }
         val path = when (val s = item.source) {
             is MediaSource.LocalFile -> s.path
             is MediaSource.Url -> if (s.url.startsWith("file://")) s.url.removePrefix("file://") else return

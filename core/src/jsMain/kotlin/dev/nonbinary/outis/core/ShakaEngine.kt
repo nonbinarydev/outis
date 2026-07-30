@@ -9,6 +9,7 @@ package dev.nonbinary.outis.core
 import dev.nonbinary.outis.core.ads.Ad
 import dev.nonbinary.outis.core.ads.AdConfig
 import dev.nonbinary.outis.core.ads.AdState
+import dev.nonbinary.outis.core.chapters.loadSidecarChapters
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
@@ -27,6 +28,7 @@ import kotlinx.browser.window
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -132,6 +134,7 @@ private external object shaka {
         fun selectTextTrack(track: dynamic)
         fun setTextTrackVisibility(on: Boolean) // synchronous in 4.x
         fun selectAudioLanguage(language: String)
+        fun selectVariantsByLabel(label: String) // picks a same-language audio stream; keeps video ABR
         fun configure(config: dynamic)
         fun getNetworkingEngine(): dynamic
 
@@ -212,7 +215,10 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     private var loadChain: dynamic = js("Promise.resolve()") // serializes loads so switches never overlap
 
     private val textTrackById = mutableMapOf<String, Any?>() // shaka text-track objects (dynamic can't be a type arg)
-    private val audioLanguageById = mutableMapOf<String, String>()
+    /** How to re-select an audio stream when same-language streams must be told apart (label first). */
+    private class ShakaAudioSelection(val language: String, val label: String?)
+
+    private val audioSelectionById = mutableMapOf<String, ShakaAudioSelection>()
     private val components = mutableListOf<PlayerComponent>()
     private val host = object : PlayerHost {
         override val state: StateFlow<PlayerState> get() = this@ShakaEngine.state
@@ -378,7 +384,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         shakaBuffering = false
         lastPlaybackState = PlaybackState.BUFFERING
         textTrackById.clear()
-        audioLanguageById.clear()
+        audioSelectionById.clear()
         playWhenReady = autoPlay
         mediaHeaders = item.headers
         clearPendingStartListener() // drop any un-fired native start-position listener from a prior item
@@ -408,10 +414,21 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 playbackState = PlaybackState.BUFFERING,
                 audioTracks = persistentListOf(), textTracks = persistentListOf(),
                 selectedAudioTrackId = null, selectedTextTrackId = null,
+                chapters = persistentListOf(),
             )
         }
         emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
         emit { p, t -> PlayerEvent.BufferingStarted(p, t) }
+
+        // WebVTT chapters sidecar — the only chapter source on Web (no local-container parsing here).
+        item.chaptersUrl?.let { sidecar ->
+            scope.launch {
+                val chapters = loadSidecarChapters(sidecar)
+                if (!released && generation == loadGeneration && chapters.isNotEmpty()) {
+                    _state.update { it.copy(chapters = chapters.toPersistentList()) }
+                }
+            }
+        }
 
         // Serialize loads so a fast burst of switches, and recovery after a failed load (e.g. a
         // Widevine stream in Safari, which has no Widevine CDM), stay deterministic. Each step first
@@ -577,7 +594,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         shakaBuffering = false
         lastPlaybackState = PlaybackState.IDLE
         textTrackById.clear()
-        audioLanguageById.clear()
+        audioSelectionById.clear()
         _state.update {
             it.copy(
                 playbackState = PlaybackState.IDLE, isPlaying = false, playWhenReady = false,
@@ -701,8 +718,11 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     override fun selectTrack(track: MediaTrack) {
         if (released || !usingShaka) return
         when (track.type) {
-            TrackType.AUDIO -> audioLanguageById[track.id]?.let { language ->
-                shakaPlayer.selectAudioLanguage(language)
+            TrackType.AUDIO -> audioSelectionById[track.id]?.let { sel ->
+                // Label picks the exact stream when languages collide (stereo vs 5.1 vs commentary) and
+                // keeps video ABR, unlike selectVariantTrack; fall back to language when there's no label.
+                if (sel.label != null) shakaPlayer.selectVariantsByLabel(sel.label)
+                else shakaPlayer.selectAudioLanguage(sel.language)
                 // On HLS, selecting audio can re-enable text visibility; re-assert "off" if subtitles are off.
                 if (_state.value.selectedTextTrackId == null) shakaPlayer.setTextTrackVisibility(false)
                 _state.update { st ->
@@ -933,21 +953,26 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     private fun loadTracks() {
         if (released || !usingShaka) return
         textTrackById.clear()
-        audioLanguageById.clear()
+        audioSelectionById.clear()
 
         val variants = shakaPlayer.getVariantTracks()
         val audio = mutableListOf<MediaTrack>()
-        val seenLanguages = mutableSetOf<String>()
+        val seenAudio = mutableSetOf<String>()
         for (i in 0 until variants.size) {
             val variant = variants[i]
             val language = variant.language as? String ?: continue
-            if (!seenLanguages.add(language)) continue
-            val id = "AUDIO:$language"
-            audioLanguageById[id] = language
+            val label = variant.label as? String
+            // Several audio streams can share a language (e.g. stereo + 5.1 + commentary, all "en"),
+            // differing only by label/channels. Key on the distinct audio stream (audioId), not language,
+            // so same-language streams don't collapse into a single selectable entry.
+            val audioKey = (variant.audioId as? Number)?.toString() ?: label ?: language
+            if (!seenAudio.add(audioKey)) continue
+            val id = "AUDIO:$audioKey"
+            audioSelectionById[id] = ShakaAudioSelection(language, label)
             audio += MediaTrack(
                 id = id,
                 type = TrackType.AUDIO,
-                label = variant.label as? String,
+                label = label,
                 language = language,
                 isSelected = variant.active == true,
             )

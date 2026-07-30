@@ -138,6 +138,13 @@ fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
             line(1f, colors.onSurface.copy(alpha = 0.2f)) // base
             if (buffered > 0f) line(buffered, colors.onSurface.copy(alpha = 0.45f)) // buffered-ahead
             if (played > 0f) line(played, colors.primary) // played
+            // Chapter ticks — a dot at each chapter start; skip 0:00 (it sits under the track's left cap).
+            val markerRadius = ScrubberTrackHeight.toPx()
+            state.chapters.forEach { chapter ->
+                if (chapter.startMs <= 0L) return@forEach
+                val fraction = (chapter.startMs.toFloat() / duration).coerceIn(0f, 1f)
+                drawCircle(colors.onSurface, radius = markerRadius, center = Offset(startX + span * fraction, cy))
+            }
             drawCircle(colors.primary, radius = r, center = Offset(startX + span * played, cy))
         }
         Slider(
