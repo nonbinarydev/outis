@@ -59,6 +59,9 @@ def main() -> int:
             if not str(item.get("url", "")).startswith("https://"):
                 errors.append(f"{at}: url must be https")
 
+            if item.get("chaptersUrl") and not str(item["chaptersUrl"]).startswith("https://"):
+                errors.append(f"{at}: chaptersUrl must be https")
+
             if "poster" in item and item["poster"] not in posters:
                 errors.append(f"{at}: poster {item['poster']!r} is not declared in posters")
 

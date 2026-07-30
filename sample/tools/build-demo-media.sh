@@ -24,6 +24,8 @@
 #
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # for committed source assets (real subtitles)
+
 # ─── config ──────────────────────────────────────────────────────────────────────────────────────────
 FFMPEG="${FFMPEG:-$HOME/bin/ffmpeg}"
 FFPROBE="${FFPROBE:-ffprobe}"
@@ -33,7 +35,9 @@ OUT="${OUT:-$PWD/demo-media-out}"          # gitignore this; segments are large
 MASTER_URL="${MASTER_URL:-https://download.blender.org/demo/movies/BBB/bbb_sunflower_2160p_60fps_normal.mp4.zip}"  # 4K60 hero (671MB); override with the 1080p30 (275MB) to iterate fast
 SEGDUR="${SEGDUR:-4}"                       # segment duration (s); keyframes are aligned to it
 PRESET="${PRESET:-medium}"                  # x264/x265 preset (use veryfast to iterate, slow for quality)
-STAGES="${STAGES:-fetch chapters subs audio encode package clearkey progressive chaptered catalogue credits}"
+THUMB_INTERVAL="${THUMB_INTERVAL:-5}"       # trickplay thumbnail interval (s) — raise it for longer content
+THUMB_WIDTH="${THUMB_WIDTH:-240}"           # trickplay tile width (px); height follows the master's aspect
+STAGES="${STAGES:-fetch chapters subs audio encode package clearkey progressive chaptered thumbnails catalogue credits}"
 
 WORK="$OUT/work"; MED="$OUT/media"
 mkdir -p "$WORK" "$MED"
@@ -107,7 +111,14 @@ if has_stage chapters; then step "Chapters (ffmetadata + WebVTT)"; gen_chapters;
 gen_subs(){
   mkdir -p "$MED/text"
   _vtt(){ printf 'WEBVTT\n\n00:00:03.000 --> 00:00:08.000\n%s\n\n00:02:05.000 --> 00:02:10.000\n%s\n' "$1" "$2" > "$MED/text/$3"; }
-  _vtt "A giant rabbit wakes in the meadow." "The rodents arrive." subs.en.vtt
+  # English: real SDH captions (committed SRT → WebVTT). es/ar/ja stay short demo placeholders — we only
+  # have a real English track, and their point is to demonstrate track *selection* (RTL/CJK rendering).
+  local en_srt="$SCRIPT_DIR/assets/bbb.en.srt"
+  if [[ -f "$en_srt" ]]; then
+    "$FFMPEG" -y -v error -i "$en_srt" "$MED/text/subs.en.vtt"
+  else
+    _vtt "A giant rabbit wakes in the meadow." "The rodents arrive." subs.en.vtt
+  fi
   _vtt "Un conejo gigante despierta en el prado." "Llegan los roedores." subs.es.vtt
   _vtt "أرنب عملاق يستيقظ في المرج." "وصل القوارض." subs.ar.vtt
   _vtt "巨大なウサギが草原で目を覚ます。" "げっ歯類が現れる。" subs.ja.vtt
@@ -121,9 +132,11 @@ gen_audio(){
   # 1) English stereo AAC from the master's first audio stream
   "$FFMPEG" -y -v error -i "$MASTER" -map 0:a:0 -ac 2 -c:a aac -b:a 128k -vn "$WORK/a.en.mp4"
   # 2) Surround: the master's 2nd audio track (BBB ships stereo mp3 + ac3), transcoded to AAC so it plays
-  #    everywhere incl. web, keeping its channel layout (5.1 if the source has it).
+  #    everywhere incl. web. aformat normalises the source's 5.1(side) to plain 5.1 — without it the AAC
+  #    lands with an *unknown* channel layout (no valid AAC channel configuration), which iOS AVPlayer
+  #    rejects with CoreMediaErrorDomain -16170 the moment you switch to the track.
   if (( $("$FFPROBE" -v error -select_streams a -show_entries stream=index -of csv=p=0 "$MASTER" | wc -l) >= 2 )); then
-    "$FFMPEG" -y -v error -i "$MASTER" -map 0:a:1 -c:a aac -b:a 256k -vn "$WORK/a.surround.mp4"
+    "$FFMPEG" -y -v error -i "$MASTER" -map 0:a:1 -af "aformat=channel_layouts=5.1" -c:a aac -b:a 256k -vn "$WORK/a.surround.mp4"
   fi
   # 3) Synthetic "commentary" — a steady tone so track *selection* is obvious by ear
   "$FFMPEG" -y -v error -f lavfi -i "sine=frequency=330:duration=$(( DURATION_MS/1000 ))" -c:a aac -b:a 96k "$WORK/a.commentary.mp4"
@@ -163,6 +176,14 @@ encode_all(){
   fg=$(make_fg 1920 1080 HEVC 4000k); echo "  HEVC 1080p"
   enc -y -v error -i "$MASTER" -filter_script:v "$fg" -c:v libx265 -tag:v hvc1 -preset "$PRESET" \
     -x265-params "keyint=$KEYINT:min-keyint=$KEYINT:scenecut=0" -b:v 4000k -pix_fmt yuv420p -an "$WORK/v.hevc.1080.mp4"
+  # HEVC 2160 — 4K for Apple devices, which decode 4K HEVC but NOT our 4K60 AVC rung. Guarded like the AVC
+  # ladder so a 1080p master doesn't upscale. Chrome (no HEVC) still gets 4K from the AVC 2160 rung in the
+  # same master, so each engine picks its decodable 4K.
+  if (( MH >= 2160 )); then
+    fg=$(make_fg 3840 2160 HEVC 12000k); echo "  HEVC 2160p"
+    enc -y -v error -i "$MASTER" -filter_script:v "$fg" -c:v libx265 -tag:v hvc1 -preset "$PRESET" \
+      -x265-params "keyint=$KEYINT:min-keyint=$KEYINT:scenecut=0" -b:v 12000k -pix_fmt yuv420p -an "$WORK/v.hevc.2160.mp4"
+  fi
   # VP9 1080 -> webm
   fg=$(make_fg 1920 1080 VP9 3500k); echo "  VP9 1080p"
   # constrained quality (-crf caps size, -b:v caps rate); -row-mt/-cpu-used keep libvpx-vp9 from crawling
@@ -213,7 +234,9 @@ package_streams(){
     args+=" in=$MED/text/subs.$s.vtt,stream=text,language=$s,segment_template=$MED/cmaf/text_$s/\$Number\$.vtt,hls_group_id=subs,hls_name=$up"
   done
   # shellcheck disable=SC2086
-  "$PACKAGER" $args --segment_duration "$SEGDUR" \
+  # --generate_static_live_mpd: with segment_template set, Shaka defaults to a *dynamic* (live) MPD, which
+  # players open at the live edge (i.e. the end). This forces a static VOD MPD with mediaPresentationDuration.
+  "$PACKAGER" $args --segment_duration "$SEGDUR" --generate_static_live_mpd \
     --hls_master_playlist_output "$MED/hls/master.m3u8" \
     --mpd_output "$MED/dash/manifest.mpd"
   relativize_manifests "$MED/hls" "$MED/dash"
@@ -231,6 +254,7 @@ clearkey_variant(){
     "in=$WORK/v.avc.1080.mp4,stream=video,init_segment=$MED/clearkey/cmaf/v/init.mp4,segment_template=$MED/clearkey/cmaf/v/\$Number\$.m4s" \
     "in=$WORK/a.en.mp4,stream=audio,init_segment=$MED/clearkey/cmaf/a/init.mp4,segment_template=$MED/clearkey/cmaf/a/\$Number\$.m4s" \
     --enable_raw_key_encryption --keys "label=:key_id=$kid:key=$key" --protection_scheme cbcs --clear_lead 0 \
+    --generate_static_live_mpd \
     --hls_master_playlist_output "$MED/clearkey/hls/master.m3u8" \
     --mpd_output "$MED/clearkey/dash/manifest.mpd"
   relativize_manifests "$MED/clearkey/hls" "$MED/clearkey/dash"
@@ -263,6 +287,37 @@ chaptered(){
   "$FFPROBE" -v error -show_chapters -of csv=p=0 "$MED/chapters/bbb-chapters.mp4" | awk -F, '{printf "  %8.1fs  %s\n",$4,$7}'
 }
 has_stage chaptered && chaptered
+
+# ─── thumbnails: trickplay sprite sheets + WebVTT, one frame per THUMB_INTERVAL from the CLEAN master ─────
+# Not tied to the video ladder — these are frame grabs, so re-encoding is unnecessary to (re)generate them.
+# The WebVTT #xywh crops are the de-facto trickplay format (Shaka-native); a chapter thumbnail is just the
+# tile nearest a chapter start, so this doubles as chapter artwork.
+gen_thumbnails(){
+  local dir="$MED/thumbnails"; mkdir -p "$dir"
+  local cols=10 rows=10 per=$((10 * 10))
+  # One JPEG per interval, scaled to THUMB_WIDTH (aspect-preserved, even height), tiled cols×rows per sheet.
+  # -start_number 0 so sheets are sheet_000.jpg… (image2 defaults to 1), matching the 0-based VTT below.
+  "$FFMPEG" -y -v error -i "$MASTER" \
+    -vf "fps=1/${THUMB_INTERVAL},scale=${THUMB_WIDTH}:-2,tile=${cols}x${rows}" \
+    -start_number 0 "$dir/sheet_%03d.jpg"
+  # Derive the true tile size from a rendered sheet, so #xywh matches ffmpeg's aspect rounding exactly.
+  local sw sh
+  read -r sw sh < <("$FFPROBE" -v error -select_streams v:0 -show_entries stream=width,height \
+    -of csv=p=0 "$dir/sheet_000.jpg" | tr ',' ' ')
+  local w=$((sw / cols)) h=$((sh / rows))
+  local vtt="$dir/thumbnails.vtt"; printf 'WEBVTT\n' > "$vtt"
+  local total=$(( (DURATION_MS / 1000 + THUMB_INTERVAL - 1) / THUMB_INTERVAL )) i
+  for ((i = 0; i < total; i++)); do
+    local start=$((i * THUMB_INTERVAL * 1000)) end=$(((i + 1) * THUMB_INTERVAL * 1000))
+    (( end > DURATION_MS )) && end=$DURATION_MS
+    local pos=$((i % per)) x y
+    x=$(( (pos % cols) * w )); y=$(( (pos / cols) * h ))
+    printf '\n%s --> %s\nsheet_%03d.jpg#xywh=%d,%d,%d,%d\n' \
+      "$(ms2vtt "$start")" "$(ms2vtt "$end")" "$((i / per))" "$x" "$y" "$w" "$h" >> "$vtt"
+  done
+  echo "  ${total} thumbs @ ${w}x${h}, every ${THUMB_INTERVAL}s → $(ls "$dir"/sheet_*.jpg | wc -l | tr -d ' ') sheet(s)"
+}
+has_stage thumbnails && { step "Trickplay thumbnails (${THUMB_INTERVAL}s sprites + WebVTT)"; gen_thumbnails; }
 
 # ─── catalogue: a ready-to-paste catalogue.json entry ────────────────────────────────────────────────────
 catalogue(){
@@ -305,5 +360,5 @@ EOF
 has_stage credits && credits
 
 step "Done — output under $OUT/media"
-echo "Next: host media/{hls,dash,cmaf,text,progressive,clearkey} (segments → R2, manifests/vtt → Pages),"
+echo "Next: host media/{hls,dash,cmaf,text,progressive,clearkey,thumbnails} (segments → R2, manifests/vtt → Pages),"
 echo "paste media/catalogue.entry.json into sample/catalogue.json, and ship media/CREDITS.md."

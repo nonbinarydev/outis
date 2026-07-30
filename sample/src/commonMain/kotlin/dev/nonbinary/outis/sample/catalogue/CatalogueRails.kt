@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.nonbinary.outis.sample.containerCaveat
 import dev.nonbinary.outis.sample.drmSchemeCaveat
 
 private val CARD_WIDTH = 190.dp
@@ -131,9 +132,10 @@ private fun CatalogueCard(item: CatalogueItem, selected: Boolean, onClick: () ->
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        // Selectable regardless: seeing the SDK report an unsupported scheme is the point, and the
-        // hint can be wrong where a disabled card could not be un-wronged.
-        item.drm?.scheme?.let(::drmSchemeCaveat)?.let {
+        // Selectable regardless: seeing the SDK report an unsupported scheme/container is the point, and
+        // the hint can be wrong where a disabled card could not be un-wronged. DRM caveat wins over the
+        // container one (a scheme mismatch is the more specific problem).
+        (item.drm?.scheme?.let(::drmSchemeCaveat) ?: item.mimeType?.let(::containerCaveat))?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.labelSmall,

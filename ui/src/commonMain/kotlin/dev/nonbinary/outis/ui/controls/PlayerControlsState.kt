@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.PlayerError
 import dev.nonbinary.outis.core.VideoPlayer
+import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.track.MediaTrack
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -137,6 +138,9 @@ class PlayerControlsState internal constructor(
 
     /** Selectable subtitle/caption tracks; empty until parsed, and empty for assets that carry none. */
     val textTracks: ImmutableList<MediaTrack> get() = snapshot.textTracks
+
+    /** Chapter markers for the current media, sorted by start; empty when the asset carries none. */
+    val chapters: ImmutableList<Chapter> get() = snapshot.chapters
 
     /** Id of the active audio track, or `null` when nothing has been resolved yet. */
     val selectedAudioTrackId: String? get() = snapshot.selectedAudioTrackId
