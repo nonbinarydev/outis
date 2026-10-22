@@ -6,11 +6,14 @@
 
 package dev.nonbinary.outis.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -26,6 +29,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import coil3.compose.LocalPlatformContext
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import dev.nonbinary.outis.core.VideoPlayer
 import dev.nonbinary.outis.ui.controls.DefaultControls
 import dev.nonbinary.outis.ui.controls.PlayerControlsScope
@@ -69,6 +75,7 @@ fun PlayerView(
     surfaceType: SurfaceType = SurfaceType.SurfaceView,
     window: PlayerWindow = PlayerWindow(),
     pauseWhenStopped: Boolean = true,
+    audioOnly: Boolean = false,
     state: PlayerControlsState = rememberPlayerControlsState(player),
     controls: @Composable PlayerControlsScope.() -> Unit = { DefaultControls() },
 ) {
@@ -172,7 +179,27 @@ fun PlayerView(
                 }
             },
     ) {
+        // The surface is still composed for audio-only items -- it is what the engine
+        // attaches to -- but it has no picture, so the artwork covers it. The host says
+        // whether an item is audio: state.videoSize is Android-only, so gating on it here
+        // would hide every video on iOS and web.
         PlayerSurface(player, Modifier.matchParentSize(), contentScale, surfaceType)
+        if (audioOnly) {
+            // collectAsState, not state.value: a raw flow read would not recompose when
+            // the item (and so the artwork) changes.
+            val meta by player.state.collectAsState()
+            meta.mediaItem?.metadata?.artworkUrl?.let { url ->
+                Image(
+                    painter = rememberAsyncImagePainter(
+                        ImageRequest.Builder(LocalPlatformContext.current)
+                            .data(url).size(coil3.size.Size.ORIGINAL).build(),
+                    ),
+                    contentDescription = meta.mediaItem?.metadata?.title,
+                    contentScale = contentScale,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+        }
         if (!window.isInPip) scope.controls()
     }
 }

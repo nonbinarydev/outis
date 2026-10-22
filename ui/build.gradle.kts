@@ -62,6 +62,9 @@ kotlin {
                 implementation(compose.material3)
                 implementation(compose.materialIconsExtended)
                 implementation(libs.androidx.lifecycle.runtime.compose)
+                // Coil's Compose API (AsyncImage) for trickplay scrub-preview tiles. The runtime network
+                // fetcher + engines live in the app (:sample), which owns the process-wide ImageLoader.
+                implementation(libs.coil.compose)
                 // kotlinx-collections-immutable arrives transitively: :core exposes ImmutableList in
                 // PlayerState and declares it `api`, so it is already on this module's compile classpath.
             }

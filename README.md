@@ -32,7 +32,7 @@ Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo
 |---|---|
 | Android | Media3 / ExoPlayer 1.10.1 |
 | iOS | AVFoundation `AVPlayer` |
-| Web (JS) | Shaka Player 4.11.2, over an HTML `<video>` |
+| Web (JS) | Shaka Player 4.16.50, over an HTML `<video>` |
 
 **Status: `0.1.0-alpha01`.** Not yet published to Maven Central; the coordinates below will not resolve until the first release.
 

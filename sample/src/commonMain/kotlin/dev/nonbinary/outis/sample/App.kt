@@ -42,6 +42,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import coil3.ImageLoader
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.network.ktor3.KtorNetworkFetcherFactory
 import dev.nonbinary.outis.analytics.mux.MuxAnalytics
 import dev.nonbinary.outis.analytics.mux.MuxConfig
 import dev.nonbinary.outis.core.AppContext
@@ -78,6 +81,13 @@ private val STATUS_GAP = 16.dp
 /** Starts Koin around the app. `KoinApplication` remembers the container, so this runs once. */
 @Composable
 fun App(appContext: AppContext, modifier: Modifier = Modifier) {
+    // One process-wide Coil ImageLoader with the Ktor network fetcher (the platform Ktor engine is on the
+    // app classpath per source set) — used for catalogue posters and trickplay scrub-preview tiles.
+    setSingletonImageLoaderFactory { context ->
+        ImageLoader.Builder(context)
+            .components { add(KtorNetworkFetcherFactory()) }
+            .build()
+    }
     // koinConfiguration + the KoinConfiguration overload — the KoinAppDeclaration-lambda form is
     // deprecated in Koin 4.2. Built once via remember so the container is not rebuilt on recomposition.
     // AppContext is provided into the graph so DI can build things that need it (the consent store's

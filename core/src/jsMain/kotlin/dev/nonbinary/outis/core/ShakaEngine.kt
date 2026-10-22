@@ -21,6 +21,7 @@ import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
 import dev.nonbinary.outis.core.source.VideoConstraints
 import dev.nonbinary.outis.core.source.WidevineLevel
+import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
 import kotlinx.browser.document
@@ -28,7 +29,6 @@ import kotlinx.browser.window
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import org.khronos.webgl.get
@@ -123,6 +124,8 @@ private external object shaka {
         }
     }
 
+    // One member per Shaka method this engine calls, so its size is Shaka's API surface, not a design.
+    @Suppress("TooManyFunctions")
     class Player {
         fun attach(mediaElement: HTMLMediaElement): kotlin.js.Promise<dynamic>
         fun load(uri: String, startTime: Double? = definedExternally): kotlin.js.Promise<dynamic>
@@ -135,6 +138,11 @@ private external object shaka {
         fun setTextTrackVisibility(on: Boolean) // synchronous in 4.x
         fun selectAudioLanguage(language: String)
         fun selectVariantsByLabel(label: String) // picks a same-language audio stream; keeps video ABR
+        fun selectVariantTrack(track: dynamic, clearBuffer: Boolean = definedExternally)
+
+        // The parsed manifest. Its video streams carry `label` and `roles`; the public Track objects
+        // from getVariantTracks() drop both, so alternate renditions are indistinguishable without it.
+        fun getManifest(): dynamic
         fun configure(config: dynamic)
         fun getNetworkingEngine(): dynamic
 
@@ -196,6 +204,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     private var released = false
     private var playWhenReady = false
     private var usingShaka = false
+    private var abrPinnedToRendition = false
     private var loadGeneration = 0
     private var lastPlaybackState = PlaybackState.IDLE
     private var wasBuffering = false
@@ -215,10 +224,14 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     private var loadChain: dynamic = js("Promise.resolve()") // serializes loads so switches never overlap
 
     private val textTrackById = mutableMapOf<String, Any?>() // shaka text-track objects (dynamic can't be a type arg)
+
     /** How to re-select an audio stream when same-language streams must be told apart (label first). */
     private class ShakaAudioSelection(val language: String, val label: String?)
 
     private val audioSelectionById = mutableMapOf<String, ShakaAudioSelection>()
+
+    /** id -> Shaka video stream id, the join key onto a variant's `videoId`. */
+    private val videoSelectionById = mutableMapOf<String, Int>()
     private val components = mutableListOf<PlayerComponent>()
     private val host = object : PlayerHost {
         override val state: StateFlow<PlayerState> get() = this@ShakaEngine.state
@@ -385,6 +398,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         lastPlaybackState = PlaybackState.BUFFERING
         textTrackById.clear()
         audioSelectionById.clear()
+        videoSelectionById.clear()
         playWhenReady = autoPlay
         mediaHeaders = item.headers
         clearPendingStartListener() // drop any un-fired native start-position listener from a prior item
@@ -415,6 +429,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 audioTracks = persistentListOf(), textTracks = persistentListOf(),
                 selectedAudioTrackId = null, selectedTextTrackId = null,
                 chapters = persistentListOf(),
+                thumbnails = persistentListOf(),
             )
         }
         emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
@@ -426,6 +441,15 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 val chapters = loadSidecarChapters(sidecar)
                 if (!released && generation == loadGeneration && chapters.isNotEmpty()) {
                     _state.update { it.copy(chapters = chapters.toPersistentList()) }
+                }
+            }
+        }
+        // WebVTT trickplay-thumbnails sidecar.
+        item.thumbnailsUrl?.let { sidecar ->
+            scope.launch {
+                val thumbs = loadThumbnails(sidecar)
+                if (!released && generation == loadGeneration && thumbs.isNotEmpty()) {
+                    _state.update { it.copy(thumbnails = thumbs.toPersistentList()) }
                 }
             }
         }
@@ -469,6 +493,11 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         configureDrm(item.drmConfig)
         configureRestrictions(item.videoConstraints)
         configureLanguagePreferences(item)
+        // ABR config is player-level and outlives an item, so a previous pin (an alternate-rendition
+        // manifest, or a rendition the viewer picked) would otherwise leave the next item unable to adapt.
+        abrPinnedToRendition = false
+        val abrReset: dynamic = js("({ abr: { enabled: true } })")
+        shakaPlayer.configure(abrReset)
         // Start position (resume / deep-link): Shaka's load() takes a start time in seconds.
         return shakaPlayer.load(url, item.startPositionMs?.let { it / 1000.0 }).then<dynamic>(
             { _ ->
@@ -525,8 +554,11 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
      * user-driven [play] carries a gesture and cannot be blocked.
      */
     private fun playWithAutoplayFallback() {
-        video.asDynamic().play().catch({ _: dynamic ->
-            if (!video.muted) {
+        video.asDynamic().play().catch({ e: dynamic ->
+            // Only an autoplay refusal is answered by muting. `play()` rejects for unrelated reasons too
+            // -- most often AbortError, when a load() supersedes a play still settling -- and muting for
+            // one of those leaves the item running silently with nothing to undo it.
+            if ((e?.name as? String) == "NotAllowedError" && !video.muted) {
                 video.muted = true
                 _state.update { it.copy(isMuted = true) }
                 video.asDynamic().play()
@@ -595,6 +627,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         lastPlaybackState = PlaybackState.IDLE
         textTrackById.clear()
         audioSelectionById.clear()
+        videoSelectionById.clear()
         _state.update {
             it.copy(
                 playbackState = PlaybackState.IDLE, isPlaying = false, playWhenReady = false,
@@ -721,8 +754,11 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
             TrackType.AUDIO -> audioSelectionById[track.id]?.let { sel ->
                 // Label picks the exact stream when languages collide (stereo vs 5.1 vs commentary) and
                 // keeps video ABR, unlike selectVariantTrack; fall back to language when there's no label.
-                if (sel.label != null) shakaPlayer.selectVariantsByLabel(sel.label)
-                else shakaPlayer.selectAudioLanguage(sel.language)
+                if (sel.label != null) {
+                    shakaPlayer.selectVariantsByLabel(sel.label)
+                } else {
+                    shakaPlayer.selectAudioLanguage(sel.language)
+                }
                 // On HLS, selecting audio can re-enable text visibility; re-assert "off" if subtitles are off.
                 if (_state.value.selectedTextTrackId == null) shakaPlayer.setTextTrackVisibility(false)
                 _state.update { st ->
@@ -744,7 +780,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 }
             }
 
-            TrackType.VIDEO -> Unit
+            TrackType.VIDEO -> videoSelectionById[track.id]?.let { selectRendition(track.id, it) }
         }
         // The variantchanged/textchanged events re-emit the authoritative lists; the above is optimistic.
         emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
@@ -924,6 +960,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 durationMs = durationMs,
                 isLive = isLive,
                 isSeekable = video.seekable.length > 0,
+                videoRange = currentVideoRange(it.videoRange),
             )
         }
 
@@ -945,15 +982,103 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         }
     }
 
+    /** Colour range of Shaka's active variant — DV from the codec, HDR from Shaka's `hdr` field ('PQ'/'HLG'). */
+    private fun currentVideoRange(fallback: VideoRange): VideoRange {
+        val active = shakaPlayer.getVariantTracks().firstOrNull { it.active == true } ?: return fallback
+        val codec = (active.videoCodec as? String).orEmpty()
+        return when {
+            codec.startsWith("dvh1") || codec.startsWith("dvhe") -> VideoRange.DOLBY_VISION
+            (active.hdr as? String) == "PQ" -> VideoRange.HDR10
+            (active.hdr as? String) == "HLG" -> VideoRange.HLG
+            else -> VideoRange.SDR
+        }
+    }
+
     private fun bufferedEndMs(fallback: Long): Long {
         val ranges = video.buffered
         return if (ranges.length > 0) (ranges.end(ranges.length - 1) * 1000).toLong() else fallback
+    }
+
+    /** Switch to rendition [streamId], keeping the audio already playing: a variant pins both together. */
+    private fun selectRendition(trackId: String, streamId: Int) {
+        val variants = shakaPlayer.getVariantTracks()
+        val all = (0 until variants.size).map { variants[it] }
+        val currentAudio = (all.firstOrNull { it.active == true }?.audioId as? Number)?.toInt()
+        val candidates = all.filter { (it.videoId as? Number)?.toInt() == streamId }
+        val chosen = candidates.firstOrNull { (it.audioId as? Number)?.toInt() == currentAudio }
+            ?: candidates.firstOrNull()
+            ?: return
+        // An explicit choice has to stick: with ABR left on, Shaka is free to move back off it.
+        disableAbr()
+        shakaPlayer.selectVariantTrack(chosen, true)
+        if (_state.value.selectedTextTrackId == null) shakaPlayer.setTextTrackVisibility(false)
+        _state.update { st ->
+            st.copy(
+                videoTracks = st.videoTracks.map { it.copy(isSelected = it.id == trackId) }.toPersistentList(),
+                selectedVideoTrackId = trackId,
+            )
+        }
+    }
+
+    /**
+     * Alternate video renditions, from the parsed manifest rather than [shaka.Player.getVariantTracks]: the
+     * public Track objects carry no video label or role, so a remaster and an original transfer look
+     * identical there. Empty unless there is a real choice -- a plain bitrate ladder is the engine's
+     * business, not the user's.
+     */
+    private fun readRenditions(variants: Array<dynamic>): List<MediaTrack> {
+        val manifestVariants = runCatching { shakaPlayer.getManifest() }.getOrNull()?.variants ?: return emptyList()
+        val activeVideoId = (variants.firstOrNull { it.active == true }?.videoId as? Number)?.toInt()
+        // A JS number arrives as Double here -- `as Int` would throw for EVERY manifest.
+        val count = (manifestVariants.length as? Number)?.toInt() ?: 0
+        val video = (0 until count)
+            .mapNotNull { manifestVariants[it]?.video }
+            .distinctBy { (it.id as? Number)?.toInt() }
+            .mapNotNull { renditionOf(it, activeVideoId) }
+        // One rendition is no choice; two unlabelled ones are a ladder we should not expose.
+        if (video.size < 2 || video.all { it.label == null }) {
+            videoSelectionById.clear()
+            return emptyList()
+        }
+        if (!abrPinnedToRendition) {
+            // Labelled renditions are alternate *versions* of the programme, not quality rungs, so ABR
+            // must not drift between them: a variant switch rebuilds the video buffer, and the playhead
+            // can be left with no video where it stands. Pin whatever Shaka already chose rather than
+            // selecting a variant, which would clear the buffer mid-start-up. Unlabelled ladders keep
+            // ABR, so multiple resolutions of one version still adapt.
+            abrPinnedToRendition = true
+            disableAbr()
+        }
+        return video
+    }
+
+    private fun renditionOf(stream: dynamic, activeVideoId: Int?): MediaTrack? {
+        val sid = (stream.id as? Number)?.toInt() ?: return null
+        val roles = (stream.roles as? Array<dynamic>)?.mapNotNull { it as? String }.orEmpty()
+        val id = "VIDEO:$sid"
+        videoSelectionById[id] = sid
+        return MediaTrack(
+            id = id,
+            type = TrackType.VIDEO,
+            label = (stream.label as? String) ?: roles.firstOrNull(),
+            isSelected = sid == activeVideoId,
+            isDefault = roles.contains("main"),
+        )
+    }
+
+    private fun disableAbr() {
+        val abr: dynamic = js("({})")
+        abr.enabled = false
+        val cfg: dynamic = js("({})")
+        cfg.abr = abr
+        shakaPlayer.configure(cfg)
     }
 
     private fun loadTracks() {
         if (released || !usingShaka) return
         textTrackById.clear()
         audioSelectionById.clear()
+        videoSelectionById.clear()
 
         val variants = shakaPlayer.getVariantTracks()
         val audio = mutableListOf<MediaTrack>()
@@ -978,6 +1103,8 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
             )
         }
 
+        val video = readRenditions(variants)
+
         val textList = shakaPlayer.getTextTracks()
         val text = mutableListOf<MediaTrack>()
         for (i in 0 until textList.size) {
@@ -997,8 +1124,10 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
             it.copy(
                 audioTracks = audio.toPersistentList(),
                 textTracks = text.toPersistentList(),
+                videoTracks = video.toPersistentList(),
                 selectedAudioTrackId = audio.firstOrNull { t -> t.isSelected }?.id,
                 selectedTextTrackId = text.firstOrNull { t -> t.isSelected }?.id,
+                selectedVideoTrackId = video.firstOrNull { t -> t.isSelected }?.id,
             )
         }
         emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }

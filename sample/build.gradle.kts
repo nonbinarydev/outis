@@ -135,6 +135,10 @@ kotlin {
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)
                 implementation(libs.kotlinx.serialization.json)
+                // Image loading for posters + trickplay tiles. coil-network-ktor3 (with the platform Ktor
+                // engines already declared per source set) backs the singleton ImageLoader for the whole app.
+                implementation(libs.coil.compose)
+                implementation(libs.coil.network.ktor)
             }
         }
 

@@ -57,6 +57,7 @@ import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
 import dev.nonbinary.outis.core.source.WidevineLevel
+import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
 import kotlinx.collections.immutable.persistentListOf
@@ -184,11 +185,13 @@ internal class ExoPlayerEngine(
                 selectedAudioTrackId = null,
                 selectedTextTrackId = null,
                 chapters = persistentListOf(),
+                thumbnails = persistentListOf(),
             )
         }
         // Media3 surfaces no chapter API, so parse embedded chapters from the local container off-thread
         // (mp4/m4v QuickTime+Nero, mkv Matroska) and publish them to PlayerState. Remote sources skip this.
         extractChaptersAsync(item)
+        loadThumbnailsAsync(item)
         // Fail fast on a DRM scheme this device can't satisfy, rather than handing ExoPlayer an
         // undecryptable source that limps along as black/silent playback. FairPlay is Apple-only (no
         // Android CDM at all); Widevine/PlayReady need a device CDM that many phones lack.
@@ -209,6 +212,10 @@ internal class ExoPlayerEngine(
                 clearVideoSizeConstraints()
             }
             setMaxVideoBitrate(c?.maxBitrateBps ?: Int.MAX_VALUE)
+            // ExoPlayer's context-default track selector caps video to the display's *viewport* size, which
+            // silently filters out a 4K rung on a sub-4K screen (a phone/tablet). The SDK shouldn't hide a
+            // rung the app didn't ask to hide — capping is the app's call via videoConstraints. Clear it.
+            clearViewportSizeConstraints()
             // Load-time language preferences. buildUpon() inherits the prior item's params, so we MUST
             // pass these every item (null included) — Media3's setPreferred*Language(null) is what clears
             // a previous preference.
@@ -466,7 +473,16 @@ internal class ExoPlayerEngine(
             trackOverrides.clear()
             val audio = mutableListOf<MediaTrack>()
             val text = mutableListOf<MediaTrack>()
+            // Alternate video renditions -- ONE entry per group, not per track. A DASH
+            // AdaptationSet is a group and its Representations are the tracks inside it, so
+            // a bitrate ladder is one group with many tracks (the engine's business) while
+            // a remaster beside an original transfer is two groups (the user's choice).
+            val video = mutableListOf<MediaTrack>()
             tracks.groups.forEachIndexed { groupIndex, group ->
+                if (group.type == C.TRACK_TYPE_VIDEO) {
+                    renditionOf(group, groupIndex)?.let { video += it }
+                    return@forEachIndexed
+                }
                 val type = when (group.type) {
                     C.TRACK_TYPE_AUDIO -> TrackType.AUDIO
                     C.TRACK_TYPE_TEXT -> TrackType.TEXT
@@ -488,12 +504,19 @@ internal class ExoPlayerEngine(
                     (if (type == TrackType.AUDIO) audio else text).add(track)
                 }
             }
+            // One rendition is no choice, and unlabelled ones we cannot describe to the user.
+            if (video.size < 2 || video.all { it.label == null }) {
+                video.forEach { trackOverrides.remove(it.id) }
+                video.clear()
+            }
             _state.update {
                 it.copy(
                     audioTracks = audio.toPersistentList(),
                     textTracks = text.toPersistentList(),
+                    videoTracks = video.toPersistentList(),
                     selectedAudioTrackId = audio.firstOrNull { t -> t.isSelected }?.id,
                     selectedTextTrackId = text.firstOrNull { t -> t.isSelected }?.id,
+                    selectedVideoTrackId = video.firstOrNull { t -> t.isSelected }?.id,
                 )
             }
             emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
@@ -537,6 +560,24 @@ internal class ExoPlayerEngine(
     }
 
     // ---- internals (all main-thread) ----
+
+    /** The rendition [group] offers, or null when none of its tracks can play. */
+    private fun renditionOf(group: Tracks.Group, groupIndex: Int): MediaTrack? {
+        val supported = (0 until group.length).filter { group.isTrackSupported(it) }
+        if (supported.isEmpty()) return null
+        val format = group.getTrackFormat(supported.first())
+        val id = "VIDEO:$groupIndex"
+        // Override the whole group so Media3 still adapts WITHIN the chosen rendition;
+        // pinning one track would also pin the bitrate.
+        trackOverrides[id] = TrackSelectionOverride(group.mediaTrackGroup, supported)
+        return MediaTrack(
+            id = id,
+            type = TrackType.VIDEO,
+            label = format.label,
+            isSelected = (0 until group.length).any { group.isTrackSelected(it) },
+            isDefault = format.roleFlags and C.ROLE_FLAG_MAIN != 0,
+        )
+    }
 
     private fun startTicker() {
         scope.launch {
@@ -592,8 +633,18 @@ internal class ExoPlayerEngine(
                 videoSize = exo.videoSize.let {
                     if (it.width > 0 && it.height > 0) VideoSize(it.width, it.height) else prev.videoSize
                 },
+                videoRange = exo.videoFormat?.toVideoRange() ?: prev.videoRange,
             )
         }
+    }
+
+    /** Colour range of the selected video [androidx.media3.common.Format] (DV from the codec, HDR from the transfer). */
+    private fun androidx.media3.common.Format.toVideoRange(): VideoRange = when {
+        androidx.media3.common.MimeTypes.VIDEO_DOLBY_VISION.equals(sampleMimeType, ignoreCase = true) ||
+            codecs?.let { it.startsWith("dvh1") || it.startsWith("dvhe") } == true -> VideoRange.DOLBY_VISION
+        colorInfo?.colorTransfer == C.COLOR_TRANSFER_ST2084 -> VideoRange.HDR10
+        colorInfo?.colorTransfer == C.COLOR_TRANSFER_HLG -> VideoRange.HLG
+        else -> VideoRange.SDR
     }
 
     /** Stamp an event with the last-known content position + a monotonic clock. Never touches the player. */
@@ -610,6 +661,15 @@ internal class ExoPlayerEngine(
     // ---- chapters (Media3 has no chapter API; parse the local container ourselves) ----
 
     /** Parse embedded chapters from a local file off-thread and publish them — no-op for remote sources. */
+    private fun loadThumbnailsAsync(item: MediaItem) {
+        val url = item.thumbnailsUrl ?: return
+        scope.launch(ioDispatcher) {
+            val thumbs = loadThumbnails(url)
+            if (thumbs.isEmpty() || released) return@launch
+            _state.update { if (it.mediaItem === item) it.copy(thumbnails = thumbs.toPersistentList()) else it }
+        }
+    }
+
     private fun extractChaptersAsync(item: MediaItem) {
         // A WebVTT sidecar wins over embedded chapters and is the only source that works for remote/streams.
         item.chaptersUrl?.let { sidecar ->

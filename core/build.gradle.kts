@@ -149,7 +149,7 @@ kotlin {
         val jsMain by getting {
             dependsOn(webMain)
             dependencies {
-                implementation(npm("shaka-player", "4.11.2"))
+                implementation(npm("shaka-player", "4.16.50"))
             }
         }
         val wasmJsMain by getting { dependsOn(webMain) }

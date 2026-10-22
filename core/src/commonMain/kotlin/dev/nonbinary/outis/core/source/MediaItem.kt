@@ -98,6 +98,13 @@ data class MediaItem(
      */
     val chaptersUrl: String? = null,
     /**
+     * WebVTT **trickplay thumbnails** sidecar URL (the de-facto format: each cue points at a sprite-sheet
+     * region, `sheet.jpg#xywh=x,y,w,h`). When set, its cues populate
+     * [dev.nonbinary.outis.core.PlayerState.thumbnails] and the UI shows a seek-preview tile while
+     * scrubbing. Works for streamed sources on every engine, since it's a plain sidecar.
+     */
+    val thumbnailsUrl: String? = null,
+    /**
      * Vendor-neutral QoS/analytics metadata, consumed by an analytics adapter (`outis-analytics-mux`).
      * `null` when nothing is wired — the field costs nothing and the SDK itself never reads it.
      * Distinct from [metadata], which is *display* metadata (title/artwork); this is what a QoS backend

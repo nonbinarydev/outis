@@ -18,7 +18,9 @@ import androidx.compose.runtime.setValue
 import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.PlayerError
 import dev.nonbinary.outis.core.VideoPlayer
+import dev.nonbinary.outis.core.VideoRange
 import dev.nonbinary.outis.core.chapters.Chapter
+import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.track.MediaTrack
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
@@ -142,11 +144,23 @@ class PlayerControlsState internal constructor(
     /** Chapter markers for the current media, sorted by start; empty when the asset carries none. */
     val chapters: ImmutableList<Chapter> get() = snapshot.chapters
 
+    /** Trickplay seek-preview thumbnails, sorted by start; empty when the asset carries none. */
+    val thumbnails: ImmutableList<ThumbnailCue> get() = snapshot.thumbnails
+
+    /** Colour/dynamic range of the current video rendition; [VideoRange.SDR] until an HDR track is selected. */
+    val videoRange: VideoRange get() = snapshot.videoRange
+
     /** Id of the active audio track, or `null` when nothing has been resolved yet. */
     val selectedAudioTrackId: String? get() = snapshot.selectedAudioTrackId
 
     /** Id of the active subtitle track. `null` means subtitles are **off**, not "unknown". */
     val selectedTextTrackId: String? get() = snapshot.selectedTextTrackId
+
+    /** Alternate video renditions of the same content; empty unless the manifest offers a real choice. */
+    val videoTracks: ImmutableList<MediaTrack> get() = snapshot.videoTracks
+
+    /** [MediaTrack.id] of the active video rendition, or `null` before the engine reports one. */
+    val selectedVideoTrackId: String? get() = snapshot.selectedVideoTrackId
 
     /** What the scrubber should show: local drag, else an in-flight seek, else the sampled position. */
     val scrubPositionMs: Long get() = scrubPosition ?: snapshot.pendingSeekTargetMs ?: snapshot.positionMs
