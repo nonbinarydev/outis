@@ -111,3 +111,4 @@ Thumbs.db
 
 # Generated demo media (build-demo-media.sh output — regenerate, do not commit)
 demo-media-out/
+sollevante-media-out/
