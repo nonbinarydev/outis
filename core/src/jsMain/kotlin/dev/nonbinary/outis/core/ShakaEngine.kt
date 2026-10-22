@@ -537,8 +537,11 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
      * user-driven [play] carries a gesture and cannot be blocked.
      */
     private fun playWithAutoplayFallback() {
-        video.asDynamic().play().catch({ _: dynamic ->
-            if (!video.muted) {
+        video.asDynamic().play().catch({ e: dynamic ->
+            // Only an autoplay refusal is answered by muting. `play()` rejects for unrelated reasons too
+            // -- most often AbortError, when a load() supersedes a play still settling -- and muting for
+            // one of those leaves the item running silently with nothing to undo it.
+            if ((e?.name as? String) == "NotAllowedError" && !video.muted) {
                 video.muted = true
                 _state.update { it.copy(isMuted = true) }
                 video.asDynamic().play()
