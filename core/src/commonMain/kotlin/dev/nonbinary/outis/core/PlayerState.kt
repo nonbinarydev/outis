@@ -137,7 +137,7 @@ data class PlayerState(
     /**
      * Alternate video renditions of the same content -- a remaster beside an original transfer, say --
      * *not* the bitrate ladder, which the engine picks between on its own. Empty unless the manifest
-     * offers a genuine choice, and currently populated only on web.
+     * offers a genuine choice. Populated on Android and web; iOS does not report renditions yet.
      */
     val videoTracks: ImmutableList<MediaTrack> = persistentListOf(),
     /** [MediaTrack.id] of the active video rendition, or `null` before the engine reports one. */
