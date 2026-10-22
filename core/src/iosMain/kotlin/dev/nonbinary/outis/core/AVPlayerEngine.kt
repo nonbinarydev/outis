@@ -151,6 +151,9 @@ private val liveEngines = mutableSetOf<AVPlayerEngine>()
  * **Memory.** Observer/notification closures capture only a [WeakReference] back to the engine
  * (AVFoundation retains the closures); [liveEngines] keeps the engine alive until [release].
  */
+// Over the LargeClass threshold since the Dolby Vision range probe landed beside the player wiring
+// and the reconciler. The probe is the self-contained piece to split out.
+@Suppress("LargeClass")
 internal class AVPlayerEngine(
     private val config: PlayerConfig,
 ) : VideoPlayer {
@@ -764,18 +767,6 @@ internal class AVPlayerEngine(
 
     // ---- state reconciliation (polled on the main queue) ----
 
-    // Maps the whole of AVPlayer/AVPlayerItem state onto one PlayerState in a single pass: status,
-    // rate, buffering, seekable/loaded ranges, tracks and errors. The branch count mirrors the number
-    // of native properties, and reading them together is what makes the snapshot coherent.
-    //
-    // This suppression is a stopgap, not a claim that the function is irreducible. Three contiguous
-    // blocks — the stall self-heal, the lazy track load, and the derived-event emission — are pure
-    // code motion into private methods and would bring this well under the threshold. What is missing
-    // is a way to catch a regression: there is no iosTest source set and no CI, and a mistake here
-    // shows up as state flapping or unpaired BufferingStarted/Ended rather than a compile error.
-    // ShakaEngine.reconcile is deliberately the line-for-line mirror of this one, so refactor both
-    // together or not at all.
-    @Suppress("CyclomaticComplexMethod")
     // 'dvh1' / 'dvhe' as FourCharCode — the Dolby Vision HEVC sample-entry codec types.
     private val fourCcDvh1: UInt = 0x64766831u
     private val fourCcDvhe: UInt = 0x64766865u
@@ -830,6 +821,18 @@ internal class AVPlayerEngine(
     private fun cfStringValue(cf: COpaquePointer?): String? =
         cf?.let { CFStringGetCStringPtr(it.reinterpret(), kCFStringEncodingUTF8)?.toKString() }
 
+    // Maps the whole of AVPlayer/AVPlayerItem state onto one PlayerState in a single pass: status,
+    // rate, buffering, seekable/loaded ranges, tracks and errors. The branch count mirrors the number
+    // of native properties, and reading them together is what makes the snapshot coherent.
+    //
+    // This suppression is a stopgap, not a claim that the function is irreducible. Three contiguous
+    // blocks — the stall self-heal, the lazy track load, and the derived-event emission — are pure
+    // code motion into private methods and would bring this well under the threshold. What is missing
+    // is a way to catch a regression: there is no iosTest source set and no CI, and a mistake here
+    // shows up as state flapping or unpaired BufferingStarted/Ended rather than a compile error.
+    // ShakaEngine.reconcile is deliberately the line-for-line mirror of this one, so refactor both
+    // together or not at all.
+    @Suppress("CyclomaticComplexMethod")
     private fun reconcile() {
         val avPlayer = player ?: return
         val item = avPlayer.currentItem
