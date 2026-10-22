@@ -480,20 +480,7 @@ internal class ExoPlayerEngine(
             val video = mutableListOf<MediaTrack>()
             tracks.groups.forEachIndexed { groupIndex, group ->
                 if (group.type == C.TRACK_TYPE_VIDEO) {
-                    val supported = (0 until group.length).filter { group.isTrackSupported(it) }
-                    val i = supported.firstOrNull() ?: return@forEachIndexed
-                    val format = group.getTrackFormat(i)
-                    val id = "VIDEO:$groupIndex"
-                    // Override the whole group so Media3 still adapts WITHIN the chosen
-                    // rendition; pinning one track would also pin the bitrate.
-                    trackOverrides[id] = TrackSelectionOverride(group.mediaTrackGroup, supported)
-                    video += MediaTrack(
-                        id = id,
-                        type = TrackType.VIDEO,
-                        label = format.label,
-                        isSelected = (0 until group.length).any { group.isTrackSelected(it) },
-                        isDefault = format.roleFlags and C.ROLE_FLAG_MAIN != 0,
-                    )
+                    renditionOf(group, groupIndex)?.let { video += it }
                     return@forEachIndexed
                 }
                 val type = when (group.type) {
@@ -573,6 +560,24 @@ internal class ExoPlayerEngine(
     }
 
     // ---- internals (all main-thread) ----
+
+    /** The rendition [group] offers, or null when none of its tracks can play. */
+    private fun renditionOf(group: Tracks.Group, groupIndex: Int): MediaTrack? {
+        val supported = (0 until group.length).filter { group.isTrackSupported(it) }
+        if (supported.isEmpty()) return null
+        val format = group.getTrackFormat(supported.first())
+        val id = "VIDEO:$groupIndex"
+        // Override the whole group so Media3 still adapts WITHIN the chosen rendition;
+        // pinning one track would also pin the bitrate.
+        trackOverrides[id] = TrackSelectionOverride(group.mediaTrackGroup, supported)
+        return MediaTrack(
+            id = id,
+            type = TrackType.VIDEO,
+            label = format.label,
+            isSelected = (0 until group.length).any { group.isTrackSelected(it) },
+            isDefault = format.roleFlags and C.ROLE_FLAG_MAIN != 0,
+        )
+    }
 
     private fun startTicker() {
         scope.launch {
