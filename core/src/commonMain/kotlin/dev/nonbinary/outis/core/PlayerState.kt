@@ -134,6 +134,14 @@ data class PlayerState(
     val selectedAudioTrackId: String? = null,
     /** `null` == subtitles **off** (not "unknown"). */
     val selectedTextTrackId: String? = null,
+    /**
+     * Alternate video renditions of the same content -- a remaster beside an original transfer, say --
+     * *not* the bitrate ladder, which the engine picks between on its own. Empty unless the manifest
+     * offers a genuine choice, and currently populated only on web.
+     */
+    val videoTracks: ImmutableList<MediaTrack> = persistentListOf(),
+    /** [MediaTrack.id] of the active video rendition, or `null` before the engine reports one. */
+    val selectedVideoTrackId: String? = null,
 
     /**
      * Embedded chapter markers (MP4/M4V QuickTime/Nero, Matroska `Chapters`), sorted by start; empty when

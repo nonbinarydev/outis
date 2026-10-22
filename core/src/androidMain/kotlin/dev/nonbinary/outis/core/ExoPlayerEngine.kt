@@ -473,7 +473,29 @@ internal class ExoPlayerEngine(
             trackOverrides.clear()
             val audio = mutableListOf<MediaTrack>()
             val text = mutableListOf<MediaTrack>()
+            // Alternate video renditions -- ONE entry per group, not per track. A DASH
+            // AdaptationSet is a group and its Representations are the tracks inside it, so
+            // a bitrate ladder is one group with many tracks (the engine's business) while
+            // a remaster beside an original transfer is two groups (the user's choice).
+            val video = mutableListOf<MediaTrack>()
             tracks.groups.forEachIndexed { groupIndex, group ->
+                if (group.type == C.TRACK_TYPE_VIDEO) {
+                    val supported = (0 until group.length).filter { group.isTrackSupported(it) }
+                    val i = supported.firstOrNull() ?: return@forEachIndexed
+                    val format = group.getTrackFormat(i)
+                    val id = "VIDEO:$groupIndex"
+                    // Override the whole group so Media3 still adapts WITHIN the chosen
+                    // rendition; pinning one track would also pin the bitrate.
+                    trackOverrides[id] = TrackSelectionOverride(group.mediaTrackGroup, supported)
+                    video += MediaTrack(
+                        id = id,
+                        type = TrackType.VIDEO,
+                        label = format.label,
+                        isSelected = (0 until group.length).any { group.isTrackSelected(it) },
+                        isDefault = format.roleFlags and C.ROLE_FLAG_MAIN != 0,
+                    )
+                    return@forEachIndexed
+                }
                 val type = when (group.type) {
                     C.TRACK_TYPE_AUDIO -> TrackType.AUDIO
                     C.TRACK_TYPE_TEXT -> TrackType.TEXT
@@ -495,12 +517,19 @@ internal class ExoPlayerEngine(
                     (if (type == TrackType.AUDIO) audio else text).add(track)
                 }
             }
+            // One rendition is no choice, and unlabelled ones we cannot describe to the user.
+            if (video.size < 2 || video.all { it.label == null }) {
+                video.forEach { trackOverrides.remove(it.id) }
+                video.clear()
+            }
             _state.update {
                 it.copy(
                     audioTracks = audio.toPersistentList(),
                     textTracks = text.toPersistentList(),
+                    videoTracks = video.toPersistentList(),
                     selectedAudioTrackId = audio.firstOrNull { t -> t.isSelected }?.id,
                     selectedTextTrackId = text.firstOrNull { t -> t.isSelected }?.id,
+                    selectedVideoTrackId = video.firstOrNull { t -> t.isSelected }?.id,
                 )
             }
             emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }

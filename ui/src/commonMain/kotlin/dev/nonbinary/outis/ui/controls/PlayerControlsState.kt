@@ -156,6 +156,12 @@ class PlayerControlsState internal constructor(
     /** Id of the active subtitle track. `null` means subtitles are **off**, not "unknown". */
     val selectedTextTrackId: String? get() = snapshot.selectedTextTrackId
 
+    /** Alternate video renditions of the same content; empty unless the manifest offers a real choice. */
+    val videoTracks: ImmutableList<MediaTrack> get() = snapshot.videoTracks
+
+    /** [MediaTrack.id] of the active video rendition, or `null` before the engine reports one. */
+    val selectedVideoTrackId: String? get() = snapshot.selectedVideoTrackId
+
     /** What the scrubber should show: local drag, else an in-flight seek, else the sampled position. */
     val scrubPositionMs: Long get() = scrubPosition ?: snapshot.pendingSeekTargetMs ?: snapshot.positionMs
 
