@@ -30,26 +30,34 @@ data class ThumbnailCue(
  * failure yields an empty list — thumbnails are optional and must never break playback.
  */
 object VttThumbnails {
-    fun parse(vtt: String, baseUrl: String): List<ThumbnailCue> {
-        val cues = mutableListOf<ThumbnailCue>()
-        for (block in vtt.replace("\r\n", "\n").replace("\r", "\n").split(Regex("\n[ \t]*\n"))) {
-            val lines = block.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-            val timingIdx = lines.indexOfFirst { "-->" in it }
-            if (timingIdx < 0) continue // header / NOTE block
-            val ends = lines[timingIdx].split("-->")
-            val start = parseTimestamp(ends.getOrNull(0)) ?: continue
-            val end = parseTimestamp(ends.getOrNull(1)?.trim()?.substringBefore(' ')) ?: continue
-            val payload = lines.getOrNull(timingIdx + 1) ?: continue
-            val spritePath = payload.substringBefore('#')
-            val xywh = payload.substringAfter("#xywh=", "").split(",")
-            if (spritePath.isEmpty() || xywh.size != XYWH_PARTS) continue
-            val x = xywh[0].trim().toIntOrNull() ?: continue
-            val y = xywh[1].trim().toIntOrNull() ?: continue
-            val w = xywh[2].trim().toIntOrNull() ?: continue
-            val h = xywh[3].trim().toIntOrNull() ?: continue
-            cues += ThumbnailCue(start, end, resolveUrl(baseUrl, spritePath), x, y, w, h)
-        }
-        return cues.sortedBy { it.startMs }
+    fun parse(vtt: String, baseUrl: String): List<ThumbnailCue> =
+        vtt.replace("\r\n", "\n").replace("\r", "\n").split(Regex("\n[ \t]*\n"))
+            .mapNotNull { parseCue(it, baseUrl) }
+            .sortedBy { it.startMs }
+
+    /** One cue block, or null for the header, a NOTE, or anything malformed. */
+    private fun parseCue(block: String, baseUrl: String): ThumbnailCue? {
+        val lines = block.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+        val timingIdx = lines.indexOfFirst { "-->" in it }
+        if (timingIdx < 0) return null
+        val ends = lines[timingIdx].split("-->")
+        val start = parseTimestamp(ends.getOrNull(0))
+        val end = parseTimestamp(ends.getOrNull(1)?.trim()?.substringBefore(' '))
+        val payload = lines.getOrNull(timingIdx + 1)
+        if (start == null || end == null || payload == null) return null
+        val spritePath = payload.substringBefore('#')
+        val rect = payload.substringAfter("#xywh=", "").split(",").map { it.trim().toIntOrNull() }
+        if (spritePath.isEmpty() || rect.size != XYWH_PARTS || rect.any { it == null }) return null
+        val r = rect.requireNoNulls()
+        return ThumbnailCue(
+            startMs = start,
+            endMs = end,
+            url = resolveUrl(baseUrl, spritePath),
+            x = r[0],
+            y = r[1],
+            width = r[2],
+            height = r[XYWH_PARTS - 1],
+        )
     }
 
     private fun resolveUrl(base: String, ref: String): String =
