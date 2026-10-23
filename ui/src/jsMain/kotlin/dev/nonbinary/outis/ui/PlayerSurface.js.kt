@@ -54,7 +54,7 @@ import org.w3c.dom.HTMLVideoElement
 @Suppress("ComposableParametersOrdering")
 @ExperimentalPlayerUiApi
 @Composable
-actual fun PlayerSurface(
+public actual fun PlayerSurface(
     player: VideoPlayer,
     modifier: Modifier,
     contentScale: ContentScale,

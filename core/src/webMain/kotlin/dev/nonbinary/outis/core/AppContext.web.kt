@@ -7,4 +7,4 @@
 package dev.nonbinary.outis.core
 
 /** Web (JS / Wasm) [AppContext] — Shaka attaches to a DOM `<video>`, no host context needed here. */
-actual class AppContext
+public actual class AppContext

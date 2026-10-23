@@ -19,7 +19,7 @@ package dev.nonbinary.outis.core.analytics
  * adapter sends what it has, and viewer identity is the *adapter's* concern (session-scoped), not the
  * item's.
  */
-data class PlaybackMetadata(
+public data class PlaybackMetadata(
     /** Stable id for this title across sessions — the primary key a QoS backend groups views by. */
     val videoId: String? = null,
     /**
@@ -41,4 +41,4 @@ data class PlaybackMetadata(
 )
 
 /** Whether content is on-demand or live — the one distinction every QoS backend treats specially. */
-enum class StreamType { VOD, LIVE }
+public enum class StreamType { VOD, LIVE }

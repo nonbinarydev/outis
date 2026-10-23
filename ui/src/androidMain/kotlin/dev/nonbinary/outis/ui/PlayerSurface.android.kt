@@ -48,7 +48,7 @@ import androidx.compose.ui.geometry.Rect as ComposeRect
 @OptIn(UnstableApi::class)
 @ExperimentalPlayerUiApi
 @Composable
-actual fun PlayerSurface(
+public actual fun PlayerSurface(
     player: VideoPlayer,
     modifier: Modifier,
     contentScale: ContentScale,

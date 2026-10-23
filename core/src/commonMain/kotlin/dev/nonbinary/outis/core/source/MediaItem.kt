@@ -19,7 +19,7 @@ import dev.nonbinary.outis.core.analytics.PlaybackMetadata
  * [startPositionMs], [startMuted]) are applied as the item is prepared — before first frame — so the
  * right track / position / mute state is in place without a reactive flip after playback starts.
  */
-data class MediaItem(
+public data class MediaItem(
     /**
      * Where the bytes come from — a remote [MediaSource.Url] or an on-device [MediaSource.LocalFile].
      * The only required field; everything else has a sensible default. When [mimeType] is `null` the
@@ -114,10 +114,10 @@ data class MediaItem(
 
 /** The SSAI ad breaks on this item, or empty if it has none. */
 @ExperimentalPlayerApi
-fun MediaItem.serverSideBreaks(): List<AdBreak> = (adConfig as? AdConfig.ServerSide)?.breaks ?: emptyList()
+public fun MediaItem.serverSideBreaks(): List<AdBreak> = (adConfig as? AdConfig.ServerSide)?.breaks ?: emptyList()
 
 /** Initial caption/subtitle visibility for a [MediaItem]. */
-enum class CaptionsDefaultMode {
+public enum class CaptionsDefaultMode {
     /** Captions hidden until the user selects a text track (the default). */
     OFF,
 
@@ -140,7 +140,7 @@ enum class CaptionsDefaultMode {
  * / `preferredPeakBitRate`) and Web (Shaka `restrictions`). Resolution caps need **both** [maxWidth] and
  * [maxHeight] (Media3/AVPlayer take a size, not a single dimension).
  */
-data class VideoConstraints(
+public data class VideoConstraints(
     /**
      * Maximum rendition width in **pixels**; `null` => unbounded. Only takes effect together with
      * [maxHeight] — a width on its own is ignored.
@@ -156,7 +156,7 @@ data class VideoConstraints(
 )
 
 /** Optional display metadata for the overlay and OS media sessions. */
-data class MediaMetadata(
+public data class MediaMetadata(
     /** Primary display line (programme / film name). `null` => nothing to show, not an empty title. */
     val title: String? = null,
     /**

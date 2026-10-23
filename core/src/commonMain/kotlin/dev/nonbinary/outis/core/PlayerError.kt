@@ -12,7 +12,7 @@ package dev.nonbinary.outis.core
  * [nativeCause] retains the original (`ExoPlaybackException`, `NSError`, Shaka error object) for
  * adapters that want engine-specific detail. [Category] is a small, stable taxonomy.
  */
-data class PlayerError(
+public data class PlayerError(
     /** Coarse, cross-engine classification — the only field safe to branch on in shared code. */
     val category: Category,
     /**
@@ -38,7 +38,7 @@ data class PlayerError(
      * The stable taxonomy playback failures are normalised into. Deliberately small: engines classify
      * on wildly different code spaces, so anything finer would not mean the same thing twice.
      */
-    enum class Category {
+    public enum class Category {
         /**
          * The media itself is unusable or unreachable: bad/unresolvable URL, 404 or other bad HTTP
          * status, malformed container/manifest, or a live stream that fell irrecoverably behind its

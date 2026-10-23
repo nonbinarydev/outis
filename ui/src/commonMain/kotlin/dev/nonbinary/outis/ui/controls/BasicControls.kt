@@ -85,7 +85,7 @@ private val DefaultPlaybackSpeeds = listOf(0.5f, 1f, 1.25f, 1.5f, 2f)
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun PlayPauseButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun PlayPauseButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
     // Always enabled (so it stays D-pad-focusable even in IDLE); the click no-ops when there's nothing to do.
     IconButton(onClick = state::playPause, modifier = modifier.controlFocusRing()) {
         Icon(
@@ -102,7 +102,7 @@ fun PlayPauseButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun BigPlayButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun BigPlayButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
     IconButton(onClick = state::playPause, modifier = modifier.size(72.dp).controlFocusRing()) {
         Icon(
             imageVector = if (state.showPlayIcon) Icons.Filled.PlayArrow else Icons.Filled.Pause,
@@ -127,7 +127,7 @@ fun BigPlayButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalMaterial3Api::class)
 @ExperimentalPlayerUiApi
 @Composable
-fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
     val duration = state.durationMs
     // No scrubbable timeline yet (live edge or unresolved duration).
     if (state.isLive || duration == null || duration <= 0L) return
@@ -270,7 +270,7 @@ private val ScrubberTouchHeight = 40.dp
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun TimeLabel(state: PlayerControlsState, modifier: Modifier = Modifier, showDuration: Boolean = true) {
+public fun TimeLabel(state: PlayerControlsState, modifier: Modifier = Modifier, showDuration: Boolean = true) {
     val text = when {
         state.isLive -> "LIVE"
         showDuration -> "${formatTime(state.scrubPositionMs)} / ${formatTime(state.durationMs)}"
@@ -289,7 +289,7 @@ fun TimeLabel(state: PlayerControlsState, modifier: Modifier = Modifier, showDur
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun BufferingIndicator(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun BufferingIndicator(state: PlayerControlsState, modifier: Modifier = Modifier) {
     if (state.isWaitingToPlay) {
         CircularProgressIndicator(
             color = LocalContentColor.current,
@@ -307,7 +307,7 @@ fun BufferingIndicator(state: PlayerControlsState, modifier: Modifier = Modifier
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun MuteButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun MuteButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
     IconButton(onClick = state::toggleMute, modifier = modifier.controlFocusRing()) {
         Icon(
             imageVector = if (state.isMuted) {
@@ -333,7 +333,7 @@ fun MuteButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun PlaybackSpeedButton(
+public fun PlaybackSpeedButton(
     state: PlayerControlsState,
     modifier: Modifier = Modifier,
     speeds: List<Float> = DefaultPlaybackSpeeds,
@@ -374,13 +374,13 @@ fun PlaybackSpeedButton(
 
 /** [PlayPauseButton] against the scope's own [PlayerControlsScope.state]. Behaviour is identical. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.PlayPauseButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.PlayPauseButton(modifier: Modifier = Modifier) {
     PlayPauseButton(state, modifier)
 }
 
 /** [BigPlayButton] against the scope's own [PlayerControlsScope.state]. Behaviour is identical. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.BigPlayButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.BigPlayButton(modifier: Modifier = Modifier) {
     BigPlayButton(state, modifier)
 }
 
@@ -389,13 +389,13 @@ fun PlayerControlsScope.BigPlayButton(modifier: Modifier = Modifier) {
  * emitting nothing for live or unresolved-duration media.
  */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.Scrubber(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.Scrubber(modifier: Modifier = Modifier) {
     Scrubber(state, modifier)
 }
 
 /** [TimeLabel] against the scope's own [PlayerControlsScope.state]. Behaviour is identical. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.TimeLabel(modifier: Modifier = Modifier, showDuration: Boolean = true) {
+public fun PlayerControlsScope.TimeLabel(modifier: Modifier = Modifier, showDuration: Boolean = true) {
     TimeLabel(state, modifier, showDuration)
 }
 
@@ -404,13 +404,13 @@ fun PlayerControlsScope.TimeLabel(modifier: Modifier = Modifier, showDuration: B
  * including drawing nothing while merely paused.
  */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.BufferingIndicator(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.BufferingIndicator(modifier: Modifier = Modifier) {
     BufferingIndicator(state, modifier)
 }
 
 /** [MuteButton] against the scope's own [PlayerControlsScope.state]. Behaviour is identical. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.MuteButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.MuteButton(modifier: Modifier = Modifier) {
     MuteButton(state, modifier)
 }
 
@@ -419,6 +419,6 @@ fun PlayerControlsScope.MuteButton(modifier: Modifier = Modifier) {
  * list. Pass the free function a `speeds` list to offer different rates.
  */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.PlaybackSpeedButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.PlaybackSpeedButton(modifier: Modifier = Modifier) {
     PlaybackSpeedButton(state, modifier)
 }

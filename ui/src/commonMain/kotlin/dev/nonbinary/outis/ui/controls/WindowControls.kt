@@ -27,7 +27,7 @@ import dev.nonbinary.outis.ui.window.PlayerWindow
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun FullscreenButton(state: PlayerControlsState, window: PlayerWindow, modifier: Modifier = Modifier) {
+public fun FullscreenButton(state: PlayerControlsState, window: PlayerWindow, modifier: Modifier = Modifier) {
     val toggle = window.onToggleFullscreen ?: return // self-hide when the host can't go fullscreen
     IconButton(
         onClick = {
@@ -53,7 +53,7 @@ fun FullscreenButton(state: PlayerControlsState, window: PlayerWindow, modifier:
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun PipButton(state: PlayerControlsState, window: PlayerWindow, modifier: Modifier = Modifier) {
+public fun PipButton(state: PlayerControlsState, window: PlayerWindow, modifier: Modifier = Modifier) {
     val enter = window.onEnterPip
     if (!window.isPipSupported || enter == null) return // self-hide when PIP is unavailable
     IconButton(
@@ -69,12 +69,12 @@ fun PipButton(state: PlayerControlsState, window: PlayerWindow, modifier: Modifi
 
 /** Scope-member form of [FullscreenButton], taking [state] and [window] from the controls lambda. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.FullscreenButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.FullscreenButton(modifier: Modifier = Modifier) {
     FullscreenButton(state, window, modifier)
 }
 
 /** Scope-member form of [PipButton], taking [state] and [window] from the controls lambda. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.PipButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.PipButton(modifier: Modifier = Modifier) {
     PipButton(state, window, modifier)
 }

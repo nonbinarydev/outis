@@ -23,22 +23,22 @@ import dev.nonbinary.outis.core.engine
  * Media3 engine.
  */
 @ExperimentalPlayerApi
-fun VideoPlayer.setAdContainer(container: ViewGroup?, obstructions: List<AdObstruction> = emptyList()) {
+public fun VideoPlayer.setAdContainer(container: ViewGroup?, obstructions: List<AdObstruction> = emptyList()) {
     (engine as? ExoPlayerEngine)?.setAdContainer(container, obstructions)
 }
 
 /** A view drawn over the video that ad viewability measurement should treat as friendly. */
 @ExperimentalPlayerApi
-class AdObstruction(
+public class AdObstruction(
     /** The overlapping view. */
-    val view: View,
+    public val view: View,
     /** Why it overlaps the ad, in Open Measurement's terms. */
-    val purpose: Purpose,
+    public val purpose: Purpose,
     /** A short free-text explanation for measurement vendors, or `null`. */
-    val reason: String? = null,
+    public val reason: String? = null,
 ) {
     /** Open Measurement's friendly-obstruction purposes. */
-    enum class Purpose {
+    public enum class Purpose {
         /** Playback controls — play/pause, scrubber, fullscreen. */
         CONTROLS,
 

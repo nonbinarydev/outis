@@ -13,7 +13,7 @@ import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.track.MediaTrack
 
 /** Immutable snapshot of everything a UI needs to render the player, carried on [VideoPlayer.state]. */
-data class PlayerState(
+public data class PlayerState(
     /**
      * Coarse engine lifecycle stage. Orthogonal to [isPlaying] and [playWhenReady]: `READY` only means the
      * engine *could* render, not that it is. Resets to [PlaybackState.IDLE] when a load fails or the
@@ -134,16 +134,16 @@ data class PlayerState(
     val selectedVideoTrackId: String? = null,
 
     /**
-     * Embedded chapter markers (MP4/M4V QuickTime/Nero, Matroska `Chapters`), sorted by start; empty when
-     * the container carries none or the platform can't read them (web). Populated at load time on Android
-     * and iOS, both parsing the local container via
-     * [dev.nonbinary.outis.core.chapters.ChapterExtractor].
+     * Chapter markers, sorted by start. Read from the
+     * [dev.nonbinary.outis.core.source.MediaItem.chaptersUrl] WebVTT sidecar on every engine; without one,
+     * from the chapters embedded in a local MP4/M4V (QuickTime/Nero) or Matroska file on Android and iOS.
+     * Empty when neither yields any. Arrives asynchronously, after the load.
      */
     val chapters: List<Chapter> = emptyList(),
     /**
      * Trickplay seek-preview thumbnails, sorted by start; empty unless
-     * [dev.nonbinary.outis.core.source.MediaItem.thumbnailsUrl] is set. Loaded from the WebVTT sidecar on
-     * every engine (streams included) — see [dev.nonbinary.outis.core.thumbnails.VttThumbnails].
+     * [dev.nonbinary.outis.core.source.MediaItem.thumbnailsUrl] is set. Loaded from that WebVTT sidecar on
+     * every engine, streams included.
      */
     val thumbnails: List<ThumbnailCue> = emptyList(),
 )
@@ -152,7 +152,7 @@ data class PlayerState(
  * Coarse engine lifecycle stage, mapped from the underlying platform player. Deliberately minimal so all
  * three engines agree — anything finer (stalls, seeks, ad breaks) is a [PlayerEvent], not a state.
  */
-enum class PlaybackState {
+public enum class PlaybackState {
     /** Nothing loaded, load failed, or the player was released. The state after any [PlayerError]. */
     IDLE,
 
@@ -173,7 +173,7 @@ enum class PlaybackState {
  * Decoded video frame dimensions in **pixels**, before any display scaling or aspect-ratio correction, so
  * `width / height` is the pixel aspect ratio rather than necessarily the intended display one.
  */
-data class VideoSize(
+public data class VideoSize(
     /** Frame width in pixels. */
     val width: Int,
     /** Frame height in pixels. */
@@ -184,7 +184,7 @@ data class VideoSize(
  * Colour/dynamic range of a video rendition. Flat rather than a "range + separate DV flag": at the app level
  * the meaningful distinction is the label to surface, and [DOLBY_VISION] already implies a PQ (HDR) base.
  */
-enum class VideoRange {
+public enum class VideoRange {
     /** Standard dynamic range (Rec.709 / gamma). */
     SDR,
 
@@ -199,7 +199,7 @@ enum class VideoRange {
 }
 
 /** The video rendition being decoded, as [PlayerEvent.BitrateChanged] reports it. */
-data class VideoFormat(
+public data class VideoFormat(
     /** Peak bandwidth of the rendition in **bits per second**, or `null` when the manifest omits it. */
     val bitrate: Int? = null,
     /** Coded frame width in pixels, or `null` when unknown (audio-only renditions). */

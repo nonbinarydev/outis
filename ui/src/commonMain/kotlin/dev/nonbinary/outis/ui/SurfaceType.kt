@@ -8,4 +8,4 @@ package dev.nonbinary.outis.ui
 
 /** How the video is rendered. `SurfaceView` is the default (best perf/HDR/DRM). */
 @ExperimentalPlayerUiApi
-enum class SurfaceType { SurfaceView, TextureView }
+public enum class SurfaceType { SurfaceView, TextureView }

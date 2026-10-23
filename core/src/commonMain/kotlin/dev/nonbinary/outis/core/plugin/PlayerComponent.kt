@@ -17,12 +17,12 @@ import kotlinx.coroutines.flow.StateFlow
  * Universal extension seam — the single attach point for analytics/QoS and anything else bound to the
  * player's lifetime. `outis-analytics-mux` is one; nothing is registered unless you register it.
  */
-interface PlayerComponent {
+public interface PlayerComponent {
     /** Called when the component is registered. Wire up collectors on [PlayerHost.scope] here. */
-    fun attach(host: PlayerHost)
+    public fun attach(host: PlayerHost)
 
     /** Called on removal or player release. Tear down anything started in [attach]. */
-    fun detach()
+    public fun detach()
 }
 
 /**
@@ -33,27 +33,27 @@ interface PlayerComponent {
  * (Android config-change reattach, or the future ads/DRM construction path rebuilding ExoPlayer).
  * A one-shot handle would silently leave them monitoring a dead player.
  */
-interface PlayerHost {
+public interface PlayerHost {
     /**
      * The player's current state, updated continuously (position is re-sampled every
      * [dev.nonbinary.outis.core.PlayerConfig.positionPollIntervalMs]). Conflated like any
      * `StateFlow`, so a slow collector **will** miss intermediate values — read discrete
      * occurrences from [events] instead.
      */
-    val state: StateFlow<PlayerState>
+    public val state: StateFlow<PlayerState>
 
     /**
      * Discrete playback occurrences (errors, transitions) as they happen. Hot and **replay-free** —
      * a component only sees events emitted after it starts collecting, so subscribe in
      * [PlayerComponent.attach] rather than lazily.
      */
-    val events: SharedFlow<PlayerEvent>
+    public val events: SharedFlow<PlayerEvent>
 
     /** Player-lifecycle-scoped; cancelled on release. Launch component collectors here. */
-    val scope: CoroutineScope
+    public val scope: CoroutineScope
 
     /** The current native player (or `null`), emitting again on every (re)construction. */
-    val nativePlayerHandle: StateFlow<Any?>
+    public val nativePlayerHandle: StateFlow<Any?>
 
     /**
      * The platform's view-level presentation object, for vendor SDKs that bind to the **view** rather
@@ -62,7 +62,7 @@ interface PlayerHost {
      * SDK binds to (Android `ExoPlayer`, web `<video>`). Emits again on (re)mount, so an adapter can bind
      * once the surface appears and re-bind if it is recreated.
      */
-    val nativePresentationHandle: StateFlow<Any?> get() = NoPresentationHandle
+    public val nativePresentationHandle: StateFlow<Any?> get() = NoPresentationHandle
 }
 
 /** Shared empty handle so hosts without a distinct presentation object need not override the getter. */

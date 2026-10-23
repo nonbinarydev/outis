@@ -20,6 +20,7 @@ readable. That is the whole point of keeping them.
 | [0007](0007-smil-resolved-before-the-engine.md) | SMIL is resolved before the engine, and the selection is replaceable | Accepted |
 | [0008](0008-public-collections-are-plain-list-and-map.md) | Public collections are plain `List` and `Map` | Accepted |
 | [0009](0009-public-model-stays-data-classes.md) | The public model stays `data class`; binary compatibility starts at 1.0 | Accepted |
+| [0010](0010-engine-less-targets-publish-the-api.md) | The engine-less `jvm` and `wasmJs` targets are published, as API only | Accepted |
 
 ## Writing a new one
 

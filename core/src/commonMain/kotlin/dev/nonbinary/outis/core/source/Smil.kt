@@ -15,7 +15,7 @@ import dev.nonbinary.outis.core.net.urlPath
  * everything the document said, understood or not.
  */
 @ExperimentalPlayerApi
-data class SmilRendition(
+public data class SmilRendition(
     /**
      * Absolute URL, from `src` resolved against the document's base: its own URL, or a `<meta>` base,
      * Wowza's `httpBase`, or an `xml:base` where the document sets one.
@@ -36,21 +36,22 @@ data class SmilRendition(
  * [dev.nonbinary.outis.core.PlayerConfig.smilSelector]; the default is [Platform]. Called once per load of a
  * SMIL item, on the main thread, so keep it a quick, pure function of its arguments.
  */
-fun interface SmilSelector {
+public fun interface SmilSelector {
     /**
      * The rendition to play from [renditions] (document order), or `null` when none will do — the load then
      * fails with [dev.nonbinary.outis.core.PlayerError.Category.SOURCE]. [item] is the item as it was set.
      */
-    fun select(renditions: List<SmilRendition>, item: MediaItem): SmilRendition?
+    public fun select(renditions: List<SmilRendition>, item: MediaItem): SmilRendition?
 
-    companion object {
+    /** The selector the SDK ships. */
+    public companion object {
         /**
          * The engine's own preference: the first DASH or HLS rendition it can play — DASH before HLS on Android
          * and the web, HLS alone on iOS — with the format the item's DRM scheme pairs with tried first: HLS for
          * FairPlay, DASH for Widevine and PlayReady. `video`, `ref` and `media` elements win over `audio` ones.
          * Progressive renditions are never chosen: one rung of a ladder would lose adaptive bitrate.
          */
-        val Platform: SmilSelector = SmilSelector { renditions, item ->
+        public val Platform: SmilSelector = SmilSelector { renditions, item ->
             selectManifest(renditions, item, platformManifestFormats)
         }
     }

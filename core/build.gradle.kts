@@ -9,6 +9,7 @@ import com.vanniktech.maven.publish.KotlinMultiplatform
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
@@ -24,6 +25,11 @@ group = "io.github.nonbinarydev"
 version = "0.1.0-alpha01"
 
 kotlin {
+    explicitApi()
+
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation()
+
     // AppContext is an expect class, still Beta in Kotlin; accepted deliberately (see its KDoc).
     compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
 

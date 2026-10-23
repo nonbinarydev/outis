@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 
 // Not injectable: an actual cannot take a dispatcher parameter its expect, shared with iOS and web, lacks.
 @Suppress("InjectDispatcher")
-actual suspend fun drmSupport(): DrmSupport = withContext(Dispatchers.IO) { deviceDrmSupport }
+public actual suspend fun drmSupport(): DrmSupport = withContext(Dispatchers.IO) { deviceDrmSupport }
 
 private val deviceDrmSupport: DrmSupport by lazy {
     val schemes = DrmScheme.entries.filterTo(mutableSetOf(), ::isDrmSchemeSupported)

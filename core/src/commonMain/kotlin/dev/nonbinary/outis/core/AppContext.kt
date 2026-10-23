@@ -16,4 +16,4 @@ package dev.nonbinary.outis.core
  * class constructor as `AppContext()`, where the factory-function alternative surfaces as
  * `AppContext_iosKt.AppContext()`. The build passes `-Xexpect-actual-classes` to accept it.
  */
-expect class AppContext
+public expect class AppContext

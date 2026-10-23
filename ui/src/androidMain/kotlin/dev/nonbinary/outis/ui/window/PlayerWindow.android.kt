@@ -52,7 +52,7 @@ private const val MIN_PIP_ASPECT_RATIO = 1.0 / MAX_PIP_ASPECT_RATIO
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun rememberPlayerWindow(
+public fun rememberPlayerWindow(
     player: VideoPlayer,
     onToggleFullscreen: ((Boolean) -> Unit)? = null,
     onPipUnavailable: (() -> Unit)? = null,

@@ -24,25 +24,25 @@ import dev.nonbinary.outis.ui.window.PlayerWindow
  */
 @ExperimentalPlayerUiApi
 @Stable
-interface PlayerControlsScope {
+public interface PlayerControlsScope {
     /** The snapshot every control reads from — position, buffering, tracks, visibility and scrub state. */
-    val state: PlayerControlsState
+    public val state: PlayerControlsState
 
     /** The player itself, for controls that need to issue transport calls beyond what [state] exposes. */
-    val player: VideoPlayer
+    public val player: VideoPlayer
 
     /**
      * Host-provided fullscreen and picture-in-picture hooks. These are Activity/window concerns the SDK
      * cannot own, so an app that supplies no implementation gets a no-op window rather than a crash.
      */
-    val window: PlayerWindow
+    public val window: PlayerWindow
 
     /**
      * Attach this to the control that should receive initial D-pad focus when the overlay appears.
      * Only meaningful on TV; harmless elsewhere. Point it at an *enabled* control — a disabled one
      * silently swallows focus and strands the user.
      */
-    val focusRequester: FocusRequester
+    public val focusRequester: FocusRequester
 }
 
 /**

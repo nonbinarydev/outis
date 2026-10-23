@@ -7,4 +7,4 @@
 package dev.nonbinary.outis.core
 
 /** JVM [AppContext] — API/test-only target; no context data needed. */
-actual class AppContext
+public actual class AppContext

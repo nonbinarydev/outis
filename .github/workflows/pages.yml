@@ -1,6 +1,7 @@
 # Publishes the GitHub Pages site.
 #
-# Today that is a landing page plus the sample catalogue, which sample applications fetch at runtime.
+# It serves a landing page, the web demo, the API reference, and the sample catalogue that sample
+# applications fetch at runtime.
 # The catalogue is served from here rather than from raw.githubusercontent.com because Pages returns
 # `content-type: application/json` as well as `access-control-allow-origin: *`; raw returns the CORS
 # header but types everything `text/plain`.
@@ -8,8 +9,8 @@
 # The catalogue is validated before publishing. Already-distributed sample apps fetch this file at
 # runtime, so a malformed or schema-breaking version cannot be caught by their build — only here.
 #
-# The web demo at /demo/ is the :sample module's Kotlin/JS browser distribution. Aggregated API docs
-# at /api/ are not built yet; see issue #10.
+# The web demo at /demo/ is the :sample module's Kotlin/JS browser distribution. The API reference at /api/
+# is the root Dokka aggregation of every published module, so it redeploys when their sources change.
 #
 # Requires: repository Settings -> Pages -> Source = "GitHub Actions".
 
@@ -22,6 +23,10 @@ on:
       - 'sample/catalogue.json'
       - 'sample/**'
       - 'site/**'
+      - 'core/**'
+      - 'ui/**'
+      - 'analytics/**'
+      - 'build.gradle.kts'
       - 'docs/img/lockup-*'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -59,6 +64,9 @@ jobs:
       - name: Build the web demo
         run: ./gradlew --no-daemon :sample:jsBrowserDistribution -Pmux.key=${{ vars.MUX_ENVIRONMENT }}
 
+      - name: Build the API reference
+        run: ./gradlew --no-daemon :dokkaGeneratePublicationHtml
+
       - name: Assemble _site
         run: |
           mkdir -p _site
@@ -73,6 +81,8 @@ jobs:
           # either risks a silently blank canvas; left alone deliberately.
           rm -f _site/demo/skikod8.mjs
           echo "demo bundle: $(du -sh _site/demo | cut -f1)"
+          mkdir -p _site/api
+          cp -r build/dokka/html/. _site/api/
           # Jekyll would otherwise ignore files and directories beginning with an underscore.
           touch _site/.nojekyll
           echo "--- published files ---"

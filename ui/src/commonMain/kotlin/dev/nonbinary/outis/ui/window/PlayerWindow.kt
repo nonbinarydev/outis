@@ -30,7 +30,7 @@ import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
  */
 @ExperimentalPlayerUiApi
 @Immutable
-data class PlayerWindow(
+public data class PlayerWindow(
     /**
      * Whether the host currently presents the player fullscreen. Purely the **host's** report — the
      * player never sets it; it only picks the expand/collapse icon from it.

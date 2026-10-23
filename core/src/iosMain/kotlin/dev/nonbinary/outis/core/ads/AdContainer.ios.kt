@@ -21,7 +21,7 @@ import platform.UIKit.UIViewController
  * content pause/resume model). A no-op on a player that is not the AVPlayer engine.
  */
 @ExperimentalPlayerApi
-fun VideoPlayer.setAdState(adState: AdState?) {
+public fun VideoPlayer.setAdState(adState: AdState?) {
     (engine as? AVPlayerEngine)?.setAdState(adState)
 }
 
@@ -32,10 +32,10 @@ fun VideoPlayer.setAdState(adState: AdState?) {
  * player that is not the AVPlayer engine.
  */
 @ExperimentalPlayerApi
-fun VideoPlayer.setAdContainer(controller: UIViewController?) {
+public fun VideoPlayer.setAdContainer(controller: UIViewController?) {
     (engine as? AVPlayerEngine)?.setAdContainer(controller)
 }
 
 /** The registered ad-container view controller (see [setAdContainer]), or `null`. */
 @ExperimentalPlayerApi
-fun VideoPlayer.adContainer(): UIViewController? = (engine as? AVPlayerEngine)?.adContainer()
+public fun VideoPlayer.adContainer(): UIViewController? = (engine as? AVPlayerEngine)?.adContainer()

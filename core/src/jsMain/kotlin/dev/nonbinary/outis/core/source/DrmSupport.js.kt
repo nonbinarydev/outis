@@ -8,7 +8,7 @@ package dev.nonbinary.outis.core.source
 
 import kotlinx.coroutines.await
 
-actual suspend fun drmSupport(): DrmSupport {
+public actual suspend fun drmSupport(): DrmSupport {
     val schemes = DrmScheme.entries.filterTo(mutableSetOf()) { KeySystems.supports(it).await() }
     val level = when {
         DrmScheme.WIDEVINE !in schemes -> null

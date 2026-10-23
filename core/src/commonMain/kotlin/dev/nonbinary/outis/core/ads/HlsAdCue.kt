@@ -10,7 +10,7 @@ import dev.nonbinary.outis.core.ExperimentalPlayerApi
 
 /** A SCTE-35-signalled ad avail parsed from an HLS media playlist. */
 @ExperimentalPlayerApi
-data class HlsAdCue(
+public data class HlsAdCue(
     /**
      * The DATERANGE `ID` attribute when present, otherwise a synthesised `"daterange-n"` / `"cue-n"`
      * token. **Only stable across reloads for the DATERANGE form** — synthesised ids are positional, so

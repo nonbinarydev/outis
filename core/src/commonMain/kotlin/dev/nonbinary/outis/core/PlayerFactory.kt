@@ -16,7 +16,7 @@ import dev.nonbinary.outis.core.source.SmilSelector
  * Construction-time configuration. New knobs arrive with defaults, so existing call sites keep
  * compiling; before 1.0 a release that adds one still needs a recompile, and the CHANGELOG says so.
  */
-data class PlayerConfig(
+public data class PlayerConfig(
     /**
      * Starting output volume in the range `0f`(silent)`..1f`(unattenuated), applied linearly by the
      * engine. This is the **player's own** gain, independent of the device/system volume, and it is
@@ -69,7 +69,7 @@ data class PlayerConfig(
  * Low-latency (LL-HLS / LL-DASH) is otherwise manifest-driven on Android + iOS — [lowLatencyMode]
  * is only the explicit toggle Web needs.
  */
-data class LiveConfig(
+public data class LiveConfig(
     /** Target playback offset behind the live edge, ms. (Android + iOS.) */
     val targetOffsetMs: Long? = null,
     /** Minimum playback speed used to catch up to the live edge. (Android only.) */
@@ -86,7 +86,7 @@ data class LiveConfig(
  * timeouts + a `DefaultLoadErrorHandlingPolicy` retry count) and **Web** (Shaka `retryParameters`).
  * **iOS (AVPlayer) is a no-op** — `AVURLAsset` exposes no granular retry/timeout API.
  */
-data class RetryConfig(
+public data class RetryConfig(
     /** Connection timeout, ms. (Android `setConnectTimeoutMs`, Shaka `connectionTimeout`.) */
     val connectTimeoutMs: Int = 30_000,
     /** Read / overall request timeout, ms. (Android `setReadTimeoutMs`, Shaka `timeout`.) */
@@ -111,7 +111,7 @@ data class RetryConfig(
  * (AVPlayer)** honours [mixWithOthers] (the `AVAudioSession` category) — interruptions/focus are handled
  * natively. **Web** has no audio-session concept, so every field is a no-op there.
  */
-data class AudioConfig(
+public data class AudioConfig(
     /** Pause / duck when another app takes audio focus or an interruption occurs. (Android.) */
     val handleAudioFocus: Boolean = true,
     /** Pause when audio becomes "noisy" — e.g. headphones unplugged. (Android.) */
@@ -134,7 +134,7 @@ data class AudioConfig(
  * the other fields are no-ops there. (Enforced at construction: `bufferForPlayback*Ms ≤ minBufferMs ≤
  * maxBufferMs`, all ≥ 0 — a bad config throws `IllegalArgumentException` early, not deep in ExoPlayer.)
  */
-data class BufferConfig(
+public data class BufferConfig(
     /** Minimum buffer to keep, ms. */
     val minBufferMs: Int = 50_000,
     /** Maximum buffer to load ahead, ms. (Shaka `bufferingGoal`, iOS `preferredForwardBufferDuration`.) */
@@ -170,8 +170,9 @@ data class BufferConfig(
  * construction must happen there. Once created, the interface methods may be called from any thread.
  *
  * @param context platform application context ([AppContext]); only Android needs real data.
+ * @throws UnsupportedOperationException on the `jvm` and `wasmJs` targets, which carry this API but no engine.
  */
-fun VideoPlayer(context: AppContext, config: PlayerConfig = PlayerConfig()): VideoPlayer =
+public fun VideoPlayer(context: AppContext, config: PlayerConfig = PlayerConfig()): VideoPlayer =
     SmilResolvingPlayer(
         engine = createPlatformPlayer(context, config),
         selector = config.smilSelector,

@@ -26,4 +26,4 @@ package dev.nonbinary.outis.core
 )
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY, AnnotationTarget.TYPEALIAS)
-annotation class ExperimentalPlayerApi
+public annotation class ExperimentalPlayerApi

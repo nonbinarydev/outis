@@ -3,11 +3,17 @@
 Outis publishes to Maven Central through the [Sonatype Central Portal](https://central.sonatype.com)
 under the namespace `io.github.nonbinarydev`.
 
-| Artifact | Coordinate |
-|---|---|
-| `:core` | `io.github.nonbinarydev:outis-core` |
-| `:ui` | `io.github.nonbinarydev:outis-ui` |
-| `:analytics:mux` | `io.github.nonbinarydev:outis-analytics-mux` |
+| Module | Coordinate | Per-target artifacts |
+|---|---|---|
+| `:core` | `io.github.nonbinarydev:outis-core` | `-android`, `-iosarm64`, `-iossimulatorarm64`, `-js`, `-jvm`†, `-wasm-js`† |
+| `:ui` | `io.github.nonbinarydev:outis-ui` | `-android`, `-iosarm64`, `-iossimulatorarm64`, `-js` |
+| `:analytics:mux` | `io.github.nonbinarydev:outis-analytics-mux` | `-android`, `-iosarm64`, `-iossimulatorarm64`, `-js` |
+| `:bom` | `io.github.nonbinarydev:outis-bom` | none — a POM-only platform |
+
+† API only: no playback engine, and `VideoPlayer(...)` throws
+([ADR-0010](../decisions/0010-engine-less-targets-publish-the-api.md)).
+
+A module added to the publication goes into `bom/build.gradle.kts` too, or the BOM stops aligning it.
 
 There are **two credential paths**, and it is worth understanding why before setting either up:
 
@@ -165,8 +171,8 @@ deployment manually in the Portal UI — worth doing while the process is new.
 
 ## Versioning
 
-The version lives in `core/build.gradle.kts`, `ui/build.gradle.kts` and
-`analytics/mux/build.gradle.kts`, currently `0.1.0-alpha01`. Keep the three in step.
+The version lives in `core/build.gradle.kts`, `ui/build.gradle.kts`, `analytics/mux/build.gradle.kts` and
+`bom/build.gradle.kts`, currently `0.1.0-alpha01`. Keep the four in step.
 
 **Published coordinates are immutable.** A version can never be re-uploaded or amended, so the artifact
 set for a version — which targets ship, whether javadoc jars are real or empty — is frozen at first

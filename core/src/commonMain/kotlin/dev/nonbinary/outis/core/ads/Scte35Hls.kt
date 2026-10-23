@@ -24,7 +24,7 @@ private val CUE_OUT_DURATION = Regex("""#EXT-X-CUE-OUT(?::(?:DURATION=)?([0-9.]+
  * CUE-OUT lines are ignored to avoid double-counting. Returns one [HlsAdCue] per avail, in playlist order.
  */
 @ExperimentalPlayerApi
-fun parseHlsAdCues(mediaPlaylist: String): List<HlsAdCue> {
+public fun parseHlsAdCues(mediaPlaylist: String): List<HlsAdCue> {
     val preferDateRange = mediaPlaylist.contains("#EXT-X-DATERANGE") &&
         (mediaPlaylist.contains("SCTE35-OUT") || mediaPlaylist.contains("PLANNED-DURATION"))
     val cues = mutableListOf<HlsAdCue>()

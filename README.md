@@ -70,14 +70,26 @@ Intel Macs cannot run the simulator build.
 ## Install
 
 ```kotlin
-// outis-core publishes: jvm, android, iosArm64, iosSimulatorArm64, js, wasmJs
+// outis-core publishes: android, iosArm64, iosSimulatorArm64, js — and jvm, wasmJs with the API but no engine
 implementation("io.github.nonbinarydev:outis-core:0.1.0-alpha01")
 // outis-ui publishes: android, iosArm64, iosSimulatorArm64, js — no jvm, no wasmJs
 implementation("io.github.nonbinarydev:outis-ui:0.1.0-alpha01")   // optional Compose UI
 ```
 
+Or import the BOM and declare the version once, for every Outis artifact:
+
+```kotlin
+commonMain.dependencies {
+    implementation(project.dependencies.platform("io.github.nonbinarydev:outis-bom:0.1.0-alpha01"))
+    implementation("io.github.nonbinarydev:outis-core")
+    implementation("io.github.nonbinarydev:outis-ui")
+}
+```
+
 Declare these in a shared `commonMain` only if that module's targets are a subset of the artifact's — a `commonMain`
-dependency on `outis-ui` from a module that also targets jvm or wasmJs will not resolve. Setup: [Android](docs/getting-started-android.md) · [iOS](docs/getting-started-ios.md) · [Web](docs/getting-started-web.md).
+dependency on `outis-ui` from a module that also targets jvm or wasmJs will not resolve. On jvm and wasmJs,
+`VideoPlayer(...)` throws: those targets exist so shared code compiles and tests can run against a fake player
+([why](docs/decisions/0010-engine-less-targets-publish-the-api.md)). Setup: [Android](docs/getting-started-android.md) · [iOS](docs/getting-started-ios.md) · [Web](docs/getting-started-web.md).
 
 ## Quick start
 
@@ -116,6 +128,7 @@ fun start(appContext: AppContext): VideoPlayer {
 | [Platform support](docs/platform-support.md) | Requirements, published targets, per-platform gaps. |
 | [Troubleshooting](docs/troubleshooting.md) | Symptom, cause, fix. |
 | Module reference | [`outis-core`](core/README.md) · [`outis-ui`](ui/README.md) — the per-module API notes that ship to Maven Central. |
+| [API reference](https://nonbinarydev.github.io/outis/api/) | Every public declaration in every published module, cross-linked. |
 | Full index | [docs/README.md](docs/README.md) |
 
 ## Threading and lifecycle

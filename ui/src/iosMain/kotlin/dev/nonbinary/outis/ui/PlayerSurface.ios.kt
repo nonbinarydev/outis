@@ -40,7 +40,7 @@ import platform.AVKit.AVPlayerViewController
 @OptIn(ExperimentalForeignApi::class)
 @ExperimentalPlayerUiApi
 @Composable
-actual fun PlayerSurface(
+public actual fun PlayerSurface(
     player: VideoPlayer,
     modifier: Modifier,
     contentScale: ContentScale,

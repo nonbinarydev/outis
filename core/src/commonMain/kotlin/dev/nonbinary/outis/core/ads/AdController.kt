@@ -45,7 +45,7 @@ private val QUARTILE_THRESHOLDS = listOf(
  * ```
  */
 @ExperimentalPlayerApi
-class AdController(breaks: List<AdBreak>) {
+public class AdController(breaks: List<AdBreak>) {
     private val breaks = breaks.sortedBy { it.startMs }.toMutableList()
     private val watched = mutableSetOf<String>()
 
@@ -56,7 +56,7 @@ class AdController(breaks: List<AdBreak>) {
      * countdown, the skip button and scrubber-locking. Outside a break this is a **reset** [AdState] that
      * still carries the current [AdState.cuePoints], so a timeline can always mark the ad positions.
      */
-    val state: StateFlow<AdState> = _state.asStateFlow()
+    public val state: StateFlow<AdState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<AdEvent>(extraBufferCapacity = 32)
 
@@ -66,14 +66,14 @@ class AdController(breaks: List<AdBreak>) {
      * you subscribe are lost, and emission is non-suspending (`tryEmit`), so a collector that can't keep
      * up will drop events rather than stall the playhead. Subscribe before the first [onPosition].
      */
-    val events: SharedFlow<AdEvent> = _events.asSharedFlow()
+    public val events: SharedFlow<AdEvent> = _events.asSharedFlow()
 
     private var activeBreak: AdBreak? = null
     private var activeAd: Ad? = null
     private val firedQuartiles = mutableSetOf<AdQuartile>()
 
     /** Drive from the player's position flow (idempotent per position; safe to call on every update). */
-    fun onPosition(positionMs: Long) {
+    public fun onPosition(positionMs: Long) {
         val active = breaks.firstOrNull { it.id !in watched && positionMs >= it.startMs && positionMs < it.endMs }
         if (active == null) {
             finalizePassedBreaks(positionMs)
@@ -127,7 +127,7 @@ class AdController(breaks: List<AdBreak>) {
      * A forward seek made from *inside* an unwatched break is pinned to [fromMs] (no skipping the current
      * ad). Backward seeks, and seeks that don't cross an unwatched break, pass through unchanged.
      */
-    fun resolveSeek(fromMs: Long, targetMs: Long): Long {
+    public fun resolveSeek(fromMs: Long, targetMs: Long): Long {
         if (targetMs <= fromMs) return targetMs
         // Already inside an unwatched break → can't seek forward out of (i.e. skip) the current ad.
         if (breaks.any { it.id !in watched && fromMs >= it.startMs && fromMs < it.endMs }) return fromMs
@@ -140,7 +140,7 @@ class AdController(breaks: List<AdBreak>) {
      * Skip the current break — meaningful only when [AdState.canSkip]. Marks it watched, clears ad state,
      * and returns the position to seek the player to (the break's end), or `null` if not in a break.
      */
-    fun skipCurrentBreak(): Long? {
+    public fun skipCurrentBreak(): Long? {
         val brk = activeBreak ?: return null
         completeActiveAd()
         watched += brk.id
@@ -157,7 +157,7 @@ class AdController(breaks: List<AdBreak>) {
      * surface avails during playback rather than up front. Ignored if a break with the same id is already
      * known. The position loop picks it up on the next [onPosition].
      */
-    fun addBreak(adBreak: AdBreak) {
+    public fun addBreak(adBreak: AdBreak) {
         if (breaks.any { it.id == adBreak.id }) return
         breaks.add(adBreak)
         breaks.sortBy { it.startMs }
@@ -165,7 +165,7 @@ class AdController(breaks: List<AdBreak>) {
     }
 
     /** Mark every break at or before [positionMs] as already watched (e.g. resuming past them). */
-    fun markWatchedUpTo(positionMs: Long) {
+    public fun markWatchedUpTo(positionMs: Long) {
         breaks.forEach { if (it.endMs <= positionMs) watched += it.id }
     }
 
@@ -173,7 +173,7 @@ class AdController(breaks: List<AdBreak>) {
      * Call when playback reaches the end. Finalizes any still-unwatched break — e.g. a post-roll the last
      * position poll never reported past — so its completion (and `AllAdsCompleted`) events still fire.
      */
-    fun onEnded() {
+    public fun onEnded() {
         finalizePassedBreaks(Long.MAX_VALUE)
         if (_state.value.isInAdBreak) _state.value = AdState(cuePoints = cuePoints())
     }

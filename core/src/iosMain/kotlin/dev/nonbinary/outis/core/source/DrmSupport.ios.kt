@@ -8,7 +8,7 @@ package dev.nonbinary.outis.core.source
 
 import platform.Foundation.NSProcessInfo
 
-actual suspend fun drmSupport(): DrmSupport = deviceDrmSupport
+public actual suspend fun drmSupport(): DrmSupport = deviceDrmSupport
 
 /** FairPlay decrypts only on a device: the simulator has no FairPlay CDM. Clear Key works on both. */
 internal val deviceDrmSupport: DrmSupport by lazy {

@@ -9,7 +9,7 @@ package dev.nonbinary.outis.core.source
 import dev.nonbinary.outis.core.PlayerError
 
 /** What this device can decrypt, as [drmSupport] reports it. */
-data class DrmSupport(
+public data class DrmSupport(
     /** The schemes this device has a working key system for. */
     val schemes: Set<DrmScheme>,
     /**
@@ -29,7 +29,7 @@ data class DrmSupport(
  * Engines check the same answer before loading a protected item, so a scheme reported missing here
  * fails the load at once with [PlayerError.Category.DRM], naming the scheme.
  */
-expect suspend fun drmSupport(): DrmSupport
+public expect suspend fun drmSupport(): DrmSupport
 
 /** The scheme's name as people write it. */
 internal val DrmScheme.label: String

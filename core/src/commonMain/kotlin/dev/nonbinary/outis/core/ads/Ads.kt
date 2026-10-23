@@ -13,14 +13,14 @@ import dev.nonbinary.outis.core.ExperimentalPlayerApi
  * already stitched and an [AdController] the app drives tracks the breaks, or client-side, where the
  * platform IMA SDK stitches ads in the engine. Either way the chrome reads one [AdState].
  */
-sealed interface AdConfig {
+public sealed interface AdConfig {
     /**
      * Server-side ad insertion. The stream is already stitched, so playback is unchanged and no engine
      * reads this; [breaks] are the ad cue-points (from a MediaTailor/DAI tracking response, SCTE-35
      * markers, …) for an [AdController] to track over the timeline — driving ad UI, emitting [AdEvent]s
      * and blocking seeks through unwatched ads.
      */
-    data class ServerSide(
+    public data class ServerSide(
         /**
          * Cue-points to track over the content timeline, in playback order. Need not be sorted —
          * [AdController] sorts by [AdBreak.startMs] on construction. Empty means SSAI is configured but no
@@ -36,7 +36,7 @@ sealed interface AdConfig {
      * [dev.nonbinary.outis.core.PlayerState.adState]. **Android** (Media3 IMA extension) and **web**
      * (Shaka's ad manager, HLS/DASH only); ignored on iOS, where no IMA adapter ships.
      */
-    data class ClientSide(
+    public data class ClientSide(
         /**
          * VAST/VMAP ad-tag URL handed straight to the platform IMA SDK. A VMAP tag carries its own
          * pre/mid/post-roll schedule; a bare VAST tag yields a single pre-roll. **Not** parsed by Outis —
@@ -47,7 +47,7 @@ sealed interface AdConfig {
 }
 
 /** One ad break (pod) beginning at [startMs] on the content timeline, made of one or more [ads]. */
-data class AdBreak(
+public data class AdBreak(
     /**
      * Stable identity of the break. **Must be unique within a session** — [AdController] keys its
      * watched-set and duplicate detection off it, so two breaks sharing an id means the second is silently
@@ -73,7 +73,7 @@ data class AdBreak(
 }
 
 /** A single ad within an [AdBreak]. [skipOffsetMs] `null` => unskippable. */
-data class Ad(
+public data class Ad(
     /**
      * Creative identity (VAST ad id, MediaTailor `adId`, …). Used to detect ad transitions and as the
      * natural dedupe key for analytics adapters, since seeking back into an unwatched break re-emits its
@@ -102,7 +102,7 @@ data class Ad(
 )
 
 /** Snapshot of ad playback, derived from the playhead by [AdController]. */
-data class AdState(
+public data class AdState(
     /**
      * `true` while the playhead sits inside an unwatched break. **This, not [currentAd] being non-`null`,
      * is the flag chrome should gate on** — it is the single condition for disabling the scrubber and
@@ -132,18 +132,18 @@ data class AdState(
 
 /** Ad lifecycle events — for analytics/QoS adapters (PAL, OMID, Mux) to observe uniformly per platform. */
 @ExperimentalPlayerApi
-sealed interface AdEvent {
+public sealed interface AdEvent {
     /**
      * The playhead entered a break. Always followed immediately by an [AdStarted] for its first ad.
      * Re-emitted if the viewer seeks back into a break that is still unwatched.
      */
-    data class BreakStarted(
+    public data class BreakStarted(
         /** The break just entered. */
         val adBreak: AdBreak,
     ) : AdEvent
 
     /** The playhead moved onto a new creative, either at break start or on the boundary between two ads. */
-    data class AdStarted(
+    public data class AdStarted(
         /** The creative now playing. */
         val ad: Ad,
         /** 0-based position of [ad] within its break — display as `indexInBreak + 1`. */
@@ -156,7 +156,7 @@ sealed interface AdEvent {
      * A 25%/50%/75% progress beacon for [ad]. Each quartile fires **at most once per ad play** — the set
      * resets when the ad changes, so re-watching a break fires them again.
      */
-    data class Quartile(
+    public data class Quartile(
         /** The creative the beacon belongs to. */
         val ad: Ad,
         /** Which threshold was crossed. There is no "complete" entry — use [AdCompleted] for 100%. */
@@ -168,7 +168,7 @@ sealed interface AdEvent {
      * finalised. **Not** a guarantee the creative was watched to the end: a seek or skip out of the break
      * also completes the ad it was on.
      */
-    data class AdCompleted(
+    public data class AdCompleted(
         /** The creative that just ended. */
         val ad: Ad,
     ) : AdEvent
@@ -177,7 +177,7 @@ sealed interface AdEvent {
      * The break is done and marked watched, so seeks may now pass through it freely. Fires whether it was
      * played through, skipped, or jumped over by a coarse position poll or seek.
      */
-    data class BreakCompleted(
+    public data class BreakCompleted(
         /** The break that just completed. */
         val adBreak: AdBreak,
     ) : AdEvent
@@ -186,12 +186,12 @@ sealed interface AdEvent {
      * Every known break has been watched. On a live stream this is not final — [AdController.addBreak] can
      * introduce new avails afterwards, and the event fires again once those are watched too.
      */
-    data object AllAdsCompleted : AdEvent
+    public data object AllAdsCompleted : AdEvent
 }
 
 /** Progress thresholds reported by [AdEvent.Quartile]. */
 @ExperimentalPlayerApi
-enum class AdQuartile {
+public enum class AdQuartile {
     /** 25% of [Ad.durationMs] elapsed. */
     FIRST,
 

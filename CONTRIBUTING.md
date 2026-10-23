@@ -84,6 +84,14 @@ Prose documentation lives in `docs/`. Two rules that matter more than style:
   [CHANGELOG.md](CHANGELOG.md) whenever it happens. From 1.0 the previous constructor and `copy` stay
   behind as hidden overloads instead — see [ADR-0009](docs/decisions/0009-public-model-stays-data-classes.md).
 - **Append data-class fields; never reorder them.** `componentN()` makes their order part of the ABI.
+- **Visibility is declared, never defaulted.** The published modules build in explicit API mode. Make a
+  declaration `public` only when consumers need it: demoting it later is a breaking change, and
+  promoting an `internal` one is not.
+- **The ABI dumps are the record of the public API.** Each published module checks its ABI into `api/`,
+  and `./gradlew checkKotlinAbi` (part of `check`, and run on every pull request) fails when the compiled
+  ABI differs. When the change is intended, run `./gradlew updateKotlinAbi` and commit the dump with it,
+  so the diff gets reviewed. Android-only declarations are not in the dumps, so review changes to their
+  `androidMain` API by eye.
 
 ## Branching
 

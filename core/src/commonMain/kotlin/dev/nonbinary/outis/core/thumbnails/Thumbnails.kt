@@ -15,8 +15,16 @@ import dev.nonbinary.outis.core.net.resolveUrl
  * sheet at [url]. Populated on [dev.nonbinary.outis.core.PlayerState.thumbnails] from a WebVTT sidecar
  * ([dev.nonbinary.outis.core.source.MediaItem.thumbnailsUrl]); the UI draws [url] cropped to
  * ([x], [y], [width], [height]) as a preview while scrubbing.
+ *
+ * @property startMs where the span this thumbnail previews starts.
+ * @property endMs where that span ends.
+ * @property url the sprite sheet, resolved against the sidecar's own URL.
+ * @property x left edge of the crop rectangle in the sprite, px.
+ * @property y top edge of the crop rectangle in the sprite, px.
+ * @property width width of the crop rectangle, px.
+ * @property height height of the crop rectangle, px.
  */
-data class ThumbnailCue(
+public data class ThumbnailCue(
     val startMs: Long,
     val endMs: Long,
     val url: String,
@@ -31,7 +39,7 @@ data class ThumbnailCue(
  * `sprite.jpg#xywh=x,y,w,h`). Sprite URLs are resolved relative to the sidecar's own [baseUrl]. Any parse
  * failure yields an empty list — thumbnails are optional and must never break playback.
  */
-object VttThumbnails {
+internal object VttThumbnails {
     fun parse(vtt: String, baseUrl: String): List<ThumbnailCue> =
         vtt.replace("\r\n", "\n").replace("\r", "\n").split(Regex("\n[ \t]*\n"))
             .mapNotNull { parseCue(it, baseUrl) }
@@ -102,7 +110,7 @@ object VttThumbnails {
 }
 
 /** The cue whose span contains [positionMs] (or the nearest earlier one), or null when there are none. */
-fun List<ThumbnailCue>.thumbnailAt(positionMs: Long): ThumbnailCue? =
+public fun List<ThumbnailCue>.thumbnailAt(positionMs: Long): ThumbnailCue? =
     lastOrNull { positionMs >= it.startMs } ?: firstOrNull()
 
 /** Load + parse a WebVTT thumbnails sidecar; empty on any failure. */

@@ -7,4 +7,4 @@
 package dev.nonbinary.outis.core.source
 
 // No playback engine on this target, so nothing to decrypt with.
-actual suspend fun drmSupport(): DrmSupport = DrmSupport(emptySet(), widevineLevel = null)
+public actual suspend fun drmSupport(): DrmSupport = DrmSupport(emptySet(), widevineLevel = null)

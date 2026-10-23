@@ -13,11 +13,11 @@ import android.content.Context
  *
  * Pass `AppContext(context.applicationContext)`; the Media3 engine reads it.
  */
-actual class AppContext(
+public actual class AppContext(
     /**
      * The process-wide `Application` context. Pass `context.applicationContext`, **never** an Activity
      * or other short-lived `Context` — the player outlives configuration changes and holding an
      * Activity here leaks it.
      */
-    val applicationContext: Context,
+    public val applicationContext: Context,
 )

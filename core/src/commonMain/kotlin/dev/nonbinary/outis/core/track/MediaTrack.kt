@@ -16,7 +16,7 @@ package dev.nonbinary.outis.core.track
  * [dev.nonbinary.outis.core.PlayerState.selectedVideoTrackId]; the engine resolves it back to the
  * native track internally. Ids are valid only for the currently-loaded item.
  */
-data class MediaTrack(
+public data class MediaTrack(
     /**
      * Opaque, engine-stable token identifying this track — see the class documentation. **Only unique
      * within one [type] for the currently-loaded item**, so match on [id] *and* [type], never [id] alone.
@@ -40,7 +40,7 @@ data class MediaTrack(
 )
 
 /** Which selection group a [MediaTrack] belongs to. */
-enum class TrackType {
+public enum class TrackType {
     /** An audio rendition — typically one per language or mix (stereo, 5.1, descriptive audio). */
     AUDIO,
 

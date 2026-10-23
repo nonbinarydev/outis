@@ -68,7 +68,7 @@ private const val POINTER_MOVE_THROTTLE_MS = 250L
 // Assembles surface, controls, gestures, keyboard, auto-hide and window hooks, each behind its own
 // flag. The branches are configuration, not logic — this is the one composable that wires the rest.
 @Suppress("CyclomaticComplexMethod")
-fun PlayerView(
+public fun PlayerView(
     player: VideoPlayer,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,

@@ -13,7 +13,7 @@ package dev.nonbinary.outis.core.chapters
  * [endMs] is the next chapter's [startMs] (or the media duration for the last chapter), filled in when the
  * boundaries are known; `null` when only start points were available.
  */
-data class Chapter(
+public data class Chapter(
     /** Start of the chapter on the content timeline, in milliseconds. */
     val startMs: Long,
     /** Chapter title, if the container carried one. */

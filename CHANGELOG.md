@@ -34,8 +34,8 @@ First release. Not yet published to Maven Central.
   the engine's own preference (ADR-0007).
 - `PlayerError` with a coarse cross-engine `Category` (`SOURCE`, `NETWORK`, `DRM`, `DECODER`,
   `RENDERER`, `UNKNOWN`), the engine's own `code`, and the untouched `nativeCause`.
-- Audio and subtitle track selection through `selectTrack` and `clearTextTrack`, with selection
-  reported back on `state` rather than applied optimistically.
+- Audio, subtitle and alternate-rendition track selection through `selectTrack` and `clearTextTrack`,
+  with selection reported back on `state` rather than applied optimistically.
 - `PlayerComponent` / `PlayerHost` plugin seam for analytics and QoS integrations, with a
   player-lifetime `CoroutineScope` and a `nativePlayerHandle` that re-emits on engine re-creation.
 - Playback configuration: `VideoConstraints` for capping the ABR ladder, plus `BufferConfig`,
@@ -77,21 +77,32 @@ First release. Not yet published to Maven Central.
 - On web, the shared Compose overlay composites over the engine's `<video>` by punching a transparent
   hole through the Compose canvas, so the same chrome runs on all three platforms.
 
+**Analytics (`outis-analytics-mux`)**
+
+- `MuxAnalytics`, a `PlayerComponent` that binds Mux Data's own SDK to the engine's native player on
+  Android, iOS and Web, with per-video metadata from `MediaItem.analytics`.
+
+**Distribution**
+
+- `outis-bom`, which aligns `outis-core`, `outis-ui` and `outis-analytics-mux` to one version.
+
 ### Known limitations
 
-- **Video rendition selection is not implemented.** `PlayerState.currentTrack` and `availableTracks`
-  are reserved and never populated; track selection covers audio and subtitles only. Use
-  `MediaItem.videoConstraints` to cap the ladder.
+- **Video selection is between alternate renditions, not bitrate rungs.** `videoTracks` lists versions
+  of a programme (a remaster beside an original) on Android and web, and is never populated on iOS.
+  Bitrate stays the engine's to adapt; cap the ladder with `MediaItem.videoConstraints`.
 - **`BitrateChanged`, `BandwidthSample` and `DroppedFrames` are emitted on Android only.**
-- **No client-side ad adapter for iOS.** The bridge exists (`updateAdState`, `setAdContainer`,
+- **No client-side ad adapter for iOS.** The bridge exists (`setAdState`, `setAdContainer`,
   `adContainer`) but no IMA iOS adapter ships, and nothing in this repository has been built against
   the IMA iOS pod.
 - **The `jvm` and `wasmJs` targets carry no engine.** They compile the API and throw
-  `UnsupportedOperationException` on construction. The JVM target exists to run the shared test suite.
+  `UnsupportedOperationException` on construction. They are published so shared code compiles for them
+  and tests can run against a fake player ([ADR-0010](docs/decisions/0010-engine-less-targets-publish-the-api.md)).
 - **No `iosX64` target**, so Intel Macs cannot run the simulator build.
 - iOS cannot play DASH, or HLS carrying in-band parameter sets (`avc3`); progressive MP4 needs
   `faststart`.
-- Chapters are unavailable on web, which has no local-file API.
+- Embedded chapters are unavailable on web, which has no local-file API. Chapters from a `chaptersUrl`
+  WebVTT sidecar work on all three platforms.
 
 [Unreleased]: https://github.com/nonbinarydev/outis/compare/v0.1.0-alpha01...HEAD
 [0.1.0-alpha01]: https://github.com/nonbinarydev/outis/releases/tag/v0.1.0-alpha01

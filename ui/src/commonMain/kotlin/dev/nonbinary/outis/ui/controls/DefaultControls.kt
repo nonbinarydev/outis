@@ -39,14 +39,14 @@ private val Scrim = Color(0x66000000)
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun PlayerControlsScope.DefaultControls(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.DefaultControls(modifier: Modifier = Modifier) {
     ControlsScaffold(modifier)
 }
 
 /** [DefaultControls] with each region overridable — retheme while keeping layout/focus/scrim/auto-hide. */
 @ExperimentalPlayerUiApi
 @Composable
-fun PlayerControlsScope.ControlsScaffold(
+public fun PlayerControlsScope.ControlsScaffold(
     modifier: Modifier = Modifier,
     top: @Composable RowScope.() -> Unit = {
         SubtitleButton()

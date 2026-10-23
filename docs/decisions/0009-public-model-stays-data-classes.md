@@ -50,4 +50,6 @@ After 1.0, every field added to a published data class costs two hidden overload
 for as long as the class lives. That is the price of keeping `copy()`. If a class ever collects enough
 of them to hurt, converting it away from `data` is a major-version change.
 
-Until the ABI dump is checked in, the reorder rule and the overload rule are enforced by review alone.
+The checked-in ABI dumps turn a reordered field or a missing overload into a diff in review, since
+`checkKotlinAbi` fails until the dump is updated. The model lives in `commonMain`, which the JVM and
+klib dumps cover; only Android-only declarations fall outside them.

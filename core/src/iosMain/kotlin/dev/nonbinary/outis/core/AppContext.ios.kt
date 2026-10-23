@@ -7,4 +7,4 @@
 package dev.nonbinary.outis.core
 
 /** iOS [AppContext] — AVPlayer needs no host context. */
-actual class AppContext
+public actual class AppContext

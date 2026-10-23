@@ -16,4 +16,4 @@ package dev.nonbinary.outis.ui
  */
 @RequiresOptIn(message = "Player UI API is experimental and may change.", level = RequiresOptIn.Level.WARNING)
 @Retention(AnnotationRetention.BINARY)
-annotation class ExperimentalPlayerUiApi
+public annotation class ExperimentalPlayerUiApi

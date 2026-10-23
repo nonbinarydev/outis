@@ -7,6 +7,7 @@ import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinMultiplatform
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -21,6 +22,11 @@ group = "io.github.nonbinarydev"
 version = "0.1.0-alpha01"
 
 kotlin {
+    explicitApi()
+
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation()
+
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     androidLibrary {
         namespace = "dev.nonbinary.outis.analytics.mux"
@@ -96,6 +102,18 @@ kotlin {
             dependencies {
                 implementation(npm("mux-embed", libs.versions.muxEmbed.get()))
             }
+        }
+    }
+}
+
+dokka {
+    moduleName.set("Outis Mux Analytics")
+    dokkaSourceSets.configureEach {
+        reportUndocumented.set(true)
+        sourceLink {
+            localDirectory.set(file("src"))
+            remoteUrl("https://github.com/nonbinarydev/outis/tree/main/analytics/mux/src")
+            remoteLineSuffix.set("#L")
         }
     }
 }
