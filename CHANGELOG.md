@@ -76,6 +76,9 @@ First release. Not yet published to Maven Central.
   `PlayerControlsScope`, with `PlayerControlsState` driving auto-hide and scrub state.
 - Fullscreen and picture-in-picture seams via `PlayerWindow`, with `rememberPlayerWindow` on Android.
 - Keyboard shortcuts on web, and a D-pad focus ring for TV.
+- Server-side ad UI: given an `AdController`, `rememberPlayerControlsState` locks the scrubber during a
+  break, routes scrubs through `resolveSeek` and marks the cue-points, and `DefaultControls` draws a
+  countdown and a skip button (`AdCountdown`, `SkipAdButton`, `AdOverlay`).
 - On web, the shared Compose overlay composites over the engine's `<video>` by punching a transparent
   hole through the Compose canvas, so the same chrome runs on all three platforms.
 

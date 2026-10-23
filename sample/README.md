@@ -27,6 +27,11 @@ rather than the content.
 A status line under the video reports the `PlaybackState`, because "nothing rendered" and "rendered but
 never became ready" look identical on a black surface.
 
+Server-side ad entries get an `AdController` per item (`ads/ServerSideAds.kt`): the catalogue's own
+breaks, or, for `scte35MasterUrl`, avails polled from the live playlist and placed at the playhead where
+they first appear. The sample drives it with the player's position and hands it to the controls state,
+so `DefaultControls` shows the countdown, the skip button and the cue-points.
+
 ### Running it
 
 **Web** — the shared UI in a browser:
@@ -147,7 +152,7 @@ Each item:
 | `poster` | no | Key into `posters`. |
 | `tint` | no | Hex colour for a solid tile when there is no poster. Mutually exclusive with `poster`. |
 | `drm` | no | `scheme` (`WIDEVINE`, `PLAYREADY`, `FAIRPLAY`, `CLEARKEY`), `licenseServerUrl`, `certificateUrl` for FairPlay, and `keys` (hex key id to hex key) for Clear Key, which has no server. |
-| `ads` | no | `type: "clientSide"` with `adTagUri`, or `type: "serverSide"` with `breaks`. |
+| `ads` | no | `type: "clientSide"` with `adTagUri`, or `type: "serverSide"` with `breaks`: each an `id`, a `startMs` on the stream's timeline, and `ads`, each an `id`, a `durationMs`, and optionally a `title` and a `skipOffsetMs`. |
 | `scte35MasterUrl` | no | Playlist to poll for live SCTE-35 cue-points. |
 | `chaptersUrl` | no | WebVTT chapters sidecar. |
 | `chapters` | no | Chapters declared inline, each `startMs`, optional `title` and `endMs`. They win over `chaptersUrl`, so keep the sidecar for sample builds that predate the field. |

@@ -122,7 +122,9 @@ public fun BigPlayButton(state: PlayerControlsState, modifier: Modifier = Modifi
  *
  * Dragging only moves the preview position; the seek is issued on release. If the scrubber leaves
  * composition mid-drag the scrub is abandoned without seeking, so the auto-hide latch is not stuck on.
- * The slider is disabled (but still drawn) while [PlayerControlsState.isSeekable] is `false`.
+ * The slider is disabled (but still drawn) while [PlayerControlsState.isSeekable] is `false` or a
+ * server-side ad plays ([PlayerControlsState.isInAdBreak]). Chapter starts are marked with dots, and
+ * server-side ad breaks with amber ticks.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @ExperimentalPlayerUiApi
@@ -159,12 +161,14 @@ public fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
             line(1f, colors.onSurface.copy(alpha = 0.2f)) // base
             if (buffered > 0f) line(buffered, colors.onSurface.copy(alpha = 0.45f)) // buffered-ahead
             if (played > 0f) line(played, colors.primary) // played
-            // Chapter ticks — a dot at each chapter start; skip 0:00 (it sits under the track's left cap).
-            val markerRadius = ScrubberTrackHeight.toPx()
-            state.chapters.forEach { chapter ->
-                if (chapter.startMs <= 0L) return@forEach
-                val fraction = (chapter.startMs.toFloat() / duration).coerceIn(0f, 1f)
-                drawCircle(colors.onSurface, radius = markerRadius, center = Offset(startX + span * fraction, cy))
+            // Markers at 0:00 would sit under the track's left cap, so they are skipped.
+            fun xAt(ms: Long) = startX + span * (ms.toFloat() / duration).coerceIn(0f, 1f)
+            state.chapters.map { it.startMs }.filter { it > 0L }.forEach { ms ->
+                drawCircle(colors.onSurface, radius = stroke, center = Offset(xAt(ms), cy))
+            }
+            state.adCuePoints.filter { it > 0L }.forEach { ms ->
+                val x = xAt(ms)
+                drawLine(AdMarkerColor, Offset(x, cy - stroke * 2f), Offset(x, cy + stroke * 2f), strokeWidth = stroke)
             }
             drawCircle(colors.primary, radius = r, center = Offset(startX + span * played, cy))
         }
@@ -173,7 +177,7 @@ public fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
             onValueChange = { state.onScrubMove(it.toLong()) },
             onValueChangeFinished = state::onScrubCommit,
             valueRange = 0f..duration.toFloat(),
-            enabled = state.isSeekable,
+            enabled = state.isSeekable && !state.isInAdBreak,
             // Invisible: the canvas above is the visual. The ScrubberThumbSize thumb keeps the value→x
             // mapping matched to the drawn dot; the full-height track box makes the whole ScrubberTouchHeight
             // band draggable, so the thin visual line isn't a pixel-precise target (was hard to grab).
@@ -252,6 +256,7 @@ private fun ThumbnailPreview(
 }
 
 private val ScrubberThumbSize = 12.dp
+private val AdMarkerColor = Color(0xFFFFC107)
 private val ScrubberTrackHeight = 4.dp
 
 // The whole scrubber row is this tall so the drag target is a comfortable ~40.dp band; the thin track and

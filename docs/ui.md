@@ -29,6 +29,7 @@ both.
 - [Web surface](#web-surface)
 - [Controls state](#controls-state)
 - [Building blocks](#building-blocks)
+- [Server-side ads](#server-side-ads)
 - [Input model](#input-model)
 - [TV and D-pad](#tv-and-d-pad)
 - [Fullscreen and picture-in-picture](#fullscreen-and-picture-in-picture)
@@ -325,12 +326,21 @@ fun rememberPlayerControlsState(
     player: VideoPlayer,
     autoHide: Duration = 3.seconds,
 ): PlayerControlsState
+
+@ExperimentalPlayerApi
+@Composable
+fun rememberPlayerControlsState(
+    player: VideoPlayer,
+    ads: AdController,
+    autoHide: Duration = 3.seconds,
+): PlayerControlsState
 ```
 
 `PlayerControlsState.kt`. It collects `player.state` **once** into a snapshot-backed field, so
-every control in the overlay reads the same consistent frame, and it runs the auto-hide effect.
+every control in the overlay reads the same consistent frame, and it runs the auto-hide effect. The
+second overload also reads a server-side `AdController`; see [Server-side ads](#server-side-ads).
 
-`autoHide` is captured on first composition: the state is created inside `remember(player)`
+`autoHide` is captured on first composition: the state is created inside `remember(player, ads)`
 (`PlayerControlsState.kt`), so changing the argument later has no effect. Key it off the player, or
 recreate the composable, if the duration must change.
 
@@ -347,12 +357,13 @@ recreate the composable, if the duration must change.
 | `isScrubbing` | True only between `onScrubMove` and `onScrubCommit`/`cancelScrub`. A programmatic seek does not count. |
 | `isMuted`, `volume`, `playbackSpeed`, `error` | `volume` is unaffected by `isMuted`. |
 | `audioTracks`, `textTracks`, `selectedAudioTrackId`, `selectedTextTrackId` | `selectedTextTrackId == null` means subtitles are **off**, not unknown. |
-| `controlsVisible`, `keepVisible`, `interactionTick` | Overlay state; see below. |
+| `adState`, `isInAdBreak`, `adCuePoints` | Server-side ads, from the `AdController` the state was created with; `null`, `false` and empty without one. Client-side ads never appear here. |
+| `controlsVisible`, `keepVisible` | Overlay state; see below. |
 | `player` | The player itself, for calls with no convenience here (`seekTo`, `setVolume`, track selection). Calls made straight on the player do **not** re-arm auto-hide — pair them with `notifyInteraction()`. |
 
 Transport conveniences, each of which counts as an interaction: `playPause()` (keyed off intent, so
 tapping during a rebuffer pauses), `toggleMute()`, `onScrubMove(ms)`, `onScrubCommit()`,
-`cancelScrub()`.
+`cancelScrub()`, and `skipAd()`, which does nothing until the current server-side ad can be skipped.
 
 ### Visibility and the keep-visible protocol
 
@@ -398,7 +409,7 @@ as a free function and does not take a `PlayerControlsState` at all.
 | ------------- | ------------ | --------- |
 | `PlayPauseButton(state, modifier)` | yes | Always enabled, even when idle, so it stays D-pad reachable; the click no-ops with no media. |
 | `BigPlayButton(state, modifier)` | yes | Same behaviour, forced to a 72.dp target around a 48.dp icon — a size in your `modifier` is overridden. |
-| `Scrubber(state, modifier)` | yes | **Emits nothing** when `isLive`, or when `durationMs` is null or non-positive. Drag moves the preview only; the seek is issued on release. Disabled but drawn when `!isSeekable`. |
+| `Scrubber(state, modifier)` | yes | **Emits nothing** when `isLive`, or when `durationMs` is null or non-positive. Drag moves the preview only; the seek is issued on release. Disabled but drawn when `!isSeekable` or during a server-side ad break. Dots mark chapter starts; amber ticks mark ad cue-points. |
 | `TimeLabel(state, modifier, showDuration = true)` | yes (`modifier`, `showDuration`) | `mm:ss` or `h:mm:ss`; literal `LIVE` for live; `--:--` for unknown or negative. Follows the drag, not the playhead, while scrubbing. |
 | `BufferingIndicator(state, modifier)` | yes | Self-gating on `isWaitingToPlay`; emits no layout when hidden. Polite live region. |
 | `MuteButton(state, modifier)` | yes | Toggles the mute flag; the volume level is untouched. |
@@ -408,7 +419,10 @@ as a free function and does not take a `PlayerControlsState` at all.
 | `FullscreenButton(state, window, modifier)` | yes | **Self-hides** when `window.onToggleFullscreen == null`. Reports the requested value; the icon flips only once the host feeds `isFullscreen` back. |
 | `PipButton(state, window, modifier)` | yes | **Self-hides** unless `isPipSupported` **and** `onEnterPip != null`. Entry only — the system window owns exit. |
 | `TrackList(tracks, selectedId, onSelect, modifier, onOff = null)` | **no** | Standalone selectable list for custom shells. Takes a `List<MediaTrack>` directly; pass `onOff` to get an "Off" row. |
-| — | `DefaultControls(modifier)` | Scope-only; delegates to `ControlsScaffold`. |
+| `AdCountdown(state, modifier)` | yes | "Ad 1 of 2 · 00:07" during a server-side break; nothing otherwise. |
+| `SkipAdButton(state, modifier)` | yes | "Skip in 3", then "Skip ad", calling `skipAd()`. Nothing for an unskippable ad or outside a break. |
+| — | `AdOverlay(modifier)` | Scope-only. The two above, bottom-left and bottom-right, kept up while the rest auto-hides. |
+| — | `DefaultControls(modifier)` | Scope-only; `ControlsScaffold` plus `AdOverlay`. |
 | — | `ControlsScaffold(modifier, top, center, bottom)` | Scope-only. See [tier 2](#tier-2--keep-the-layout-swap-one-region). |
 
 Track labelling everywhere falls back `label` → `language` → `id`, so an unlabelled manifest still
@@ -416,6 +430,23 @@ produces a readable menu (`TrackControls.kt`).
 
 All blocks take their colour from `LocalContentColor`, which `ControlsScaffold` sets to white over its
 scrim. Wrap them in `CompositionLocalProvider(LocalContentColor provides …)` to retheme.
+
+## Server-side ads
+
+For a stitched stream, hand the overlay the `AdController` you already drive (see
+[Server-side ads](ads-server-side.md)):
+
+```kotlin
+PlayerView(player, state = rememberPlayerControlsState(player, ads))
+```
+
+The overlay then locks the scrubber during a break, routes every scrub through `resolveSeek` so it stops
+at the start of an unwatched break, marks the cue-points on the scrubber, and `DefaultControls` adds a
+countdown and a skip button that stay up while the rest auto-hides. It only reads the controller: feeding
+it positions and `onEnded()` stays your job, so ad tracking keeps working when no overlay is composed.
+
+None of this applies to client-side ads. IMA draws its own countdown and skip button over the video, and
+the overlay never reads `PlayerState.adState`.
 
 ## Input model
 
@@ -583,13 +614,11 @@ your scope, not when the surface does.
 
 Stated plainly so nobody designs around a feature that is not there.
 
-**No ad awareness whatsoever.** A grep for `adState`, `AdState`, `isInAdBreak` or `cuePoint` across
-`ui/src` returns nothing. The scrubber is **not** locked during an ad break, no ad countdown or skip
-button is drawn, and cue-point markers are not rendered. `PlayerState.adState` is populated by the
-Android and web engines, and `AdController` publishes its own state for server-side ads, but the
-overlay never reads either. If you monetise, you gate seeking and draw ad UI yourself — tier 3 exists
-for this. The module's entire ad involvement is handing the platform surface to the engine so IMA has
-somewhere to render (see [`PlayerSurface`](#playersurface)).
+**Nothing for client-side ads.** The overlay never reads `PlayerState.adState`, so an IMA break does
+not lock the scrubber; IMA draws its own countdown and skip button. For client-side ads the module's
+whole involvement is handing the platform surface to the engine so IMA has somewhere to render (see
+[`PlayerSurface`](#playersurface)). The ad UI above is for server-side ads, and only when the controls
+state was given the `AdController`.
 
 **Chapters are scrubber ticks, nothing more.** The scrubber marks each chapter start
 (`BasicControls.kt`); nothing shows a chapter's title, lists chapters, or decodes `Chapter.thumbnail`.

@@ -261,8 +261,9 @@ equivalent guard — it writes `video.currentTime` unconditionally on every reco
 
 ## What you still have to write
 
-The shipped Compose chrome has **no ad awareness on any platform**. Nothing under `ui/src` reads
-`adState`, and the scrubber is not disabled during a break. Gating the UI is the host app's job:
+The shipped Compose chrome does **nothing for client-side ads** on any platform. It never reads
+`PlayerState.adState`, and the scrubber is not disabled during a break; its ad UI is for server-side
+ads, driven by `AdController`. Gating the UI around IMA is the host app's job:
 
 ```kotlin
 import dev.nonbinary.outis.core.ads.AdState

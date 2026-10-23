@@ -42,9 +42,11 @@ emits a reset `AdState` carrying the current cue-points (`AdController.kt`). Chr
 that tests `adState != null` to decide "an ad is playing" will believe an ad is playing permanently.
 The correct test is `AdState.isInAdBreak`, as `Ads.kt` says.
 
-**The shipped Compose chrome has no ad awareness.** `outis-ui` does not lock the scrubber during a
-break, draw a countdown or a skip button, or render cue-point markers. See
-[the Compose UI](ui.md#what-the-shipped-controls-do-not-do). Ad UI is yours to build.
+**The Compose chrome draws the ad UI once you hand it the controller.** With
+`rememberPlayerControlsState(player, ads)`, `outis-ui` locks the scrubber during a break, routes scrubs
+through `resolveSeek`, marks the cue-points, and shows a countdown and a skip button. It only reads the
+controller; everything in [Wiring it up](#wiring-it-up) stays yours. See
+[the Compose UI](ui.md#server-side-ads).
 
 ## The model
 
@@ -100,6 +102,7 @@ import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.serverSideBreaks
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -113,6 +116,9 @@ fun startSsai(player: VideoPlayer, item: MediaItem, scope: CoroutineScope): AdCo
 
     scope.launch {
         player.state
+            // Until setMediaItem lands, positions belong to the previous item, and would mark this
+            // one's pre-roll as already passed.
+            .filter { it.mediaItem == item }
             .map { it.positionMs }
             .distinctUntilChanged()
             .collect { ads.onPosition(it) }

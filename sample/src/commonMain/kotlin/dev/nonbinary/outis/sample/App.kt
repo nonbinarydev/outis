@@ -50,6 +50,8 @@ import dev.nonbinary.outis.analytics.mux.MuxConfig
 import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.VideoPlayer
+import dev.nonbinary.outis.core.ads.AdController
+import dev.nonbinary.outis.sample.ads.rememberServerSideAds
 import dev.nonbinary.outis.sample.catalogue.CatalogueItem
 import dev.nonbinary.outis.sample.catalogue.CatalogueRepository
 import dev.nonbinary.outis.sample.catalogue.CatalogueState
@@ -63,6 +65,8 @@ import dev.nonbinary.outis.sample.generated.resources.Res
 import dev.nonbinary.outis.sample.generated.resources.outis_lockup
 import dev.nonbinary.outis.ui.PlayerView
 import dev.nonbinary.outis.ui.controls.DefaultControls
+import dev.nonbinary.outis.ui.controls.PlayerControlsState
+import dev.nonbinary.outis.ui.controls.rememberPlayerControlsState
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
@@ -144,6 +148,7 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
         }
     }
 
+    val ads = rememberServerSideAds(player, selected)
     val state by player.state.collectAsState()
     val window = rememberSampleWindow(player)
     val immersive = window.isFullscreen || window.isInPip
@@ -171,6 +176,7 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
                         player,
                         modifier = Modifier.fillMaxSize(),
                         window = window,
+                        state = rememberControlsState(player, ads),
                         controls = { if (!window.isInPip) DefaultControls() },
                     )
                 }
@@ -237,6 +243,11 @@ private fun MuxQosBinding(player: VideoPlayer, appContext: AppContext, performan
         onDispose { mux?.let(player::removeComponent) }
     }
 }
+
+/** Controls that also show [ads], when the item has server-side ads. */
+@Composable
+private fun rememberControlsState(player: VideoPlayer, ads: AdController?): PlayerControlsState =
+    if (ads != null) rememberPlayerControlsState(player, ads) else rememberPlayerControlsState(player)
 
 /** The title of the rail [item] sits in, for QoS grouping — the item alone does not know its rail. */
 private fun seriesOf(catalogue: CatalogueState, item: CatalogueItem): String? =

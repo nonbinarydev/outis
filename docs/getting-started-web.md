@@ -308,8 +308,8 @@ The ad UI renders into a `<div>` the engine creates and keeps aligned over the v
 so IMA's skip and click-through are reachable above the Compose canvas, and the
 overlay receives pointer events the rest of the time.
 
-Note that the shipped Compose controls have no ad awareness of their own: nothing in `ui/src` reads
-`PlayerState.adState`, and the scrubber is not locked during a break. Full detail, including which
+Note that the shipped Compose controls ignore client-side ads: nothing in `ui/src` reads
+`PlayerState.adState`, and the scrubber is not locked during an IMA break. Full detail, including which
 `AdState` fields Web actually populates, is in [Client-side ads](ads-client-side.md).
 
 ## 8. Progressive sources take a different path

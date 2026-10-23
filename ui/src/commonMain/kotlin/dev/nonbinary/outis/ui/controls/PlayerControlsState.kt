@@ -15,10 +15,13 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.nonbinary.outis.core.ExperimentalPlayerApi
 import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.PlayerError
 import dev.nonbinary.outis.core.VideoPlayer
 import dev.nonbinary.outis.core.VideoRange
+import dev.nonbinary.outis.core.ads.AdController
+import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.track.MediaTrack
@@ -53,8 +56,10 @@ public class PlayerControlsState internal constructor(
      */
     public val player: VideoPlayer,
     internal val autoHideMillis: Long,
+    private val ads: AdController? = null,
 ) {
     internal var snapshot by mutableStateOf(player.state.value)
+    internal var adSnapshot: AdState? by mutableStateOf(ads?.state?.value)
 
     /**
      * Whether the overlay should currently be drawn. Starts `true` so controls are visible on first
@@ -173,6 +178,29 @@ public class PlayerControlsState internal constructor(
     public val isScrubbing: Boolean get() = scrubPosition != null
 
     // ---- visibility ----
+    // ---- server-side ads ----
+    /**
+     * The state of the [AdController] this overlay was created with, or `null` without one. Client-side
+     * ads never appear here: IMA draws its own ad UI over the video.
+     */
+    public val adState: AdState? get() = adSnapshot
+
+    /** `true` while the playhead is inside an unwatched server-side ad break. Seeking is locked meanwhile. */
+    public val isInAdBreak: Boolean get() = adSnapshot?.isInAdBreak == true
+
+    /** Where the server-side ad breaks start, in ms, for marking on a timeline. Empty without ads. */
+    public val adCuePoints: List<Long> get() = adSnapshot?.cuePoints.orEmpty()
+
+    /**
+     * Skip the current server-side ad break and seek past it. Does nothing until [AdState.canSkip], so a
+     * button can call it unconditionally.
+     */
+    public fun skipAd() {
+        if (adSnapshot?.canSkip != true) return
+        ads?.skipCurrentBreak()?.let(player::seekTo)
+        notifyInteraction()
+    }
+
     /** Mark that the user interacted; re-arms the auto-hide countdown without changing visibility. */
     public fun notifyInteraction() { interactionTick++ }
 
@@ -238,9 +266,11 @@ public class PlayerControlsState internal constructor(
     /**
      * Finish a scrub: seek to the last [onScrubMove] position and release the auto-hide hold. A no-op
      * seek-wise if no drag was in progress, so it is safe to call from an unconditional gesture-end path.
+     * With server-side ads the seek goes through [AdController.resolveSeek], so it stops at the start of
+     * an unwatched break instead of jumping it.
      */
     public fun onScrubCommit() {
-        scrubPosition?.let { player.seekTo(it) }
+        scrubPosition?.let { target -> player.seekTo(ads?.resolveSeek(snapshot.positionMs, target) ?: target) }
         scrubPosition = null
         releaseVisible(ScrubToken)
     }
@@ -262,10 +292,33 @@ public class PlayerControlsState internal constructor(
 public fun rememberPlayerControlsState(
     player: VideoPlayer,
     autoHide: Duration = 3.seconds,
-): PlayerControlsState {
-    val state = remember(player) { PlayerControlsState(player, autoHide.inWholeMilliseconds) }
-    LaunchedEffect(player) {
+): PlayerControlsState = rememberControlsState(player, ads = null, autoHide)
+
+/**
+ * [rememberPlayerControlsState] for a stream with server-side ads. The overlay reads [ads] for the ad
+ * countdown, the skip button and the cue-points on the scrubber, locks the scrubber during a break, and
+ * routes every scrub through [AdController.resolveSeek]. Driving [ads] with the playhead stays the app's
+ * job: this only reads it.
+ */
+@ExperimentalPlayerApi
+@ExperimentalPlayerUiApi
+@Composable
+public fun rememberPlayerControlsState(
+    player: VideoPlayer,
+    ads: AdController,
+    autoHide: Duration = 3.seconds,
+): PlayerControlsState = rememberControlsState(player, ads, autoHide)
+
+@Composable
+private fun rememberControlsState(player: VideoPlayer, ads: AdController?, autoHide: Duration): PlayerControlsState {
+    val state = remember(player, ads) { PlayerControlsState(player, autoHide.inWholeMilliseconds, ads) }
+    LaunchedEffect(state) {
         player.state.collect { state.snapshot = it }
+    }
+    if (ads != null) {
+        LaunchedEffect(state) {
+            ads.state.collect { state.adSnapshot = it }
+        }
     }
     // Auto-hide while actively playing; never while paused/ended or while a menu/scrub is active.
     // Re-arms on every interaction (interactionTick) and on relevant state changes.

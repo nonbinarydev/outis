@@ -208,8 +208,10 @@ callbacks (`AVPictureInPictureController` on iOS, `requestPictureInPicture()` /
 `requestFullscreen()` on web). Buttons whose capability is absent hide themselves
 (`PlayerWindow.kt`).
 
-The shipped controls have **no ad awareness** on any platform: nothing under `ui/src` reads
-`adState`, and the scrubber is not locked during an ad break. That is the host app's job today.
+The shipped controls **ignore client-side ads** on every platform: nothing under `ui/src` reads
+`PlayerState.adState`, and the scrubber is not locked during an IMA break. For server-side ads they lock
+the scrubber, mark the cue-points and draw a countdown and skip button, once given the `AdController`
+([ui.md](ui.md#server-side-ads)).
 
 ### iOS specifics worth knowing
 
