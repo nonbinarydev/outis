@@ -75,7 +75,8 @@ First release. Not yet published to Maven Central.
 - A controls overlay built from composable building blocks, usable wholesale or piece by piece through
   `PlayerControlsScope`, with `PlayerControlsState` driving auto-hide and scrub state.
 - Fullscreen and picture-in-picture seams via `PlayerWindow`, with `rememberPlayerWindow` on Android.
-- Keyboard shortcuts on web, and a D-pad focus ring for TV.
+- Keyboard shortcuts on web, and D-pad support for TV: a focus ring, and focus kept on the player while
+  the controls are hidden, so the next key brings them back.
 - Server-side ad UI: given an `AdController`, `rememberPlayerControlsState` locks the scrubber during a
   break, routes scrubs through `resolveSeek` and marks the cue-points, and `DefaultControls` draws a
   countdown and a skip button (`AdCountdown`, `SkipAdButton`, `AdOverlay`).

@@ -501,7 +501,10 @@ deadlock" (`PlayerControlsState.kt`). Today:
 - Focus movement bumps `interactionTick` (`DefaultControls.kt`), which **re-arms** the countdown; it
   never pins the overlay.
 - While actively playing, the overlay hides after `autoHide` whether or not a control has focus.
-- The next key press brings it straight back, via the `onPreviewKeyEvent` wake above.
+- The next key press brings it straight back, via the `onPreviewKeyEvent` wake above. That needs
+  something to hold focus while the overlay is gone, since with nothing focused no key reaches a
+  composable: when the overlay hides while one of its controls has focus, `PlayerView` takes focus
+  itself (`PlayerView.kt`). It is focusable only then, so it is never an extra stop otherwise.
 
 Design against that, not against a permanently visible focused overlay.
 

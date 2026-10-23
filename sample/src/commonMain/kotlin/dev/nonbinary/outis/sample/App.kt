@@ -81,9 +81,18 @@ private val LOCKUP_MIN_HEIGHT = 48.dp
 private val LOCKUP_GAP = 24.dp
 private val STATUS_GAP = 16.dp
 
-/** Starts Koin around the app. `KoinApplication` remembers the container, so this runs once. */
+/** The sample's one screen, as phones, tablets, iOS and the web show it. */
 @Composable
 fun App(appContext: AppContext, modifier: Modifier = Modifier) {
+    SampleHost(appContext) { AppContent(appContext, modifier) }
+}
+
+/**
+ * What every sample screen runs inside: the image loader and the Koin graph. `KoinApplication` remembers
+ * the container, so this runs once.
+ */
+@Composable
+internal fun SampleHost(appContext: AppContext, content: @Composable () -> Unit) {
     // One process-wide Coil ImageLoader with the Ktor network fetcher (the platform Ktor engine is on the
     // app classpath per source set) — used for catalogue posters and trickplay scrub-preview tiles.
     setSingletonImageLoaderFactory { context ->
@@ -101,7 +110,7 @@ fun App(appContext: AppContext, modifier: Modifier = Modifier) {
         }
     }
     KoinApplication(config) {
-        AppContent(appContext, modifier)
+        content()
     }
 }
 
@@ -246,7 +255,7 @@ private fun MuxQosBinding(player: VideoPlayer, appContext: AppContext, performan
 
 /** Controls that also show [ads], when the item has server-side ads. */
 @Composable
-private fun rememberControlsState(player: VideoPlayer, ads: AdController?): PlayerControlsState =
+internal fun rememberControlsState(player: VideoPlayer, ads: AdController?): PlayerControlsState =
     if (ads != null) rememberPlayerControlsState(player, ads) else rememberPlayerControlsState(player)
 
 /** The title of the rail [item] sits in, for QoS grouping — the item alone does not know its rail. */

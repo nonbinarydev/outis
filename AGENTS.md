@@ -14,7 +14,7 @@ Outis is a Kotlin Multiplatform video player SDK — one engine-agnostic playbac
 | `:core` | yes (`outis-core`) | The playback API and the three engines. No UI, no DI, no HTTP client. |
 | `:ui` | yes (`outis-ui`) | Optional Compose Multiplatform surface and controls over `:core`. |
 | `:sample` | no | The demo. Compose Multiplatform app: catalogue, custom-stream form, dialogs. |
-| `:sample:android` | no | The installable Android host for `:sample` (the KMP Android plugin builds libraries only). |
+| `:sample:android` | no | The installable Android host for `:sample`, phones and Android TV (the KMP Android plugin builds libraries only). |
 
 `:core` uses a **custom source-set hierarchy** (`webMain` shared by `jsMain`/`wasmJsMain`), so its
 default hierarchy template is disabled. `:ui` and `:sample` use the default template — reach `iosMain`
@@ -67,8 +67,8 @@ Some versions are held deliberately; read the comment before changing them.
 
 ## The sample's shape (when working in `:sample`)
 
-- One `PlayerView` call site, always. A second inside a mode branch disposes and recreates the
-  surface on a tab switch — on web that tears the `<video>` out of the DOM.
+- One `PlayerView` call site per screen (`App`, `TvApp`), always composed. A second inside a mode
+  branch disposes and recreates the surface on a tab switch — on web that tears the `<video>` out of the DOM.
 - The catalogue is fetched at runtime from GitHub Pages, never bundled. `CatalogueRepository.load()`
   **never throws** — any failure degrades to a built-in stream, because a blank screen says nothing
   about whether the player works.

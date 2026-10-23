@@ -73,6 +73,16 @@ public class PlayerControlsState internal constructor(
     internal var interactionTick: Int by mutableIntStateOf(0)
         private set
 
+    /** Whether focus is inside the overlay, as the overlay reports it. */
+    internal var overlayHasFocus: Boolean = false
+
+    /**
+     * Whether the overlay had focus when it last hid. The player then holds focus in its place: with
+     * nothing focused, no key reaches the handler that brings the overlay back.
+     */
+    internal var holdsFocus: Boolean by mutableStateOf(false)
+        private set
+
     private var scrubPosition by mutableStateOf<Long?>(null)
     private val keepVisibleTokens = mutableStateListOf<Any>()
 
@@ -211,7 +221,10 @@ public class PlayerControlsState internal constructor(
     }
 
     /** Explicit hide — always succeeds (auto-hide pausing via [keepVisible] does not block this). */
-    public fun hideControls() { controlsVisible = false }
+    public fun hideControls() {
+        holdsFocus = overlayHasFocus
+        controlsVisible = false
+    }
 
     /**
      * Flip visibility — the natural binding for a tap on the video surface. Hiding this way is an

@@ -9,6 +9,8 @@ package dev.nonbinary.outis.sample
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import dev.nonbinary.outis.core.AppContext
+import dev.nonbinary.outis.sample.tv.TvApp
+import kotlinx.browser.window
 
 /**
  * Web entry point. `AppContext()` carries nothing here — it exists so the Android engine can reach a
@@ -18,10 +20,13 @@ import dev.nonbinary.outis.core.AppContext
  * there, so `index.html` provides an empty `<div>` rather than a canvas of its own. The web
  * `PlayerSurface` then keeps the engine's `<video>` underneath that canvas and punches a transparent
  * hole through it, so the same Compose controls composite over the video as they do on Android and iOS.
+ *
+ * `?tv` in the URL shows the television screen instead, to try its arrow-key navigation without a TV.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
+    val tv = window.location.search.removePrefix("?").split('&').contains("tv")
     ComposeViewport(viewportContainerId = "outis") {
-        App(AppContext())
+        if (tv) TvApp(AppContext()) else App(AppContext())
     }
 }

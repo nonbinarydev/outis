@@ -50,6 +50,13 @@ the shared `App()`; install it on a device or emulator:
 ./gradlew :sample:android:installDebug
 ```
 
+**Android TV** — the same APK. Its `TvActivity` is listed only by the TV launcher (`LEANBACK_LAUNCHER`, with
+a banner) and presents `TvApp()`: catalogue rails to move through with the D-pad, the player full screen,
+and Back to return. It is catalogue-only, since typing a URL with a D-pad is no way to try a player, and
+it runs no analytics, so it asks for no consent. One APK rather than a second application module, so the
+Compose-resources staging in `sample/android/build.gradle.kts` is not duplicated. To try the TV screen
+without a television, open the web build with `?tv` and use the arrow keys, Enter and Escape.
+
 **iOS** — `sample/iosApp` is an Xcode host that presents the shared `App()` through
 `mainViewController()`. It links Mux's iOS SDK via CocoaPods, so run `pod install` in `sample/iosApp`
 once, then open **`iosApp.xcworkspace`** (not the `.xcodeproj`) and Run (simulator or device). The Kotlin
