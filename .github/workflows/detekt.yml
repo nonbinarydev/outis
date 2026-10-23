@@ -52,7 +52,7 @@ jobs:
             :core:detektAndroidMain \
             :core:detektJsMain :core:detektWasmJsMain \
             :ui:detektMetadataCommonMain \
-            :ui:detektAndroidMain \
+            :ui:detektAndroidMain :ui:detektAndroidHostTest \
             :ui:detektJsMain
 
       # Runs even on failure: a red build is exactly when the findings are worth reading.

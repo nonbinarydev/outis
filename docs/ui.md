@@ -167,9 +167,8 @@ Three things you inherit from `ControlsScaffold` and lose here, in order of how 
    overlay that never checks it is permanently on screen.
 2. **The D-pad focus grab.** Apply `Modifier.focusRequester(focusRequester).focusGroup()` to your root
    and request focus in a `LaunchedEffect(state.controlsVisible)` if you care about TV.
-3. **The focus ring.** `Modifier.controlFocusRing()` is `internal` (`FocusRing.kt`), so it is
-   applied to the shipped `IconButton`s and cannot be applied to yours. Custom controls need their own
-   focus indication.
+3. **The focus ring.** The shipped `IconButton`s carry `Modifier.controlFocusRing()` (`FocusRing.kt`).
+   Put it on your own controls, before their `clickable`, for the same ring.
 
 `BufferingIndicator` gates itself on `isWaitingToPlay` (`BasicControls.kt`) and emits no layout
 when hidden, so the surrounding `if` in the old README example was redundant.
@@ -490,9 +489,9 @@ system because key routing through the skiko canvas is unreliable, Safari especi
 
 ## TV and D-pad
 
-The shipped controls are focusable `IconButton`s carrying an internal white 2.dp circular focus ring,
-drawn inside the bounds so it never affects layout (`FocusRing.kt`). Nothing else is required to
-support TV — the same `PlayerView` works on phone, tablet and TV.
+The shipped controls are focusable `IconButton`s carrying a white 2.dp circular focus ring,
+`controlFocusRing()`, drawn inside the bounds so it never affects layout (`FocusRing.kt`). Nothing else is
+required to support TV — the same `PlayerView` works on phone, tablet and TV.
 
 **Auto-hide is not suspended by focus.** This is the correction most worth reading: an earlier version
 of this SDK vetoed hiding while a control held focus, and that veto was removed as "the old TV
@@ -503,8 +502,9 @@ deadlock" (`PlayerControlsState.kt`). Today:
 - While actively playing, the overlay hides after `autoHide` whether or not a control has focus.
 - The next key press brings it straight back, via the `onPreviewKeyEvent` wake above. That needs
   something to hold focus while the overlay is gone, since with nothing focused no key reaches a
-  composable: when the overlay hides while one of its controls has focus, `PlayerView` takes focus
-  itself (`PlayerView.kt`). It is focusable only then, so it is never an extra stop otherwise.
+  composable: when the overlay hides while focus is in the player, `PlayerView` takes focus itself
+  (`PlayerView.kt`). It is focusable only then, so it is never an extra stop otherwise. This works for a
+  custom overlay too, provided it takes focus when it appears.
 
 Design against that, not against a permanently visible focused overlay.
 
@@ -640,9 +640,9 @@ sets it. Call `state.player.setVolume(…)` and pair it with `state.notifyIntera
 
 **`surfaceType` does nothing** on any platform, as noted under [`PlayerView`](#playerview).
 
-**No UI test target.** `:ui` has no test source set. The overlay and controls have been exercised by
-compilation, review and manual use; full rendering, D-pad navigation and PiP are best confirmed on a
-real device or TV.
+**No rendering tests.** `:ui`'s only tests are JVM host tests of `PlayerControlsState`: scrub routing,
+the ad skip, the focus hold (`ui/src/androidHostTest`). Nothing renders a composable under test, so the
+overlay, D-pad navigation, the focus ring and PiP are confirmed by hand, best on a real device or TV.
 
 ---
 

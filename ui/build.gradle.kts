@@ -48,6 +48,9 @@ kotlin {
                 }
             }
         }
+
+        // The controls state on the host JVM: its logic needs Compose's snapshot state, not a device.
+        withHostTest { isReturnDefaultValues = true }
     }
     iosArm64()
     iosSimulatorArm64()
@@ -62,6 +65,11 @@ kotlin {
         all {
             languageSettings.optIn("dev.nonbinary.outis.ui.ExperimentalPlayerUiApi")
             languageSettings.optIn("dev.nonbinary.outis.core.ExperimentalPlayerApi")
+        }
+
+        // withHostTest creates this one later than this block runs, so it is configured when it appears.
+        matching { it.name == "androidHostTest" }.configureEach {
+            dependencies { implementation(libs.kotlin.test) }
         }
 
         val commonMain by getting {

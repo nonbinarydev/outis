@@ -24,6 +24,7 @@ Everything else comes from the Gradle wrapper.
 ./gradlew build          # assemble and test
 ./gradlew :core:allTests # the full multiplatform test suite
 ./gradlew :core:jvmTest   # just the JVM run — much faster while iterating
+./gradlew :ui:testAndroidHostTest # :ui's tests, of its controls state, on the host JVM
 ```
 
 `:core:allTests` runs the shared `commonTest` suite against every target that can host it, so the same

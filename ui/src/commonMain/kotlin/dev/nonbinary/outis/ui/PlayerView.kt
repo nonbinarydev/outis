@@ -23,6 +23,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusTarget
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -211,8 +212,8 @@ public fun PlayerView(
 }
 
 /**
- * Takes focus when the overlay hides while holding it, so the next key still reaches the wake handler:
- * with nothing focused, no key event reaches a composable at all.
+ * Takes focus when the overlay hides while the player has it, so the next key still reaches the wake
+ * handler: with nothing focused, no key event reaches a composable at all.
  */
 @Composable
 private fun rememberFocusHold(state: PlayerControlsState): FocusRequester {
@@ -223,8 +224,12 @@ private fun rememberFocusHold(state: PlayerControlsState): FocusRequester {
     return requester
 }
 
-/** Focusable only while it stands in for the hidden overlay, so it is never an extra stop otherwise. */
+/**
+ * Reports whether focus is anywhere in the player, overlay included, and is focusable only while it stands
+ * in for the hidden overlay, so it is never an extra stop otherwise.
+ */
 private fun Modifier.focusHold(requester: FocusRequester, state: PlayerControlsState): Modifier =
-    focusRequester(requester)
+    onFocusChanged { state.playerHasFocus = it.hasFocus }
+        .focusRequester(requester)
         .focusProperties { canFocus = state.holdsFocus && !state.controlsVisible }
         .focusTarget()

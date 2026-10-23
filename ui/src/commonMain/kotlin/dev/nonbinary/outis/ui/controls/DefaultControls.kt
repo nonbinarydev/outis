@@ -81,10 +81,7 @@ public fun PlayerControlsScope.ControlsScaffold(
                 .focusRequester(focusRequester)
                 .focusGroup()
                 // Focus movement re-arms auto-hide (it counts as interaction) but never PINS the overlay.
-                .onFocusChanged {
-                    state.overlayHasFocus = it.hasFocus
-                    if (it.hasFocus) state.notifyInteraction()
-                },
+                .onFocusChanged { if (it.hasFocus) state.notifyInteraction() },
         ) {
             // Top-left: the HDR/DV badge (self-hides for SDR), mirroring where the demo burns its info board.
             VideoRangeBadge(Modifier.align(Alignment.TopStart).padding(8.dp))
