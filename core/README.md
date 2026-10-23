@@ -15,7 +15,7 @@ Targets: `jvm` (API/test-only — no engine), `android`, `iosArm64`, `iosSimulat
 
 | Platform | Engine | Status |
 |---|---|---|
-| Android | Media3 / ExoPlayer (`1.10.1`) — main-thread-pinned, one `Player.Listener` + one `AnalyticsListener`, 250 ms ticker | ✅ |
+| Android | Media3 / ExoPlayer (`1.11.1`) — main-thread-pinned, one `Player.Listener` + one `AnalyticsListener`, 250 ms ticker | ✅ |
 | iOS (arm64 + simulator) | AVFoundation `AVPlayer` — polled state, `AVContentKeySession` for FairPlay | ✅ |
 | Web — `js(IR)` | Shaka Player over a DOM `<video>` | ✅ |
 | Web — `wasmJs` | — | stub (ships headless; `createPlatformPlayer` throws — Kotlin/Wasm↔Shaka interop is a separate effort) |

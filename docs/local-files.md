@@ -105,10 +105,10 @@ Select with `player.selectTrack(track)` and turn subtitles off with `player.clea
 Android surface (`PlayerSurface.android.kt:27`, `:72`), AVKit on iOS. Outis decodes no subtitles itself
 on any platform.
 
-**Image-based subtitles (PGS, VobSub).** Media3 1.10.1 — the version this SDK pins
-(`gradle/libs.versions.toml:20`) — ships the whole pipeline: `MatroskaExtractor` recognises `S_VOBSUB`
+**Image-based subtitles (PGS, VobSub).** Media3 1.11.1 — the version this SDK pins
+(`gradle/libs.versions.toml:34`) — ships the whole pipeline: `MatroskaExtractor` recognises `S_VOBSUB`
 and `S_HDMV/PGS`, and `DefaultSubtitleParserFactory` constructs `VobsubParser` and `PgsParser` (verified
-in the resolved `media3-extractor-1.10.1.aar`). Older advice that these are missing on Android is stale.
+in the resolved `media3-extractor-1.11.1.aar`). Older advice that these are missing on Android is stale.
 There is no equivalent on iOS or Web, and since neither can open mkv, the common mkv case does not
 arise there.
 

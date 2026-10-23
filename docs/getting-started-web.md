@@ -13,7 +13,7 @@ the Compose canvas, the host page, and — on the `:core`-only route — the fac
 its `<video>` but never puts it in the document. This page covers all three, in that order, plus the
 two page-level side effects the Compose surface has on your DOM.
 
-The web engine is [Shaka Player](https://github.com/shaka-project/shaka-player) 4.16.50 driving an
+The web engine is [Shaka Player](https://github.com/shaka-project/shaka-player) 5.3.1 driving an
 HTML `<video>` element. Adaptive sources (HLS, DASH) go through Shaka; a single progressive file
 (mp4, webm) is played straight off `video.src`, which matters more than it sounds — see
 [Progressive sources take a different path](#8-progressive-sources-take-a-different-path).
@@ -72,9 +72,9 @@ Compose-plugin flag, not an Outis one, and `:core`-only consumers do not need it
 
 ### You do not add `shaka-player` yourself
 
-`:core` declares `implementation(npm("shaka-player", "4.16.50"))` in its `jsMain` source set
-(`core/build.gradle.kts:152`), and the Kotlin/JS plugin records that in the artifact's published
-`package.json` — this repository's own build output shows `"shaka-player": "4.16.50"` under
+`:core` declares `shaka-player` as an npm dependency of its `jsMain` source set, at the version pinned
+in `gradle/libs.versions.toml` (`shakaPlayer`), and the Kotlin/JS plugin records that in the artifact's
+published `package.json` — this repository's own build output shows `"shaka-player": "5.3.1"` under
 `dependencies` for both `outis-core` and `outis-ui`. Your project's generated `package.json` picks it
 up transitively. Adding it again yourself only risks a version conflict.
 

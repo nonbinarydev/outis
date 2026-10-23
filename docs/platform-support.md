@@ -26,8 +26,8 @@ stated otherwise.
 | Android `compileSdk` | 37 | `core/build.gradle.kts:34-37`, `ui/build.gradle.kts:29-32`. |
 | Android JVM bytecode target | 11 | Set on the Android compilations of both modules (`core/build.gradle.kts:43-49`, `ui/build.gradle.kts:38-44`). No project-wide Java toolchain is declared, so the plain `jvm()` target of `:core` uses the Kotlin compiler default. |
 | Compose Multiplatform | 1.11.1 | `:ui` only. `:core` has no Compose dependency of any kind (`core/build.gradle.kts:79-88`). |
-| AndroidX Media3 | 1.10.1 | The Android engine (`exoplayer`, `-hls`, `-dash`, `-ima`), plus `media3-ui` in `:ui`. |
-| Shaka Player | 4.16.50 | Declared as an npm dependency by `:core`'s JS target (`core/build.gradle.kts:152`). The Kotlin/JS plugin propagates it to your `package.json` — **you do not add it yourself**. |
+| AndroidX Media3 | 1.11.1 | The Android engine (`exoplayer`, `-hls`, `-dash`, `-ima`), plus `media3-ui` in `:ui`. |
+| Shaka Player | 5.3.1 | Declared as an npm dependency by `:core`'s JS target, pinned as `shakaPlayer` in `gradle/libs.versions.toml`. The Kotlin/JS plugin propagates it to your `package.json` — **you do not add it yourself**. |
 
 Building the Apple targets requires macOS. Building the Android and JS targets does not.
 
@@ -118,7 +118,7 @@ declarations above are harmless once they do.
 
 | | Android | iOS | Web |
 |---|---|---|---|
-| Engine | Media3 / ExoPlayer 1.10.1 | `AVPlayer` (AVFoundation) | Shaka Player 4.16.50, plus the native `<video>` for progressive files |
+| Engine | Media3 / ExoPlayer 1.11.1 | `AVPlayer` (AVFoundation) | Shaka Player 5.3.1, plus the native `<video>` for progressive files |
 | `nativePlayerHandle` is | `ExoPlayer` (`ExoPlayerEngine.kt:505`) | `AVPlayer` (`AVPlayerEngine.kt:195`) | `HTMLVideoElement`, **never** `shaka.Player` (`ShakaEngine.kt:190`) |
 
 The Shaka `Player` instance is not exposed at all. On web, a progressive source (an `MimeType.MP4`, a

@@ -17,7 +17,7 @@ page still applies to your `androidApp`; only the dependency declaration moves t
 | | Value | Why |
 |---|---|---|
 | `minSdk` | **24** or higher | `gradle/libs.versions.toml:4`, applied at `core/build.gradle.kts:38` |
-| `compileSdk` | **36** or higher | Media3 1.10.1 AARs declare `minCompileSdk=36` |
+| `compileSdk` | **36** or higher | Media3 1.11.1 AARs declare `minCompileSdk=36` |
 | Java / Kotlin JVM target | **11** or higher | Outis' Android classes are Java 11 bytecode (class-file major version 55) |
 | Android Gradle Plugin | **8.2.0** or higher | required by the Google IMA AAR that Media3's IMA extension pulls in |
 | Kotlin | **2.4.10** recommended | Outis is built with it (`gradle/libs.versions.toml:3`) |
@@ -38,7 +38,7 @@ whether you use ads.
 of `outis-core` gets it. Two artifacts in that chain declare the requirement in their AAR metadata,
 and the Android Gradle Plugin enforces it:
 
-- `androidx.media3:media3-exoplayer-ima:1.10.1` — `coreLibraryDesugaringEnabled=true`,
+- `androidx.media3:media3-exoplayer-ima:1.11.1` — `coreLibraryDesugaringEnabled=true`,
   `desugarJdkLib=com.android.tools:desugar_jdk_libs:2.1.5`
 - `com.google.ads.interactivemedia.v3:interactivemedia:3.39.0` (pulled in transitively) —
   `coreLibraryDesugaringEnabled=true`, `desugarJdkLib=com.android.tools:desugar_jdk_libs:2.1.3`

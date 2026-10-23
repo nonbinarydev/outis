@@ -117,13 +117,14 @@ suspecting the integration.
 ## Web
 
 The web engine drives CSAI through Shaka's ad manager, which wraps the IMA HTML5 SDK. On a successful
-Shaka load of a `ClientSide` item it calls `initClientSide` once per Player instance, wires the ad
-events, and issues the request (`ShakaEngine.kt:466`, `:583-593`).
+Shaka load of a `ClientSide` item it hands the ad manager its container and wires the ad events once per
+Player instance, then issues the request; Shaka rebuilds its IMA client for each asset itself
+(`ShakaEngine.requestClientSideAds`).
 
 Two requirements you will not discover from the API.
 
 **1. The host page must load `ima3.js`.** `shaka.ads` needs the global `google.ima`, and the engine
-constructs the request with `js("new google.ima.AdsRequest()")` (`ShakaEngine.kt:590`). Add the
+constructs the request with `js("new google.ima.AdsRequest()")` (`ShakaEngine.requestClientSideAds`). Add the
 script tag to your `index.html`:
 
 ```html

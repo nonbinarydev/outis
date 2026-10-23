@@ -74,16 +74,33 @@ private fun ByteArray.toJsBody(): ArrayBuffer {
 }
 
 /**
- * EME `(videoRobustness, audioRobustness)` for a Widevine level. Single strings — EME `robustness` is a
- * `DOMString`, and Shaka 4.11 assigns it as-is (an array would be stringified to a comma-joined token and
- * rejected). L1 = hardware-backed, L3 = software; [WidevineLevel.AUTO] returns `""` (empty), which Shaka
- * omits so the browser/CDM negotiates — and, written every time, resets any level a prior item left in
- * Shaka's merged config.
+ * EME `(videoRobustness, audioRobustness)` for a Widevine level, as the **arrays** Shaka's config demands:
+ * its type check rejects a plain string outright, leaving the level unapplied. Shaka tries each entry in
+ * order. L1 = hardware-backed, L3 = software; [WidevineLevel.AUTO] is empty, which Shaka treats as "use its
+ * Widevine default" — and, written every time, resets any level a prior item left in the merged config.
  */
-private fun widevineRobustness(level: WidevineLevel): Pair<String, String> = when (level) {
-    WidevineLevel.AUTO -> "" to ""
-    WidevineLevel.L1 -> "HW_SECURE_DECODE" to "HW_SECURE_CRYPTO"
-    WidevineLevel.L3 -> "SW_SECURE_DECODE" to "SW_SECURE_CRYPTO"
+private fun widevineRobustness(level: WidevineLevel): Pair<Array<String>, Array<String>> = when (level) {
+    WidevineLevel.AUTO -> emptyArray<String>() to emptyArray()
+    WidevineLevel.L1 -> arrayOf("HW_SECURE_DECODE") to arrayOf("HW_SECURE_CRYPTO")
+    WidevineLevel.L3 -> arrayOf("SW_SECURE_DECODE") to arrayOf("SW_SECURE_CRYPTO")
+}
+
+/**
+ * A Shaka `AudioPreference`. `channelCount = 2` keeps Shaka's own default of preferring stereo, which a
+ * written preference list would otherwise replace. `spatialAudio` is left unset on purpose: any value,
+ * `false` included, filters on it.
+ */
+private fun audioPreference(language: String): dynamic {
+    val pref: dynamic = js("({ role: '', label: '', channelCount: 2, codec: '' })")
+    pref.language = language
+    return pref
+}
+
+/** A Shaka `TextPreference` for [language]. */
+private fun textPreference(language: String): dynamic {
+    val pref: dynamic = js("({ role: '', format: '', forced: false })")
+    pref.language = language
+    return pref
 }
 
 /** Read a Shaka request headers object into a Kotlin map (so an interceptor sees Shaka's own headers). */
@@ -133,26 +150,23 @@ private external object shaka {
         fun destroy(): kotlin.js.Promise<dynamic>
         fun addEventListener(type: String, listener: (event: dynamic) -> Unit)
         fun getVariantTracks(): Array<dynamic>
+        fun getAudioTracks(): Array<dynamic>
         fun getTextTracks(): Array<dynamic>
-        fun selectTextTrack(track: dynamic)
-        fun setTextTrackVisibility(on: Boolean) // synchronous in 4.x
-        fun selectAudioLanguage(language: String)
-        fun selectVariantsByLabel(label: String) // picks a same-language audio stream; keeps video ABR
-        fun selectVariantTrack(track: dynamic, clearBuffer: Boolean = definedExternally)
+        fun selectAudioTrack(track: dynamic) // keeps video ABR, unlike selectVariantTrack
 
-        // The parsed manifest. Its video streams carry `label` and `roles`; the public Track objects
-        // from getVariantTracks() drop both, so alternate renditions are indistinguishable without it.
-        fun getManifest(): dynamic
+        // Selecting a track also shows it, and `null` hides text: Shaka 5 has no separate visibility switch.
+        fun selectTextTrack(track: dynamic)
+        fun selectVariantTrack(track: dynamic, clearBuffer: Boolean = definedExternally)
         fun configure(config: dynamic)
         fun getNetworkingEngine(): dynamic
 
-        // shaka.ads.AdManager — used dynamically (initClientSide/requestClientSideAds/events)
+        // shaka.ads.AdManager — used dynamically (setContainers/requestClientSideAds/events)
         fun getAdManager(): dynamic
     }
 
-    /** Client-side-ads (IMA HTML5) event-name constants on `shaka.ads.AdManager`. */
+    /** Client-side-ads (IMA HTML5) event-name constants. Shaka 5 keeps them on `Utils`, not `AdManager`. */
     object ads {
-        object AdManager {
+        object Utils {
             val AD_STARTED: String
             val AD_CONTENT_PAUSE_REQUESTED: String
             val AD_CONTENT_RESUME_REQUESTED: String
@@ -189,13 +203,13 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         it.controls = false
         it.setAttribute("playsinline", "true")
     }
-    private var shakaPlayer = shaka.Player()
+    private var shakaPlayer = newShakaPlayer()
     private var shakaBroken = false // a failed Shaka load (e.g. DRM in Safari) wedges the Player; recreate before reuse
 
     // CSAI: IMA (via Shaka's ad manager) renders its ad UI into this div; the engine keeps it aligned over
     // the <video> and interactive only during ad breaks (see syncAdContainer). Created once, removed on release.
     private val adContainer = (document.createElement("div") as HTMLElement)
-    private var adsInitedForPlayer = false // shaka.ads.AdManager.initClientSide done for the current Player instance
+    private var adsInitedForPlayer = false // ad containers set and listeners wired on the current Player's ad manager
     private val _native = MutableStateFlow<Any?>(video)
     override val nativePlayerHandle: Any? get() = _native.value
 
@@ -223,12 +237,9 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     private var pendingStartListener: EventListener? = null // one-shot loadedmetadata seek for native start position
     private var loadChain: dynamic = js("Promise.resolve()") // serializes loads so switches never overlap
 
-    private val textTrackById = mutableMapOf<String, Any?>() // shaka text-track objects (dynamic can't be a type arg)
-
-    /** How to re-select an audio stream when same-language streams must be told apart (label first). */
-    private class ShakaAudioSelection(val language: String, val label: String?)
-
-    private val audioSelectionById = mutableMapOf<String, ShakaAudioSelection>()
+    // Shaka's own track objects, handed back to its select* calls (dynamic can't be a type argument).
+    private val textTrackById = mutableMapOf<String, Any?>()
+    private val audioTrackById = mutableMapOf<String, Any?>()
 
     /** id -> Shaka video stream id, the join key onto a variant's `videoId`. */
     private val videoSelectionById = mutableMapOf<String, Int>()
@@ -247,7 +258,6 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     )
 
     init {
-        shaka.polyfill.installAll()
         video.volume = config.initialVolume.toDouble()
         with(adContainer.style) {
             position = "fixed"
@@ -378,7 +388,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         shakaBroken = false
         adsInitedForPlayer = false // the fresh Player has no ad manager wired yet
         val old = shakaPlayer
-        val fresh = shaka.Player()
+        val fresh = newShakaPlayer()
         wireShaka(fresh)
         shakaPlayer = fresh
         return old.destroy().catch { it }.then({ _ ->
@@ -397,7 +407,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         shakaBuffering = false
         lastPlaybackState = PlaybackState.BUFFERING
         textTrackById.clear()
-        audioSelectionById.clear()
+        audioTrackById.clear()
         videoSelectionById.clear()
         playWhenReady = autoPlay
         mediaHeaders = item.headers
@@ -473,6 +483,14 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
      */
     private fun startSource(generation: Int, progressive: Boolean, item: MediaItem, url: String): dynamic {
         if (released || generation != loadGeneration) return js("Promise.resolve()")
+        if (usingShaka && !shakaBroken) {
+            // Hide text while the old item's tracks still exist. A media element that last showed captions
+            // switches on the first subtitle track it is given next, and Shaka's native text displayer
+            // adopts that as the selection — the next item would start with captions it never asked for.
+            // usingShaka goes false first so the old item's text events cannot reach state.
+            usingShaka = false
+            shakaPlayer.selectTextTrack(null)
+        }
         // Reset Shaka before the new source: recreate it if a prior load wedged it (unload() can't
         // recover a Safari DRM failure), otherwise just unload to clear the previous content.
         val reset: dynamic = if (shakaBroken) recreateShaka() else shakaPlayer.unload()
@@ -626,7 +644,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         shakaBuffering = false
         lastPlaybackState = PlaybackState.IDLE
         textTrackById.clear()
-        audioSelectionById.clear()
+        audioTrackById.clear()
         videoSelectionById.clear()
         _state.update {
             it.copy(
@@ -645,31 +663,33 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
      * Stitch client-side ads from [adTagUri] over the just-loaded content via Shaka's ad manager (which
      * wraps the IMA HTML5 SDK — `google.ima`, loaded as a global by the host page's `ima3.js` script), and
      * map its ad lifecycle into [PlayerState.adState] so the shared chrome blocks seeking, mirroring
-     * Android/iOS. `initClientSide` runs once per Player; subsequent items just request again.
+     * Android/iOS. Containers and listeners are set once per Player; Shaka rebuilds its IMA client for each
+     * asset itself, so later items just request again.
      */
     private fun requestClientSideAds(adTagUri: String) {
         val adManager = shakaPlayer.getAdManager()
         if (!adsInitedForPlayer) {
-            adManager.initClientSide(adContainer, video)
+            // Client-side and server-side containers; only client-side ads are requested here.
+            adManager.setContainers(adContainer, adContainer)
             wireAdEvents(adManager)
             adsInitedForPlayer = true
         }
         val request = js("new google.ima.AdsRequest()")
         request.adTagUrl = adTagUri
-        adManager.requestClientSideAds(request)
+        adManager.requestClientSideAds(request, null)
     }
 
     private fun wireAdEvents(adManager: dynamic) {
-        adManager.addEventListener(shaka.ads.AdManager.AD_CONTENT_PAUSE_REQUESTED) { _: dynamic ->
+        adManager.addEventListener(shaka.ads.Utils.AD_CONTENT_PAUSE_REQUESTED) { _: dynamic ->
             if (!released) _state.update { it.copy(adState = AdState(isInAdBreak = true)) }
         }
-        adManager.addEventListener(shaka.ads.AdManager.AD_STARTED) { e: dynamic ->
+        adManager.addEventListener(shaka.ads.Utils.AD_STARTED) { e: dynamic ->
             if (!released) _state.update { it.copy(adState = adStateFromShaka(e.ad)) }
         }
         val clear = { _: dynamic -> if (!released) _state.update { it.copy(adState = null) } }
-        adManager.addEventListener(shaka.ads.AdManager.AD_CONTENT_RESUME_REQUESTED, clear)
-        adManager.addEventListener(shaka.ads.AdManager.ALL_ADS_COMPLETED, clear)
-        adManager.addEventListener(shaka.ads.AdManager.AD_ERROR, clear)
+        adManager.addEventListener(shaka.ads.Utils.AD_CONTENT_RESUME_REQUESTED, clear)
+        adManager.addEventListener(shaka.ads.Utils.ALL_ADS_COMPLETED, clear)
+        adManager.addEventListener(shaka.ads.Utils.AD_ERROR, clear)
     }
 
     /** Map a Shaka `shaka.extern.IAd` to [AdState]. */
@@ -751,16 +771,10 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     override fun selectTrack(track: MediaTrack) {
         if (released || !usingShaka) return
         when (track.type) {
-            TrackType.AUDIO -> audioSelectionById[track.id]?.let { sel ->
-                // Label picks the exact stream when languages collide (stereo vs 5.1 vs commentary) and
-                // keeps video ABR, unlike selectVariantTrack; fall back to language when there's no label.
-                if (sel.label != null) {
-                    shakaPlayer.selectVariantsByLabel(sel.label)
-                } else {
-                    shakaPlayer.selectAudioLanguage(sel.language)
-                }
-                // On HLS, selecting audio can re-enable text visibility; re-assert "off" if subtitles are off.
-                if (_state.value.selectedTextTrackId == null) shakaPlayer.setTextTrackVisibility(false)
+            TrackType.AUDIO -> audioTrackById[track.id]?.let { shakaTrack ->
+                shakaPlayer.selectAudioTrack(shakaTrack)
+                // A language change can switch on forced subtitles; re-assert "off" if subtitles are off.
+                if (_state.value.selectedTextTrackId == null) shakaPlayer.selectTextTrack(null)
                 _state.update { st ->
                     st.copy(
                         audioTracks = st.audioTracks.map { it.copy(isSelected = it.id == track.id) }.toPersistentList(),
@@ -771,7 +785,6 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
 
             TrackType.TEXT -> textTrackById[track.id]?.let { shakaTrack ->
                 shakaPlayer.selectTextTrack(shakaTrack)
-                shakaPlayer.setTextTrackVisibility(true)
                 _state.update { st ->
                     st.copy(
                         textTracks = st.textTracks.map { it.copy(isSelected = it.id == track.id) }.toPersistentList(),
@@ -788,7 +801,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
 
     override fun clearTextTrack() {
         if (released) return
-        if (usingShaka) shakaPlayer.setTextTrackVisibility(false)
+        if (usingShaka) shakaPlayer.selectTextTrack(null)
         _state.update { st ->
             st.copy(
                 textTracks = st.textTracks.map { it.copy(isSelected = false) }.toPersistentList(),
@@ -803,7 +816,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
      * that the `init` request filter injects into LICENSE requests. The header set is reset each call
      * (empty for clear content). Note Shaka's `configure()` **merges** — it never deletes keys — so a
      * value a prior item set survives unless this call overwrites it; we therefore rewrite the fields a
-     * later item could otherwise inherit (`servers[keySystem]`, and for Widevine the robustness — `""`
+     * later item could otherwise inherit (`servers[keySystem]`, and for Widevine the robustness — empty
      * for AUTO) rather than relying on the rebuilt-each-call `servers`/`advanced` locals to clear them.
      * Entries for key systems the current item doesn't use linger in the merged config but are inert (no
      * matching content). FairPlay (Safari) additionally needs the application certificate, which Shaka
@@ -837,10 +850,10 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 advanced[keySystem] = fps
             }
             // Widevine security level → EME robustness. L1 demands hardware (HW_SECURE_*, fails if the
-            // browser has no hardware CDM); L3 forces software (SW_SECURE_*); AUTO writes "" so the
-            // browser/CDM negotiates. Always set it (even for AUTO): configure() merges and never deletes
-            // keys, so writing "" each time clears any HW/SW level a prior item left behind. No analog for
-            // PlayReady (different tokens) or FairPlay, so the knob is Widevine-only here too.
+            // browser has no hardware CDM); L3 forces software (SW_SECURE_*); AUTO writes an empty list so
+            // Shaka applies its own Widevine default. Always set it (even for AUTO): configure() merges and
+            // never deletes keys, so writing it each time clears any HW/SW level a prior item left behind. No
+            // analog for PlayReady (different tokens) or FairPlay, so the knob is Widevine-only here too.
             if (drm.scheme == DrmScheme.WIDEVINE) {
                 val (videoRob, audioRob) = widevineRobustness(drm.widevineLevel)
                 val wv: dynamic = js("({})")
@@ -859,27 +872,46 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     }
 
     /**
+     * Pre-select audio/subtitle language before load so the right track is active at first frame. Both lists
+     * are written for every item, because configure() merges and would otherwise hand the previous item's
+     * preference to this one. A preferred text track is only configured when captions start on: Shaka 5
+     * shows whatever text track it selects at load.
+     */
+    private fun configureLanguagePreferences(item: MediaItem) {
+        // The trailing language-less entry keeps Shaka's stereo default when the language is absent.
+        val audio = listOfNotNull(item.preferredAudioLanguage, "").map(::audioPreference)
+        val text = item.preferredTextLanguage
+            ?.takeIf { item.captionsDefault == CaptionsDefaultMode.ON }
+            ?.let { listOf(textPreference(it)) }
+            .orEmpty()
+        val config: dynamic = js("({})")
+        config.preferredAudio = audio.toTypedArray()
+        config.preferredText = text.toTypedArray()
+        shakaPlayer.configure(config)
+    }
+
+    /**
+     * Initial caption visibility after load. FOLLOW_SYSTEM has no universal web signal, so it maps to OFF.
+     * ON with no preferred language shows the manifest's primary text track, else its first.
+     */
+    private fun applyCaptionsDefault(item: MediaItem) {
+        val tracks = shakaPlayer.getTextTracks()
+        if (item.captionsDefault != CaptionsDefaultMode.ON) {
+            // Off also hides forced subtitles Shaka may have picked for the audio language.
+            if (tracks.any { it.active == true }) shakaPlayer.selectTextTrack(null)
+            return
+        }
+        if (tracks.none { it.active == true }) {
+            val pick: Any? = tracks.firstOrNull { it.primary == true } ?: tracks.firstOrNull()
+            if (pick != null) shakaPlayer.selectTextTrack(pick)
+        }
+    }
+
+    /**
      * Cap adaptive selection via Shaka `restrictions` (filters out rungs above the limits, for ABR and
      * manual alike). Always reset (to `Infinity` when unconstrained) so a capped item doesn't leave a
      * stale ceiling on the next source.
      */
-
-    /** Pre-select audio/subtitle language before load so the right track is active at first frame. */
-    private fun configureLanguagePreferences(item: MediaItem) {
-        val audio = item.preferredAudioLanguage
-        val text = item.preferredTextLanguage
-        if (audio == null && text == null) return
-        val config: dynamic = js("({})")
-        if (audio != null) config.preferredAudioLanguage = audio
-        if (text != null) config.preferredTextLanguage = text
-        shakaPlayer.configure(config)
-    }
-
-    /** Initial caption visibility after load. FOLLOW_SYSTEM has no universal web signal, so it maps to OFF. */
-    private fun applyCaptionsDefault(item: MediaItem) {
-        shakaPlayer.setTextTrackVisibility(item.captionsDefault == CaptionsDefaultMode.ON)
-    }
-
     private fun configureRestrictions(constraints: VideoConstraints?) {
         val restrictions: dynamic = js("({})")
         restrictions.maxWidth = constraints?.maxWidth ?: js("Infinity")
@@ -1011,7 +1043,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         // An explicit choice has to stick: with ABR left on, Shaka is free to move back off it.
         disableAbr()
         shakaPlayer.selectVariantTrack(chosen, true)
-        if (_state.value.selectedTextTrackId == null) shakaPlayer.setTextTrackVisibility(false)
+        if (_state.value.selectedTextTrackId == null) shakaPlayer.selectTextTrack(null)
         _state.update { st ->
             st.copy(
                 videoTracks = st.videoTracks.map { it.copy(isSelected = it.id == trackId) }.toPersistentList(),
@@ -1021,19 +1053,15 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     }
 
     /**
-     * Alternate video renditions, from the parsed manifest rather than [shaka.Player.getVariantTracks]: the
-     * public Track objects carry no video label or role, so a remaster and an original transfer look
-     * identical there. Empty unless there is a real choice -- a plain bitrate ladder is the engine's
-     * business, not the user's.
+     * Alternate video renditions, keyed by each variant's video stream and named by its `videoLabel` (the
+     * variant's own `label` describes the audio). Empty unless there is a real choice -- a plain bitrate
+     * ladder is the engine's business, not the user's.
      */
     private fun readRenditions(variants: Array<dynamic>): List<MediaTrack> {
-        val manifestVariants = runCatching { shakaPlayer.getManifest() }.getOrNull()?.variants ?: return emptyList()
-        val activeVideoId = (variants.firstOrNull { it.active == true }?.videoId as? Number)?.toInt()
         // A JS number arrives as Double here -- `as Int` would throw for EVERY manifest.
-        val count = (manifestVariants.length as? Number)?.toInt() ?: 0
-        val video = (0 until count)
-            .mapNotNull { manifestVariants[it]?.video }
-            .distinctBy { (it.id as? Number)?.toInt() }
+        val activeVideoId = (variants.firstOrNull { it.active == true }?.videoId as? Number)?.toInt()
+        val video = variants
+            .distinctBy { (it.videoId as? Number)?.toInt() }
             .mapNotNull { renditionOf(it, activeVideoId) }
         // One rendition is no choice; two unlabelled ones are a ladder we should not expose.
         if (video.size < 2 || video.all { it.label == null }) {
@@ -1052,15 +1080,15 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         return video
     }
 
-    private fun renditionOf(stream: dynamic, activeVideoId: Int?): MediaTrack? {
-        val sid = (stream.id as? Number)?.toInt() ?: return null
-        val roles = (stream.roles as? Array<dynamic>)?.mapNotNull { it as? String }.orEmpty()
+    private fun renditionOf(variant: dynamic, activeVideoId: Int?): MediaTrack? {
+        val sid = (variant.videoId as? Number)?.toInt() ?: return null
+        val roles = (variant.videoRoles as? Array<dynamic>)?.mapNotNull { it as? String }.orEmpty()
         val id = "VIDEO:$sid"
         videoSelectionById[id] = sid
         return MediaTrack(
             id = id,
             type = TrackType.VIDEO,
-            label = (stream.label as? String) ?: roles.firstOrNull(),
+            label = (variant.videoLabel as? String) ?: roles.firstOrNull(),
             isSelected = sid == activeVideoId,
             isDefault = roles.contains("main"),
         )
@@ -1077,33 +1105,34 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
     private fun loadTracks() {
         if (released || !usingShaka) return
         textTrackById.clear()
-        audioSelectionById.clear()
+        audioTrackById.clear()
         videoSelectionById.clear()
 
-        val variants = shakaPlayer.getVariantTracks()
+        // Shaka folds every quality of one audio stream into a single track, so these are already the
+        // distinct choices. Same-language streams (stereo, 5.1, commentary) stay apart by label, role and
+        // channel count; anything still colliding gets a suffix rather than being dropped.
+        val audioList = shakaPlayer.getAudioTracks()
         val audio = mutableListOf<MediaTrack>()
-        val seenAudio = mutableSetOf<String>()
-        for (i in 0 until variants.size) {
-            val variant = variants[i]
-            val language = variant.language as? String ?: continue
-            val label = variant.label as? String
-            // Several audio streams can share a language (e.g. stereo + 5.1 + commentary, all "en"),
-            // differing only by label/channels. Key on the distinct audio stream (audioId), not language,
-            // so same-language streams don't collapse into a single selectable entry.
-            val audioKey = (variant.audioId as? Number)?.toString() ?: label ?: language
-            if (!seenAudio.add(audioKey)) continue
-            val id = "AUDIO:$audioKey"
-            audioSelectionById[id] = ShakaAudioSelection(language, label)
+        for (i in 0 until audioList.size) {
+            val shakaTrack = audioList[i]
+            val language = shakaTrack.language as? String ?: continue
+            val label = shakaTrack.label as? String
+            val roles = (shakaTrack.roles as? Array<dynamic>)?.joinToString(",").orEmpty()
+            val key = "AUDIO:$language|${label.orEmpty()}|$roles|${shakaTrack.channelsCount ?: ""}"
+            var id = key
+            var n = 2
+            while (id in audioTrackById) id = "$key#${n++}"
+            audioTrackById[id] = shakaTrack
             audio += MediaTrack(
                 id = id,
                 type = TrackType.AUDIO,
                 label = label,
                 language = language,
-                isSelected = variant.active == true,
+                isSelected = shakaTrack.active == true,
             )
         }
 
-        val video = readRenditions(variants)
+        val video = readRenditions(shakaPlayer.getVariantTracks())
 
         val textList = shakaPlayer.getTextTracks()
         val text = mutableListOf<MediaTrack>()
@@ -1178,6 +1207,20 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         private const val HAVE_CURRENT_DATA = 2
         private const val HAVE_FUTURE_DATA = 3
     }
+}
+
+private var shakaPolyfillsInstalled = false
+
+/**
+ * A new Shaka Player, with Shaka's polyfills installed first. They must precede the first Player: Shaka 5's
+ * constructor already calls built-ins that current browsers lack (`Map.getOrInsertComputed`).
+ */
+private fun newShakaPlayer(): shaka.Player {
+    if (!shakaPolyfillsInstalled) {
+        shaka.polyfill.installAll()
+        shakaPolyfillsInstalled = true
+    }
+    return shaka.Player()
 }
 
 /** Adaptive (Shaka) vs progressive (native `video.src`) — Shaka can't play single-file mp4/webm. */
