@@ -100,7 +100,7 @@ else. See the platform getting-started pages.
 
 `ControlsScaffold` is `DefaultControls` with its three regions exposed. **The scrubber is not one of
 them.** `ControlsScaffold` draws `Scrubber(Modifier.fillMaxWidth())` itself, in a `Column` directly
-above the `bottom` row (`DefaultControls.kt:90-93`), so `bottom` is the transport row only. Putting a
+above the `bottom` row (`DefaultControls.kt`), so `bottom` is the transport row only. Putting a
 `Scrubber` in `bottom` renders a second one, stacked under the built-in one.
 
 ```kotlin
@@ -117,7 +117,7 @@ PlayerView(player) {
 }
 ```
 
-The three overridable regions and their defaults (`DefaultControls.kt:49-70`):
+The three overridable regions and their defaults (`DefaultControls.kt`):
 
 | Region   | Receiver   | Default content |
 | -------- | ---------- | --------------- |
@@ -166,11 +166,11 @@ Three things you inherit from `ControlsScaffold` and lose here, in order of how 
    overlay that never checks it is permanently on screen.
 2. **The D-pad focus grab.** Apply `Modifier.focusRequester(focusRequester).focusGroup()` to your root
    and request focus in a `LaunchedEffect(state.controlsVisible)` if you care about TV.
-3. **The focus ring.** `Modifier.controlFocusRing()` is `internal` (`FocusRing.kt:38`), so it is
+3. **The focus ring.** `Modifier.controlFocusRing()` is `internal` (`FocusRing.kt`), so it is
    applied to the shipped `IconButton`s and cannot be applied to yours. Custom controls need their own
    focus indication.
 
-`BufferingIndicator` gates itself on `isWaitingToPlay` (`BasicControls.kt:155`) and emits no layout
+`BufferingIndicator` gates itself on `isWaitingToPlay` (`BasicControls.kt`) and emits no layout
 when hidden, so the surrounding `if` in the old README example was redundant.
 
 `DefaultControls()` is written entirely against this public scope, so forking `DefaultControls.kt` is a
@@ -204,7 +204,7 @@ composables.
 Everything `PlayerView` wires is now yours to wire or to skip:
 
 - Tap/click/hover gestures and the auto-hide interaction feedback.
-- The web keyboard shortcuts. `PlatformPlayerKeyboard` is `internal` (`PlayerKeyboard.kt:23`), so this
+- The web keyboard shortcuts. `PlatformPlayerKeyboard` is `internal` (`PlayerKeyboard.kt`), so this
   tier has no route to Space/K/M/F on web at all.
 - `pauseWhenStopped`. Nothing else in the SDK touches the lifecycle.
 - The PiP collapse (`if (!window.isInPip)`).
@@ -214,7 +214,7 @@ needs a `PlayerWindow` to use them.
 
 ## `PlayerView`
 
-`PlayerView.kt:64-73`.
+`PlayerView.kt`.
 
 ```kotlin
 @ExperimentalPlayerUiApi
@@ -235,15 +235,15 @@ fun PlayerView(
 | --------- | ----- |
 | `player` | The surface re-binds when the engine re-emits `PlayerEvent.NativePlayerAttached`. |
 | `contentScale` | Only three values are distinguished: `Crop`, `FillBounds`, and everything else, which maps to fit. Details under [`PlayerSurface`](#playersurface). |
-| `surfaceType` | **Currently a no-op.** It is declared and threaded to `PlayerSurface`, but no actual reads it (`PlayerSurface.android.kt:44`, `.ios.kt:47`, `.js.kt:61` all ignore the parameter). Android therefore always gets Media3 `PlayerView`'s default `SurfaceView`. |
+| `surfaceType` | **Currently a no-op.** It is declared and threaded to `PlayerSurface`, but no actual reads it (`PlayerSurface.android.kt`, `.ios.kt`, `.js.kt` all ignore the parameter). Android therefore always gets Media3 `PlayerView`'s default `SurfaceView`. |
 | `window` | Fullscreen/PiP delegation. Defaults to a no-op `PlayerWindow()`, which hides both buttons and disables mouse double-click-to-fullscreen. |
 | `pauseWhenStopped` | See [background and lifecycle](#background-and-lifecycle). |
 | `state` | Pass a hoisted state to share it with controls outside the overlay, or to change the auto-hide duration — the default calls `rememberPlayerControlsState(player)` with the 3-second default. |
-| `controls` | Receiver is `PlayerControlsScope`. Not composed at all while `window.isInPip` is true (`PlayerView.kt:168`), so PiP shows bare video. |
+| `controls` | Receiver is `PlayerControlsScope`. Not composed at all while `window.isInPip` is true (`PlayerView.kt`), so PiP shows bare video. |
 
 There is no `showSubtitles` parameter on `PlayerView`. It calls
 `PlayerSurface(player, Modifier.matchParentSize(), contentScale, surfaceType)`
-(`PlayerView.kt:167`), leaving `showSubtitles` at its default of `true`. To turn native subtitle
+(`PlayerView.kt`), leaving `showSubtitles` at its default of `true`. To turn native subtitle
 rendering off you must drop to tier 4 and call `PlayerSurface` yourself.
 
 On Android, note the name collision: `dev.nonbinary.outis.ui.PlayerView` and
@@ -251,7 +251,7 @@ On Android, note the name collision: `dev.nonbinary.outis.ui.PlayerView` and
 
 ## `PlayerSurface`
 
-`PlayerSurface.kt:24-30`.
+`PlayerSurface.kt`.
 
 ```kotlin
 @ExperimentalPlayerUiApi
@@ -270,9 +270,9 @@ public so video can go anywhere in your layout — an overlay, a rail, a mini-pl
 
 | Platform | Implementation | `contentScale` | `showSubtitles` |
 | -------- | -------------- | -------------- | --------------- |
-| Android | Media3 `PlayerView` with `useController = false`, black background (`PlayerSurface.android.kt:57-60`) | `Crop` → `RESIZE_MODE_ZOOM`, `FillBounds` → `RESIZE_MODE_FILL`, else `RESIZE_MODE_FIT` | Honoured: toggles `subtitleView.visibility` (`:72`) |
-| iOS | `AVPlayerViewController` with `showsPlaybackControls = false`, hosted by `UIKitViewController` (`PlayerSurface.ios.kt:57-78`) | `Crop` → `ResizeAspectFill`, `FillBounds` → `Resize`, else `ResizeAspect` | **Ignored.** AVKit renders the selected text track and there is no switch. |
-| Web | The engine's `<video>` element, repositioned under the Compose canvas (`PlayerSurface.js.kt:75-123`) | `Crop` → `object-fit: cover`, `FillBounds` → `fill`, else `contain` | **Ignored.** |
+| Android | Media3 `PlayerView` with `useController = false`, black background (`PlayerSurface.android.kt`) | `Crop` → `RESIZE_MODE_ZOOM`, `FillBounds` → `RESIZE_MODE_FILL`, else `RESIZE_MODE_FIT` | Honoured: toggles `subtitleView.visibility` |
+| iOS | `AVPlayerViewController` with `showsPlaybackControls = false`, hosted by `UIKitViewController` (`PlayerSurface.ios.kt`) | `Crop` → `ResizeAspectFill`, `FillBounds` → `Resize`, else `ResizeAspect` | **Ignored.** AVKit renders the selected text track and there is no switch. |
+| Web | The engine's `<video>` element, repositioned under the Compose canvas (`PlayerSurface.js.kt`) | `Crop` → `object-fit: cover`, `FillBounds` → `fill`, else `contain` | **Ignored.** |
 
 `ContentScale.Inside`, `FillHeight`, `FillWidth` and any custom `ContentScale` all fall into the "else"
 branch on all three platforms and behave as fit.
@@ -294,14 +294,14 @@ above that canvas would occlude the overlay, so `PlayerSurface` does the opposit
 
 - The `<video>` (read from `player.nativePlayerHandle`, refreshed on
   `PlayerEvent.NativePlayerAttached`) is appended to `document.body` with `position: fixed`,
-  `margin: 0`, black background and `z-index: 0`, and native `controls` off (`PlayerSurface.js.kt:81-90`).
+  `margin: 0`, black background and `z-index: 0`, and native `controls` off (`PlayerSurface.js.kt`).
 - `raiseComposeHostsAbove` then walks every direct child of `document.body` except the video, sets
   `z-index: 1`, and adds `position: relative` to any host whose computed position is `static`
-  (`PlayerSurface.js.kt:138-146`). **This rewrites page-level styles you did not author** — if your page
+  (`PlayerSurface.js.kt`). **This rewrites page-level styles you did not author** — if your page
   has siblings alongside the Compose host, they are restyled too.
 - The Compose `Box` carries
   `Modifier.drawBehind { drawRect(Color.Transparent, blendMode = BlendMode.Clear) }`
-  (`PlayerSurface.js.kt:113`). Skiko presents the canvas with per-pixel alpha, so the video shows
+  (`PlayerSurface.js.kt`). Skiko presents the canvas with per-pixel alpha, so the video shows
   through, and the same shared Compose overlay composites on top — exactly as on Android and iOS, with
   no native controls.
 - Layering, bottom to top: page background → `<video>` (`z-index: 0`) → Compose canvas (`z-index: 1`,
@@ -312,7 +312,7 @@ above that canvas would occlude the overlay, so `PlayerSurface` does the opposit
 - Because the element is `position: fixed` on `document.body`, it does not clip to a scroll container
   or to any ancestor with `overflow: hidden`. It will happily paint over the rest of your page if your
   layout assumes otherwise.
-- On a fatal error the surface sets `display: none` on the video (`PlayerSurface.js.kt:104-107`) so a
+- On a fatal error the surface sets `display: none` on the video (`PlayerSurface.js.kt`) so a
   frozen or garbage frame does not show through the hole, and restores it on the next good load.
 
 Verified on Chrome and Safari.
@@ -327,11 +327,11 @@ fun rememberPlayerControlsState(
 ): PlayerControlsState
 ```
 
-`PlayerControlsState.kt:241-259`. It collects `player.state` **once** into a snapshot-backed field, so
+`PlayerControlsState.kt`. It collects `player.state` **once** into a snapshot-backed field, so
 every control in the overlay reads the same consistent frame, and it runs the auto-hide effect.
 
 `autoHide` is captured on first composition: the state is created inside `remember(player)`
-(`PlayerControlsState.kt:246`), so changing the argument later has no effect. Key it off the player, or
+(`PlayerControlsState.kt`), so changing the argument later has no effect. Key it off the player, or
 recreate the composable, if the duration must change.
 
 ### Derived state
@@ -357,7 +357,7 @@ tapping during a rebuffer pauses), `toggleMute()`, `onScrubMove(ms)`, `onScrubCo
 ### Visibility and the keep-visible protocol
 
 `controlsVisible` starts `true`. Auto-hide is a single `LaunchedEffect`
-(`PlayerControlsState.kt:252-257`) that fires only when **all three** hold:
+(`PlayerControlsState.kt`) that fires only when **all three** hold:
 
 ```kotlin
 state.controlsVisible && !state.keepVisible && !state.showPlayIcon
@@ -372,7 +372,7 @@ so it never runs while paused or ended, and it re-arms whenever `controlsVisible
 - `releaseVisible(token)` removes it. Auto-hide resumes only once **every** token is released.
 - A leaked token pins the overlay open permanently. Release from the same disposal path that took it.
 
-The shipped pattern, from `PlaybackSpeedButton` (`BasicControls.kt:199-203`) and both track buttons:
+The shipped pattern, from `PlaybackSpeedButton` (`BasicControls.kt`) and both track buttons:
 
 ```kotlin
 var open by remember { mutableStateOf(false) }
@@ -382,10 +382,10 @@ DisposableEffect(Unit) { onDispose { state.releaseVisible(token) } }
 ```
 
 `Scrubber` uses an internal token for the duration of a drag and self-heals on disposal
-(`BasicControls.kt:107-109`), so a scrubber removed mid-drag cannot strand the latch.
+(`BasicControls.kt`), so a scrubber removed mid-drag cannot strand the latch.
 
 Explicit `hideControls()` and `toggleControls()` always win — a held token does not veto them
-(`PlayerControlsState.kt:167, 173`). That is deliberate: a tap on the video hides the overlay even with
+(`PlayerControlsState.kt`). That is deliberate: a tap on the video hides the overlay even with
 a menu open.
 
 ## Building blocks
@@ -412,14 +412,14 @@ as a free function and does not take a `PlayerControlsState` at all.
 | — | `ControlsScaffold(modifier, top, center, bottom)` | Scope-only. See [tier 2](#tier-2--keep-the-layout-swap-one-region). |
 
 Track labelling everywhere falls back `label` → `language` → `id`, so an unlabelled manifest still
-produces a readable menu (`TrackControls.kt:40`).
+produces a readable menu (`TrackControls.kt`).
 
 All blocks take their colour from `LocalContentColor`, which `ControlsScaffold` sets to white over its
 scrim. Wrap them in `CompositionLocalProvider(LocalContentColor provides …)` to retheme.
 
 ## Input model
 
-All of this lives on `PlayerView` (`PlayerView.kt:100-165`). Tier 4 gets none of it.
+All of this lives on `PlayerView` (`PlayerView.kt`). Tier 4 gets none of it.
 
 **Touch.** A tap toggles the overlay (`state.toggleControls()`) and nothing else. Touch never
 plays or pauses through the surface.
@@ -443,7 +443,7 @@ clicking and scrubbing still work; a no-op on touch, where these events do not f
 or shows them if they are not. It never consumes the event.
 
 **Web keyboard shortcuts.** Web is the only platform with an implementation; Android and iOS have
-deliberately empty actuals. A DOM `keydown` listener on `document` (`PlayerKeyboard.js.kt:28-56`)
+deliberately empty actuals. A DOM `keydown` listener on `document` (`PlayerKeyboard.js.kt`)
 handles:
 
 | Key | Action |
@@ -460,14 +460,14 @@ system because key routing through the skiko canvas is unreliable, Safari especi
 ## TV and D-pad
 
 The shipped controls are focusable `IconButton`s carrying an internal white 2.dp circular focus ring,
-drawn inside the bounds so it never affects layout (`FocusRing.kt:25-38`). Nothing else is required to
+drawn inside the bounds so it never affects layout (`FocusRing.kt`). Nothing else is required to
 support TV — the same `PlayerView` works on phone, tablet and TV.
 
 **Auto-hide is not suspended by focus.** This is the correction most worth reading: an earlier version
 of this SDK vetoed hiding while a control held focus, and that veto was removed as "the old TV
-deadlock" (`PlayerControlsState.kt:37-38`). Today:
+deadlock" (`PlayerControlsState.kt`). Today:
 
-- Focus movement bumps `interactionTick` (`DefaultControls.kt:82`), which **re-arms** the countdown; it
+- Focus movement bumps `interactionTick` (`DefaultControls.kt`), which **re-arms** the countdown; it
   never pins the overlay.
 - While actively playing, the overlay hides after `autoHide` whether or not a control has focus.
 - The next key press brings it straight back, via the `onPreviewKeyEvent` wake above.
@@ -476,7 +476,7 @@ Design against that, not against a permanently visible focused overlay.
 
 `ControlsScaffold` grabs D-pad focus when the overlay appears: the `focusRequester` is on the root,
 which is a `focusGroup()`, so focus forwards to the first focusable child and the grab survives you
-overriding `bottom` (`DefaultControls.kt:79-80, 98-100`). It is wrapped in `runCatching`, so a
+overriding `bottom` (`DefaultControls.kt`). It is wrapped in `runCatching`, so a
 requester with nothing to focus fails quietly.
 
 `PlayerControlsScope.focusRequester` is exposed so a custom overlay can do the same. Point it at an
@@ -485,7 +485,7 @@ requester with nothing to focus fails quietly.
 ## Fullscreen and picture-in-picture
 
 The library never owns the Activity, so it delegates through an immutable `PlayerWindow`
-(`PlayerWindow.kt:24-44`):
+(`PlayerWindow.kt`):
 
 ```kotlin
 @Immutable
@@ -520,7 +520,7 @@ While `isInPip` is true, `PlayerView` skips the controls lambda entirely and sho
 
 ### Android: `rememberPlayerWindow`
 
-Android is the only platform with a ready-made implementation (`PlayerWindow.android.kt:47-89`); it
+Android is the only platform with a ready-made implementation (`PlayerWindow.android.kt`); it
 lives in `androidMain`, so it is not callable from `commonMain`.
 
 ```kotlin
@@ -560,7 +560,7 @@ On iOS and web there is no `rememberPlayerWindow`: implement the same callbacks 
 ## Background and lifecycle
 
 `PlayerView(pauseWhenStopped = true)` is the default and the **only** lifecycle handling anywhere in
-the SDK — `:core` has none. When enabled (`PlayerView.kt:78-90`):
+the SDK — `:core` has none. When enabled (`PlayerView.kt`):
 
 - On `Lifecycle.Event.ON_STOP` it records `player.state.value.playWhenReady` and calls `player.pause()`.
 - On `Lifecycle.Event.ON_START` it calls `player.play()` if it had been playing.

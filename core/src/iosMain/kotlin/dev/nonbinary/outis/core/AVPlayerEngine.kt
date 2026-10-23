@@ -26,11 +26,8 @@ import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
 import kotlinx.cinterop.BetaInteropApi
-import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.reinterpret
-import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,12 +45,10 @@ import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryOptionMixWithOthers
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.setActive
-import platform.AVFoundation.AVAssetTrack
 import platform.AVFoundation.AVMediaCharacteristicAudible
 import platform.AVFoundation.AVMediaCharacteristicLegible
 import platform.AVFoundation.AVMediaSelectionGroup
 import platform.AVFoundation.AVMediaSelectionOption
-import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVPlayerItemDidPlayToEndTimeNotification
@@ -73,7 +68,6 @@ import platform.AVFoundation.currentTime
 import platform.AVFoundation.duration
 import platform.AVFoundation.error
 import platform.AVFoundation.extendedLanguageTag
-import platform.AVFoundation.formatDescriptions
 import platform.AVFoundation.mediaSelectionGroupForMediaCharacteristic
 import platform.AVFoundation.muted
 import platform.AVFoundation.playbackBufferEmpty
@@ -93,21 +87,11 @@ import platform.AVFoundation.setRate
 import platform.AVFoundation.setVolume
 import platform.AVFoundation.status
 import platform.AVFoundation.timeControlStatus
-import platform.AVFoundation.tracksWithMediaType
 import platform.AVFoundation.volume
-import platform.CoreFoundation.CFStringGetCStringPtr
-import platform.CoreFoundation.kCFStringEncodingUTF8
 import platform.CoreGraphics.CGSizeMake
-import platform.CoreMedia.CMFormatDescriptionGetExtension
-import platform.CoreMedia.CMFormatDescriptionGetMediaSubType
-import platform.CoreMedia.CMFormatDescriptionRef
 import platform.CoreMedia.CMTimeGetSeconds
 import platform.CoreMedia.CMTimeMake
 import platform.CoreMedia.CMTimeMakeWithSeconds
-import platform.CoreMedia.kCMFormatDescriptionExtension_TransferFunction
-import platform.CoreVideo.CVBufferGetAttachment
-import platform.CoreVideo.CVBufferRelease
-import platform.CoreVideo.kCVImageBufferTransferFunctionKey
 import platform.Foundation.NSError
 import platform.Foundation.NSNotification
 import platform.Foundation.NSNotificationCenter
@@ -152,8 +136,8 @@ private val liveEngines = mutableSetOf<AVPlayerEngine>()
  * **Memory.** Observer/notification closures capture only a [WeakReference] back to the engine
  * (AVFoundation retains the closures); [liveEngines] keeps the engine alive until [release].
  */
-// Over the LargeClass threshold since the Dolby Vision range probe landed beside the player wiring
-// and the reconciler. The probe is the self-contained piece to split out.
+// Over the LargeClass threshold. Track selection — loadTracks through applyTrackPreferences and the
+// three fields they share — is the next piece to split out, once an iOS test host can catch a mistake.
 @Suppress("LargeClass")
 internal class AVPlayerEngine(
     private val config: PlayerConfig,
@@ -793,59 +777,8 @@ internal class AVPlayerEngine(
 
     // ---- state reconciliation (polled on the main queue) ----
 
-    // 'dvh1' / 'dvhe' as FourCharCode — the Dolby Vision HEVC sample-entry codec types.
-    private val fourCcDvh1: UInt = 0x64766831u
-    private val fourCcDvhe: UInt = 0x64766865u
-
     // A per-item AVPlayerItemVideoOutput used only to sample the decoded frame's colour range for HLS.
     private var videoOutput: AVPlayerItemVideoOutput? = null
-
-    /**
-     * Colour range of the current video. Two sources, because AVFoundation surfaces this differently by
-     * container:
-     *  1. Progressive / local — the asset's video track has a [CMFormatDescription]: Dolby Vision from the
-     *     codec sub-type, HDR10/HLG from the transfer-function extension. Exact, incl. DV.
-     *  2. HLS — the asset exposes **no** video track (HLS uses internal variants), so we read the decoded
-     *     frame's transfer function off the [videoOutput] tap. This tells HDR10/HLG/SDR but **cannot** tell
-     *     Dolby Vision apart from HDR10 (DV decodes to a PQ buffer). Apple surfaces no per-variant codec.
-     * Pointer identity against the interned transfer constants throughout — CFEqual isn't importable in K/N.
-     */
-    @OptIn(ExperimentalForeignApi::class)
-    private fun currentVideoRange(item: AVPlayerItem?, fallback: VideoRange): VideoRange {
-        val tracks = item?.asset?.tracksWithMediaType(AVMediaTypeVideo)
-        val track = tracks?.firstOrNull() as? AVAssetTrack
-        val desc = track?.formatDescriptions?.firstOrNull() as? CMFormatDescriptionRef
-        if (desc != null) {
-            val sub = CMFormatDescriptionGetMediaSubType(desc)
-            if (sub == fourCcDvh1 || sub == fourCcDvhe) return VideoRange.DOLBY_VISION
-            val ext = CMFormatDescriptionGetExtension(desc, kCMFormatDescriptionExtension_TransferFunction)
-            return transferToRange(ext) ?: VideoRange.SDR
-        }
-        // HLS: no video AVAssetTrack — read the decoded frame's transfer function off the video-output tap.
-        val output = videoOutput
-        val time = item?.currentTime()
-        val hasNew = output != null && time != null && output.hasNewPixelBufferForItemTime(time)
-        val buffer = when {
-            !hasNew || output == null || time == null -> null
-            else -> output.copyPixelBufferForItemTime(time, null)
-        }
-        val tf = buffer?.let { CVBufferGetAttachment(it, kCVImageBufferTransferFunctionKey, null) }
-        val range = if (buffer == null) fallback else (transferToRange(tf) ?: VideoRange.SDR)
-        buffer?.let { CVBufferRelease(it) }
-        return range
-    }
-
-    /** HDR range from a CoreVideo/CoreMedia transfer-function value, matched by string — pointer identity fails. */
-    private fun transferToRange(cf: COpaquePointer?): VideoRange? = when (cfStringValue(cf)) {
-        "SMPTE_ST_2084_PQ" -> VideoRange.HDR10
-        "ITU_R_2100_HLG" -> VideoRange.HLG
-        null -> null
-        else -> VideoRange.SDR
-    }
-
-    /** A CFString's value as a Kotlin string, or null. */
-    private fun cfStringValue(cf: COpaquePointer?): String? =
-        cf?.let { CFStringGetCStringPtr(it.reinterpret(), kCFStringEncodingUTF8)?.toKString() }
 
     // Maps the whole of AVPlayer/AVPlayerItem state onto one PlayerState in a single pass: status,
     // rate, buffering, seekable/loaded ranges, tracks and errors. The branch count mirrors the number
@@ -854,8 +787,9 @@ internal class AVPlayerEngine(
     // This suppression is a stopgap, not a claim that the function is irreducible. Three contiguous
     // blocks — the stall self-heal, the lazy track load, and the derived-event emission — are pure
     // code motion into private methods and would bring this well under the threshold. What is missing
-    // is a way to catch a regression: there is no iosTest source set and no CI, and a mistake here
-    // shows up as state flapping or unpaired BufferingStarted/Ended rather than a compile error.
+    // is a way to catch a regression: CI runs only the common tests on the simulator, nothing exercises
+    // this engine, and a mistake here shows up as state flapping or unpaired BufferingStarted/Ended
+    // rather than a compile error. An iOS test host unblocks it.
     // ShakaEngine.reconcile is deliberately the line-for-line mirror of this one, so refactor both
     // together or not at all.
     @Suppress("CyclomaticComplexMethod")
@@ -916,7 +850,7 @@ internal class AVPlayerEngine(
                 // which would otherwise flicker isLive=true for a tick.
                 isLive = itemReady && durationMs == null && item?.seekableTimeRanges?.isNotEmpty() == true,
                 isSeekable = itemReady,
-                videoRange = currentVideoRange(item, it.videoRange),
+                videoRange = videoRangeOf(item, videoOutput, it.videoRange),
             )
         }
 

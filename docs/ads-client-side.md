@@ -8,7 +8,7 @@ mirrors whatever the platform IMA SDK reports into `PlayerState.adState`.
 
 **It is implemented on Android and on Web only, and on Web only for Shaka (MSE) sources.
 `AdConfig.ClientSide` is silently ignored on iOS — no iOS code path reads `MediaItem.adConfig` — and
-silently ignored for progressive sources on Web (`ShakaEngine.kt:448-451`, `:466`). Setting it on
+silently ignored for progressive sources on Web (`ShakaEngine.kt`). Setting it on
 those paths produces no ad, no error and no log line: content simply plays.**
 
 Server-side ads are a completely separate mechanism with a separate API — see
@@ -37,7 +37,7 @@ Full per-platform capability claims live in
 ## Configuring an item
 
 `AdConfig` is a sealed interface in `dev.nonbinary.outis.core.ads`
-([`Ads.kt:15-45`](../core/src/commonMain/kotlin/dev/nonbinary/outis/core/ads/Ads.kt)):
+([`Ads.kt`](../core/src/commonMain/kotlin/dev/nonbinary/outis/core/ads/Ads.kt)):
 
 ```kotlin
 sealed interface AdConfig {
@@ -128,12 +128,12 @@ suspecting the integration.
 The web engine drives CSAI through Shaka's ad manager, which wraps the IMA HTML5 SDK. On a successful
 Shaka load of a `ClientSide` item it hands the ad manager its container and wires the ad events once per
 Player instance, then issues the request; Shaka rebuilds its IMA client for each asset itself
-(`ShakaEngine.requestClientSideAds`).
+(`ShakaAds.request`).
 
 Two requirements you will not discover from the API.
 
 **1. The host page must load `ima3.js`.** `shaka.ads` needs the global `google.ima`, and the engine
-constructs the request with `js("new google.ima.AdsRequest()")` (`ShakaEngine.requestClientSideAds`). Add the
+constructs the request with `js("new google.ima.AdsRequest()")` (`ShakaAds.request`). Add the
 script tag to your `index.html`:
 
 ```html
@@ -141,28 +141,28 @@ script tag to your `index.html`:
 ```
 
 Without it the ad path throws where it is called, inside the load success handler
-(`ShakaEngine.kt:466`). Nothing is surfaced as a `PlayerError`, so the symptom is content playing
+(`ShakaEngine.kt`). Nothing is surfaced as a `PlayerError`, so the symptom is content playing
 with no ads and an exception in the browser console.
 
 **2. The ad overlay has to sit above the Compose canvas.** The web surface draws the whole Compose UI
 into one `<canvas>` at `z-index: 1` over the `<video>` at `z-index: 0`
-(`PlayerSurface.js.kt:86`, `:138-146`). The engine creates its own ad-container `<div>`, appends
+(`PlayerSurface.js.kt`). The engine creates its own ad-container `<div>`, appends
 it to `document.body` and styles it `z-index: 2` with `pointer-events: none`
-(`ShakaEngine.kt:188`, `:235-242`). On every reconcile tick, while a break is active, it aligns the
+(`ShakaAds.kt`). On every reconcile tick, while a break is active, it aligns the
 div over the `<video>`, re-asserts `z-index: 2` — the surface's `raiseComposeHostsAbove` sets
 `z-index: 1` on *every* direct child of `body`, including this div — and flips `pointer-events` to
 `auto` so IMA's skip and click-through are reachable. Outside a break only `pointer-events` is set
-back to `none`; the geometry is left as it was (`ShakaEngine.kt:644-658`).
+back to `none`; the geometry is left as it was (`ShakaAds.sync`).
 
 The practical consequence: if your app renders its own DOM chrome above `z-index: 2`, it will cover
 IMA's ad UI.
 
 ### Progressive sources are not covered
 
-`requestClientSideAds` is only reached in the Shaka `load()` success handler
-(`ShakaEngine.kt:458-466`). Progressive sources — `MimeType.MP4`, any `.mp4`/`.webm` URL, and every
-`MediaSource.LocalFile` (`ShakaEngine.kt:1001-1010`) — take the native `<video>.src` branch and
-return before that point (`:448-451`). `AdConfig.ClientSide` on those is a silent no-op. If you need
+`ShakaAds.request` is only reached in the Shaka `load()` success handler
+(`ShakaEngine.kt`). Progressive sources — `MimeType.MP4`, any `.mp4`/`.webm` URL, and every
+`MediaSource.LocalFile` (`ShakaEngine.kt`) — take the native `<video>.src` branch and
+return before that point. `AdConfig.ClientSide` on those is a silent no-op. If you need
 web CSAI, deliver HLS or DASH.
 
 ---
@@ -212,9 +212,9 @@ ad plays.** Every field below is therefore a snapshot taken at ad start, not a l
 | `canSkip` | Always `false` | `isSkippable() && canSkipNow()` sampled once at ad start — so `false` for any ad with a non-zero skip offset, and it never flips |
 | `cuePoints` | Always empty | Always empty |
 
-Sources: `ExoPlayerEngine.kt:642-673` and `ShakaEngine.kt:595-637`.
+Sources: `ExoPlayerEngine.kt` and `ShakaAds.kt`.
 
-Inside `currentAd` (`Ad`, [`Ads.kt:74-100`](../core/src/commonMain/kotlin/dev/nonbinary/outis/core/ads/Ads.kt)):
+Inside `currentAd` (`Ad`, [`Ads.kt`](../core/src/commonMain/kotlin/dev/nonbinary/outis/core/ads/Ads.kt)):
 
 | `Ad` field | Android | Web |
 |---|---|---|
@@ -238,14 +238,14 @@ the ad's length.
 
 | Trigger | Android | Web |
 |---|---|---|
-| Content resume requested | Clears (`:648`) | Clears (`:603`) |
-| All ads completed | Clears (`:649`) | Clears (`:604`) |
-| Ad error | Not handled — only logged (`:626`); state clears when IMA subsequently requests content resume | Clears (`:605`) |
+| Content resume requested | Clears | Clears |
+| All ads completed | Clears | Clears |
+| Ad error | Not handled — only logged; state clears when IMA subsequently requests content resume | Clears |
 | `setMediaItem` for a new item | **Not cleared** | **Not cleared** |
 | `release()` | Player is gone | Player is gone |
 
-Neither engine resets `adState` in `setMediaItem` (`ExoPlayerEngine.kt:160-179`,
-`ShakaEngine.kt:404-414`), so a break that never reaches a resume or completion event leaves a stale
+Neither engine resets `adState` in `setMediaItem` (`ExoPlayerEngine.kt`,
+`ShakaEngine.kt`), so a break that never reaches a resume or completion event leaves a stale
 `adState` on the next item. If your chrome gates on `isInAdBreak`, clear or ignore it on
 `PlayerEvent.MediaItemTransition`.
 
@@ -253,9 +253,9 @@ Neither engine resets `adState` in `setMediaItem` (`ExoPlayerEngine.kt:160-179`,
 
 The Android engine deliberately freezes `positionMs` and `bufferedPositionMs` while
 `ExoPlayer.isPlayingAd` is true, because ExoPlayer reports ad time there and `PlayerState.positionMs`
-is defined as content time (`ExoPlayerEngine.kt:519-520`, `:553-560`). The web engine has no
+is defined as content time (`ExoPlayerEngine.kt`). The web engine has no
 equivalent guard — it writes `video.currentTime` unconditionally on every reconcile tick
-(`ShakaEngine.kt:866`) — so do not rely on `positionMs` during a web ad break.
+(`ShakaEngine.kt`) — so do not rely on `positionMs` during a web ad break.
 
 ---
 
