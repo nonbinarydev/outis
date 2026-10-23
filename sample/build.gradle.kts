@@ -105,6 +105,11 @@ kotlin {
     }
 
     sourceSets {
+        all {
+            languageSettings.optIn("dev.nonbinary.outis.ui.ExperimentalPlayerUiApi")
+            languageSettings.optIn("dev.nonbinary.outis.core.ExperimentalPlayerApi")
+        }
+
         val commonMain by getting {
             // Provider form so every compileKotlin* task depends on generation; a bare dir would race.
             kotlin.srcDir(generateSampleConfig.flatMap { it.outputDir })

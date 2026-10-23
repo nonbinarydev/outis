@@ -6,12 +6,15 @@
 
 package dev.nonbinary.outis.core.ads
 
+import dev.nonbinary.outis.core.ExperimentalPlayerApi
+
 /**
  * Ad-insertion config for a [dev.nonbinary.outis.core.source.MediaItem]. Server-side today (the
  * KMP-friendly path: the player just plays a normally-stitched stream and the SDK tracks cue-points over
  * it); a client-side (IMA/CSAI) variant — an ad-tag URL plus per-platform ad rendering — slots in beside
  * it later behind the same [AdState]/[AdEvent] contract.
  */
+@ExperimentalPlayerApi
 sealed interface AdConfig {
     /**
      * Server-side ad insertion. The stream is already stitched, so playback is unchanged; [breaks] are
@@ -45,6 +48,7 @@ sealed interface AdConfig {
 }
 
 /** One ad break (pod) beginning at [startMs] on the content timeline, made of one or more [ads]. */
+@ExperimentalPlayerApi
 data class AdBreak(
     /**
      * Stable identity of the break. **Must be unique within a session** — [AdController] keys its
@@ -71,6 +75,7 @@ data class AdBreak(
 }
 
 /** A single ad within an [AdBreak]. [skipOffsetMs] `null` => unskippable. */
+@ExperimentalPlayerApi
 data class Ad(
     /**
      * Creative identity (VAST ad id, MediaTailor `adId`, …). Used to detect ad transitions and as the
@@ -100,6 +105,7 @@ data class Ad(
 )
 
 /** Snapshot of ad playback, derived from the playhead by [AdController]. */
+@ExperimentalPlayerApi
 data class AdState(
     /**
      * `true` while the playhead sits inside an unwatched break. **This, not [currentAd] being non-`null`,
@@ -129,6 +135,7 @@ data class AdState(
 )
 
 /** Ad lifecycle events — for analytics/QoS adapters (PAL, OMID, Mux) to observe uniformly per platform. */
+@ExperimentalPlayerApi
 sealed interface AdEvent {
     /**
      * The playhead entered a break. Always followed immediately by an [AdStarted] for its first ad.
@@ -187,6 +194,7 @@ sealed interface AdEvent {
 }
 
 /** Progress thresholds reported by [AdEvent.Quartile]. */
+@ExperimentalPlayerApi
 enum class AdQuartile {
     /** 25% of [Ad.durationMs] elapsed. */
     FIRST,

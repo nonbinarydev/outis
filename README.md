@@ -56,9 +56,9 @@ Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo
 The DRM split is the unavoidable one: Widevine has no CDM on Apple platforms, FairPlay is Apple-only. SSAI is
 *app-driven*: no engine reads `AdConfig.ServerSide` — the stitched stream plays unchanged and you drive the shared
 `AdController`. On web the shared Compose overlay composites over the engine's `<video>` rather than falling back to
-native controls ([how](docs/ui.md#web-surface)). **Not yet:** video-rendition (quality) selection — `currentTrack` and
-`availableTracks` are reserved and never populated, so the track-selection row means audio and subtitles only; cap the
-ladder with `MediaItem.videoConstraints`. Full per-platform behaviour, gaps and target sets → **[docs/platform-support.md](docs/platform-support.md)**.
+native controls ([how](docs/ui.md#web-surface)). Video quality is the engine's to adapt — cap the ladder with
+`MediaItem.videoConstraints` — while alternate *versions* of a programme (a remaster beside an original) are selectable
+`videoTracks` on Android and web. Full per-platform behaviour, gaps and target sets → **[docs/platform-support.md](docs/platform-support.md)**.
 
 ## Requirements
 

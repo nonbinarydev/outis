@@ -6,9 +6,6 @@
 
 package dev.nonbinary.outis.core.source
 
-import kotlinx.collections.immutable.ImmutableMap
-import kotlinx.collections.immutable.persistentMapOf
-
 /**
  * DRM parameters for a [MediaItem].
  *
@@ -55,12 +52,12 @@ data class DrmConfig(
      * (Shaka `clearKeys`) and **iOS** (`AVContentKeySystemClearKey`, **HLS only** — AVPlayer has no DASH,
      * so an iOS Clear Key item must be an HLS source).
      */
-    val clearKeys: ImmutableMap<String, String> = persistentMapOf(),
+    val clearKeys: Map<String, String> = emptyMap(),
     /**
      * Extra headers on the license request (e.g. an auth token). Honoured on Android, Web and
      * iOS (FairPlay SPC POST).
      */
-    val licenseRequestHeaders: ImmutableMap<String, String> = persistentMapOf(),
+    val licenseRequestHeaders: Map<String, String> = emptyMap(),
     /** Allow multiple concurrent key sessions — some live / key-rotating streams require it (Android only). */
     val multiSession: Boolean = false,
     /**

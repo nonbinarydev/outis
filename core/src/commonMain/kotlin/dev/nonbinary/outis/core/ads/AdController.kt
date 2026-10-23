@@ -6,6 +6,7 @@
 
 package dev.nonbinary.outis.core.ads
 
+import dev.nonbinary.outis.core.ExperimentalPlayerApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -43,6 +44,7 @@ private val QUARTILE_THRESHOLDS = listOf(
  * // chrome: disable the scrubber while ads.state.isInAdBreak; route seeks via ads.resolveSeek(from, to)
  * ```
  */
+@ExperimentalPlayerApi
 class AdController(breaks: List<AdBreak>) {
     private val breaks = breaks.sortedBy { it.startMs }.toMutableList()
     private val watched = mutableSetOf<String>()

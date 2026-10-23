@@ -7,6 +7,7 @@
 package dev.nonbinary.outis.ui.window
 
 import androidx.compose.runtime.Immutable
+import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 
 /**
  * Host-owned window state for fullscreen + Picture-in-Picture. The player library never owns the
@@ -27,6 +28,7 @@ import androidx.compose.runtime.Immutable
  * Activity for you. On iOS/web the host implements the same callbacks
  * (`AVPictureInPictureController` / `requestPictureInPicture()` + `requestFullscreen()`).
  */
+@ExperimentalPlayerUiApi
 @Immutable
 data class PlayerWindow(
     /**

@@ -74,40 +74,49 @@ player.setMediaItem(
 
 ## Android
 
-You add no dependency: `outis-core` already declares `media3-exoplayer-ima`
-(`core/build.gradle.kts:105`) and it reaches your app transitively.
+You add no dependency: `outis-core` already declares `media3-exoplayer-ima` and it reaches your app
+transitively.
 
 On `setMediaItem`, when the item carries a `ClientSide` config, the engine builds an `ImaAdsLoader`
 once and binds it to the ExoPlayer instance *before* the ad media source is set — Media3's required
-order (`ExoPlayerEngine.kt:220`, `:623-633`). The tag rides on the Media3 `MediaItem` as an
-`AdsConfiguration` (`:717-721`), and the loader plus the ad view are handed to the media-source
-factory via `setLocalAdInsertionComponents` (`:254-256`). On `release()` the loader is unbound and
-released (`:329-334`).
+order (`ExoPlayerEngine.bindImaAdsLoader`). The tag rides on the Media3 `MediaItem` as an
+`AdsConfiguration`, and the loader plus the ad view are handed to the media-source factory via
+`setLocalAdInsertionComponents` (`ExoPlayerEngine.buildMediaSource`). On `release()` the loader is
+unbound and released.
 
 ### The ad view
 
 IMA renders its own skip button, countdown and click-through affordance, and it needs a `ViewGroup`
-to render them into. The engine takes one through a Media3 `AdViewProvider`:
+laid over the video to render them into. The engine takes one through:
 
 ```kotlin
-// androidMain, package dev.nonbinary.outis.core
-fun VideoPlayer.setAdViewProvider(provider: AdViewProvider?)
+// androidMain, package dev.nonbinary.outis.core.ads
+@ExperimentalPlayerApi
+fun VideoPlayer.setAdContainer(container: ViewGroup?, obstructions: List<AdObstruction> = emptyList())
+
+@ExperimentalPlayerApi
+class AdObstruction(val view: View, val purpose: Purpose, val reason: String? = null) {
+    enum class Purpose { CONTROLS, CLOSE_AD, OTHER, NOT_VISIBLE }
+}
 ```
 
-If you use `:ui`, this is already done: `PlayerSurface` hands its Media3 `PlayerView` — which
-implements `AdViewProvider` — to the engine on attach and clears it on release
-(`PlayerSurface.android.kt:66`, `:76`).
+`obstructions` are the views drawn over the video — your controls, a close button — that IMA's
+Open Measurement viewability check should treat as friendly rather than count against the ad.
 
-If you are on `:core` only, you must call it yourself with your own `PlayerView`, and you must
-declare `androidx.media3:media3-ui` (or at minimum `media3-common`, for the `AdViewProvider` type) in
-your own build: `:core` declares Media3 with `implementation`, not `api`, so none of those types are
-on your compile classpath. Until a provider is set the engine substitutes an unattached `FrameLayout`
-(`ExoPlayerEngine.kt:677-682`), so ad media still plays but IMA's ad UI has nowhere to appear.
+If you use `:ui`, this is already done: `PlayerSurface` registers its Media3 `PlayerView`'s ad view
+group and overlay views on attach and clears them on release (`PlayerSurface.android.kt`).
+
+If you are on `:core` only, call it yourself with a `ViewGroup` from your own layout. You need no
+Media3 dependency to do so: the bridge takes only Android framework types and Outis's own
+`AdObstruction`. Until a container is set the engine substitutes an unattached `FrameLayout`, so ad
+media still plays but IMA's ad UI has nowhere to appear.
+
+Both are `@ExperimentalPlayerApi` (see [Opting in](ui.md#opting-in)) — they may change before 1.0.
 
 ### Ad errors
 
 The engine's IMA error listener only logs, under the Logcat tag `PlayerIMA`
-(`ExoPlayerEngine.kt:626`, `:695`). An ad failure never becomes a `PlayerError` and never appears on
+(`ExoPlayerEngine.bindImaAdsLoader`). An ad failure never becomes a `PlayerError` and never appears on
 `PlayerState.error` or the `events` stream on any platform — content plays on. If ad requests fail on
 a machine where they work elsewhere, check for network-level filtering of the ad host before
 suspecting the integration.
@@ -163,21 +172,20 @@ web CSAI, deliver HLS or DASH.
 No IMA adapter ships. `AVPlayerEngine` never reads `MediaItem.adConfig`, so setting
 `AdConfig.ClientSide` does nothing at all on iOS today.
 
-What does exist is the seam an adapter would need — three public functions in
-`dev.nonbinary.outis.core` (`AVPlayerEngine.kt:873`, `:883`, `:888`), each a no-op on any player that
-is not the AVPlayer engine:
+What does exist is the seam an adapter would need — three `@ExperimentalPlayerApi` functions in
+`dev.nonbinary.outis.core.ads` (`AdContainer.ios.kt`), each a no-op on any player that is not the
+AVPlayer engine:
 
 ```kotlin
-fun VideoPlayer.updateAdState(adState: AdState?)              // push ad state into PlayerState.adState
+fun VideoPlayer.setAdState(adState: AdState?)                 // push ad state into PlayerState.adState
 fun VideoPlayer.setAdContainer(controller: UIViewController?) // register the hosting view controller
 fun VideoPlayer.adContainer(): UIViewController?              // read it back to anchor IMA's ad UI
 ```
 
 `:ui` already registers the surface: `PlayerSurface` calls `setAdContainer(controller)` with its
-`AVPlayerViewController` on attach and `setAdContainer(null)` on release
-(`PlayerSurface.ios.kt:65`, `:75`), so an adapter can read `player.adContainer()` for both the
-container view and the presenting view controller. The content `AVPlayer` is reachable through
-`player.nativePlayerHandle`.
+`AVPlayerViewController` on attach and `setAdContainer(null)` on release (`PlayerSurface.ios.kt`),
+so an adapter can read `player.adContainer()` for both the container view and the presenting view
+controller. The content `AVPlayer` is reachable through `player.nativePlayerHandle`.
 
 Writing the coordinator means adding the Kotlin CocoaPods plugin and the
 `GoogleAds-IMA-iOS-SDK` pod to *your* module (not `:core`), then driving IMA's content pause/resume

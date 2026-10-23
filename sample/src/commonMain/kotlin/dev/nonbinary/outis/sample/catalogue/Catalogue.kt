@@ -14,8 +14,6 @@ import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
 import dev.nonbinary.outis.sample.CUSTOM_STREAM_ID
-import kotlinx.collections.immutable.persistentMapOf
-import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -98,7 +96,7 @@ fun CatalogueItem.toMediaItem(startMuted: Boolean = false, series: String? = nul
             scheme = it.scheme,
             licenseServerUrl = it.licenseServerUrl,
             certificateUrl = it.certificateUrl,
-            clearKeys = it.keys?.toImmutableMap() ?: persistentMapOf(),
+            clearKeys = it.keys.orEmpty(),
         )
     },
     chaptersUrl = chaptersUrl,

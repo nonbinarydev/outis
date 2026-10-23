@@ -26,8 +26,6 @@ import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
 import kotlinx.browser.document
 import kotlinx.browser.window
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -436,10 +434,10 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 isLive = false, isSeekable = false, videoSize = null,
                 playWhenReady = autoPlay, isMuted = item.startMuted || it.isMuted,
                 playbackState = PlaybackState.BUFFERING,
-                audioTracks = persistentListOf(), textTracks = persistentListOf(),
-                selectedAudioTrackId = null, selectedTextTrackId = null,
-                chapters = persistentListOf(),
-                thumbnails = persistentListOf(),
+                audioTracks = emptyList(), textTracks = emptyList(), videoTracks = emptyList(),
+                selectedAudioTrackId = null, selectedTextTrackId = null, selectedVideoTrackId = null,
+                chapters = emptyList(),
+                thumbnails = emptyList(),
             )
         }
         emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
@@ -450,7 +448,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
             scope.launch {
                 val chapters = loadSidecarChapters(sidecar)
                 if (!released && generation == loadGeneration && chapters.isNotEmpty()) {
-                    _state.update { it.copy(chapters = chapters.toPersistentList()) }
+                    _state.update { it.copy(chapters = chapters.toList()) }
                 }
             }
         }
@@ -459,7 +457,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
             scope.launch {
                 val thumbs = loadThumbnails(sidecar)
                 if (!released && generation == loadGeneration && thumbs.isNotEmpty()) {
-                    _state.update { it.copy(thumbnails = thumbs.toPersistentList()) }
+                    _state.update { it.copy(thumbnails = thumbs.toList()) }
                 }
             }
         }
@@ -651,8 +649,9 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 playbackState = PlaybackState.IDLE, isPlaying = false, playWhenReady = false,
                 mediaItem = null, positionMs = 0, bufferedPositionMs = 0, durationMs = null,
                 isLive = false, isSeekable = false, pendingSeekTargetMs = null, videoSize = null, error = null,
-                audioTracks = persistentListOf(), textTracks = persistentListOf(),
-                selectedAudioTrackId = null, selectedTextTrackId = null,
+                audioTracks = emptyList(), textTracks = emptyList(), videoTracks = emptyList(),
+                selectedAudioTrackId = null, selectedTextTrackId = null, selectedVideoTrackId = null,
+                chapters = emptyList(), thumbnails = emptyList(),
             )
         }
     }
@@ -777,7 +776,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 if (_state.value.selectedTextTrackId == null) shakaPlayer.selectTextTrack(null)
                 _state.update { st ->
                     st.copy(
-                        audioTracks = st.audioTracks.map { it.copy(isSelected = it.id == track.id) }.toPersistentList(),
+                        audioTracks = st.audioTracks.map { it.copy(isSelected = it.id == track.id) },
                         selectedAudioTrackId = track.id,
                     )
                 }
@@ -787,7 +786,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 shakaPlayer.selectTextTrack(shakaTrack)
                 _state.update { st ->
                     st.copy(
-                        textTracks = st.textTracks.map { it.copy(isSelected = it.id == track.id) }.toPersistentList(),
+                        textTracks = st.textTracks.map { it.copy(isSelected = it.id == track.id) },
                         selectedTextTrackId = track.id,
                     )
                 }
@@ -796,7 +795,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
             TrackType.VIDEO -> videoSelectionById[track.id]?.let { selectRendition(track.id, it) }
         }
         // The variantchanged/textchanged events re-emit the authoritative lists; the above is optimistic.
-        emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
+        emit { p, t -> _state.value.tracksChanged(p, t) }
     }
 
     override fun clearTextTrack() {
@@ -804,11 +803,11 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         if (usingShaka) shakaPlayer.selectTextTrack(null)
         _state.update { st ->
             st.copy(
-                textTracks = st.textTracks.map { it.copy(isSelected = false) }.toPersistentList(),
+                textTracks = st.textTracks.map { it.copy(isSelected = false) },
                 selectedTextTrackId = null,
             )
         }
-        emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
+        emit { p, t -> _state.value.tracksChanged(p, t) }
     }
 
     /**
@@ -1046,7 +1045,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         if (_state.value.selectedTextTrackId == null) shakaPlayer.selectTextTrack(null)
         _state.update { st ->
             st.copy(
-                videoTracks = st.videoTracks.map { it.copy(isSelected = it.id == trackId) }.toPersistentList(),
+                videoTracks = st.videoTracks.map { it.copy(isSelected = it.id == trackId) },
                 selectedVideoTrackId = trackId,
             )
         }
@@ -1151,15 +1150,15 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
 
         _state.update {
             it.copy(
-                audioTracks = audio.toPersistentList(),
-                textTracks = text.toPersistentList(),
-                videoTracks = video.toPersistentList(),
+                audioTracks = audio.toList(),
+                textTracks = text.toList(),
+                videoTracks = video.toList(),
                 selectedAudioTrackId = audio.firstOrNull { t -> t.isSelected }?.id,
                 selectedTextTrackId = text.firstOrNull { t -> t.isSelected }?.id,
                 selectedVideoTrackId = video.firstOrNull { t -> t.isSelected }?.id,
             )
         }
-        emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
+        emit { p, t -> _state.value.tracksChanged(p, t) }
     }
 
     private fun onShakaError(detail: dynamic) {

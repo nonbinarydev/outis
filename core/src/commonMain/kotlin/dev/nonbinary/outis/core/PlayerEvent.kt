@@ -8,7 +8,6 @@ package dev.nonbinary.outis.core
 
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.track.MediaTrack
-import kotlinx.collections.immutable.ImmutableList
 
 /**
  * One-shot player events.
@@ -190,19 +189,25 @@ sealed interface PlayerEvent {
         override val elapsedRealtimeMs: Long,
     ) : PlayerEvent
 
-    /** The available audio/text tracks (or the current selection) changed. */
+    /** The available audio, text or video tracks (or the current selection) changed. */
     data class TracksChanged(
         /**
          * Every selectable audio track, in engine order. Empty when the engine exposes no
          * selectable alternatives, which is **not** the same as the asset having no audio.
          */
-        val audioTracks: ImmutableList<MediaTrack>,
+        val audioTracks: List<MediaTrack>,
         /** Every selectable subtitle/caption track, in engine order; empty when the asset has none. */
-        val textTracks: ImmutableList<MediaTrack>,
+        val textTracks: List<MediaTrack>,
+        /** Alternate video renditions, as [PlayerState.videoTracks] describes them; usually empty. */
+        val videoTracks: List<MediaTrack>,
         override val positionMs: Long,
         override val elapsedRealtimeMs: Long,
     ) : PlayerEvent
 }
+
+/** A [PlayerEvent.TracksChanged] carrying this state's three track lists. */
+internal fun PlayerState.tracksChanged(positionMs: Long, elapsedRealtimeMs: Long): PlayerEvent.TracksChanged =
+    PlayerEvent.TracksChanged(audioTracks, textTracks, videoTracks, positionMs, elapsedRealtimeMs)
 
 /** Why [PlayerEvent.PlaybackRecovered] fired. */
 enum class RecoveryReason {

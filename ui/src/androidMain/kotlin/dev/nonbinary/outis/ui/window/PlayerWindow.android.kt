@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.PictureInPictureModeChangedInfo
 import androidx.core.util.Consumer
 import dev.nonbinary.outis.core.VideoPlayer
+import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import dev.nonbinary.outis.ui.PlayerSurfaceBounds
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -49,6 +50,7 @@ private const val MIN_PIP_ASPECT_RATIO = 1.0 / MAX_PIP_ASPECT_RATIO
  * The host still must declare `android:supportsPictureInPicture="true"` and the appropriate
  * `android:configChanges` on its Activity — a library cannot inject those.
  */
+@ExperimentalPlayerUiApi
 @Composable
 fun rememberPlayerWindow(
     player: VideoPlayer,

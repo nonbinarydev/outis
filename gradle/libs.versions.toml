@@ -27,7 +27,6 @@ coil = "3.5.0"
 dokka = "2.2.0"
 ktlint = "14.2.0"
 guava = "33.6.0-android" # matches the Guava that Media3 resolves; declared so the IDE sees Tracks' ImmutableList
-kotlinx-collections-immutable = "0.5.1"
 kotlinxCoroutines = "1.11.0"
 kotlinxDatetime = "0.8.0"
 kotlinxSerializationJson = "1.11.0"
@@ -43,7 +42,6 @@ detekt-formatting = { module = "io.gitlab.arturbosch.detekt:detekt-formatting", 
 detekt-compose = { module = "io.nlopez.compose.rules:detekt", version.ref = "detektCompose" }
 detekt-compose2 = { module = "ru.kode:detekt-rules-compose", version.ref = "detektCompose2" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
-kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }

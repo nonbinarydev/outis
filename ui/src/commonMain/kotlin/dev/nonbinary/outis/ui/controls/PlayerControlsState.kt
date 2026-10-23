@@ -22,7 +22,7 @@ import dev.nonbinary.outis.core.VideoRange
 import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.track.MediaTrack
-import kotlinx.collections.immutable.ImmutableList
+import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import kotlinx.coroutines.delay
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -43,6 +43,7 @@ import kotlin.time.Duration.Companion.seconds
  * Create with [rememberPlayerControlsState]; hoist and pass to building blocks for the "controls
  * beside the video" pattern.
  */
+@ExperimentalPlayerUiApi
 @Stable
 class PlayerControlsState internal constructor(
     /**
@@ -136,16 +137,16 @@ class PlayerControlsState internal constructor(
     val error: PlayerError? get() = snapshot.error
 
     /** Selectable audio renditions; empty until the manifest/container has been parsed. */
-    val audioTracks: ImmutableList<MediaTrack> get() = snapshot.audioTracks
+    val audioTracks: List<MediaTrack> get() = snapshot.audioTracks
 
     /** Selectable subtitle/caption tracks; empty until parsed, and empty for assets that carry none. */
-    val textTracks: ImmutableList<MediaTrack> get() = snapshot.textTracks
+    val textTracks: List<MediaTrack> get() = snapshot.textTracks
 
     /** Chapter markers for the current media, sorted by start; empty when the asset carries none. */
-    val chapters: ImmutableList<Chapter> get() = snapshot.chapters
+    val chapters: List<Chapter> get() = snapshot.chapters
 
     /** Trickplay seek-preview thumbnails, sorted by start; empty when the asset carries none. */
-    val thumbnails: ImmutableList<ThumbnailCue> get() = snapshot.thumbnails
+    val thumbnails: List<ThumbnailCue> get() = snapshot.thumbnails
 
     /** Colour/dynamic range of the current video rendition; [VideoRange.SDR] until an HDR track is selected. */
     val videoRange: VideoRange get() = snapshot.videoRange
@@ -157,7 +158,7 @@ class PlayerControlsState internal constructor(
     val selectedTextTrackId: String? get() = snapshot.selectedTextTrackId
 
     /** Alternate video renditions of the same content; empty unless the manifest offers a real choice. */
-    val videoTracks: ImmutableList<MediaTrack> get() = snapshot.videoTracks
+    val videoTracks: List<MediaTrack> get() = snapshot.videoTracks
 
     /** [MediaTrack.id] of the active video rendition, or `null` before the engine reports one. */
     val selectedVideoTrackId: String? get() = snapshot.selectedVideoTrackId
@@ -256,6 +257,7 @@ class PlayerControlsState internal constructor(
 }
 
 /** Remember a [PlayerControlsState] for [player], collecting its state and running auto-hide. */
+@ExperimentalPlayerUiApi
 @Composable
 fun rememberPlayerControlsState(
     player: VideoPlayer,

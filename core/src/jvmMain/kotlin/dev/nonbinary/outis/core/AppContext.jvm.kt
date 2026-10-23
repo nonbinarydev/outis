@@ -7,5 +7,4 @@
 package dev.nonbinary.outis.core
 
 /** JVM [AppContext] — API/test-only target; no context data needed. */
-@Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 actual class AppContext

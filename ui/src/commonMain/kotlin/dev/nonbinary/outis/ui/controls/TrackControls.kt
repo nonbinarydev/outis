@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
-import kotlinx.collections.immutable.ImmutableList
 
 private fun trackLabel(track: MediaTrack): String = track.label ?: track.language ?: track.id
 
@@ -123,7 +122,7 @@ fun AudioButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
 @ExperimentalPlayerUiApi
 @Composable
 fun TrackList(
-    tracks: ImmutableList<MediaTrack>,
+    tracks: List<MediaTrack>,
     selectedId: String?,
     onSelect: (MediaTrack) -> Unit,
     modifier: Modifier = Modifier,

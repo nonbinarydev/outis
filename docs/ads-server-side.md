@@ -12,6 +12,9 @@ Outis ships that bookkeeping as `AdController`, in `dev.nonbinary.outis.core.ads
 in `commonMain`, it does no I/O, it touches no engine, and it behaves identically on Android, iOS and
 Web — because it never talks to any of them.
 
+Everything on this page is `@ExperimentalPlayerApi`, a warning-level opt-in (see
+[Opting in](ui.md#opting-in)): the ad model is the part of `:core` expected to change shape before 1.0.
+
 ## The SDK does not drive SSAI for you
 
 This is the first thing to understand and the easiest thing to get wrong.
@@ -404,10 +407,7 @@ implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 ```
 
 You do **not** need `kotlinx-serialization` — the parsers take and return ordinary Kotlin types, and
-the JSON dependency is internal to `:core`. You will need
-`kotlinx-collections-immutable` if you construct a `MediaItem` with non-empty `headers`, for the same
-`implementation`-scoping reason (`core/build.gradle.kts:81`). See
-[platform support](platform-support.md) for the full list.
+the JSON dependency is internal to `:core`.
 
 ## Checklist
 

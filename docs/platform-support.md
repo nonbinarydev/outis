@@ -74,41 +74,13 @@ drop the extra targets.
   engine creates its `<video>` element with `document.createElement` (`ShakaEngine.kt:179`), so it
   cannot run headless under Node.
 
-### Transitive dependencies you must declare yourself
+### Transitive dependencies
 
-`:core` declares `kotlinx-coroutines-core` and `kotlinx-collections-immutable` with
-`implementation(...)`, not `api(...)` (`core/build.gradle.kts:79-88`). Both appear in the **public**
-API signature:
-
-- `VideoPlayer.state: StateFlow<PlayerState>` and `VideoPlayer.events: SharedFlow<PlayerEvent>`
-  (`VideoPlayer.kt:36,42`) — kotlinx-coroutines.
-- `PlayerState.audioTracks` / `textTracks` / `chapters` / `availableTracks`, all
-  `ImmutableList<…>` (`PlayerState.kt:99,112,117,132`); `PlayerEvent.TracksChanged`'s two lists
-  (`PlayerEvent.kt:199,201`); `MediaItem.headers: ImmutableMap<String, String>`
-  (`MediaItem.kt:36`); `DrmConfig.licenseRequestHeaders: ImmutableMap<String, String>`
-  (`DrmConfig.kt:49`) — kotlinx-collections-immutable.
-
-An implementation-scoped dependency is not on a consumer's compile classpath, so until this is
-changed to `api(...)` you must add both to your own build. Without them you cannot collect `state`,
-and you cannot construct the `persistentMapOf(...)` value that `MediaItem.headers` or
-`DrmConfig.licenseRequestHeaders` require.
-
-```kotlin
-// build.gradle.kts — your shared module
-commonMain.dependencies {
-    implementation("io.github.nonbinarydev:outis-core:0.1.0-alpha01")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.1")
-}
-```
-
-`:ui` has the same issue for `kotlinx-collections-immutable`: it is `implementation`-scoped there too
-(`ui/build.gradle.kts:65`), and `TrackList` takes an `ImmutableList<MediaTrack>` as its first
-parameter (`TrackControls.kt:125-131`). `:ui` does declare `api(project(":core"))`
-(`ui/build.gradle.kts:58`), so taking `outis-ui` brings `outis-core` with it.
-
-This is a packaging defect, not a design choice. Expect the scopes to change before 1.0; the
-declarations above are harmless once they do.
+`:core` declares `kotlinx-coroutines-core` as `api`, because `VideoPlayer.state` and `.events` are a
+`StateFlow` and a `SharedFlow`, so it reaches your compile classpath with `outis-core`. Nothing else
+needs declaring: the model's collections are plain `List` and `Map`
+([ADR-0008](decisions/0008-public-collections-are-plain-list-and-map.md)). `:ui` declares
+`api(project(":core"))`, so taking `outis-ui` brings `outis-core` with it.
 
 ---
 
@@ -181,10 +153,10 @@ endpoint fails there.
 |---|---|
 | `videoSize` | **Android only.** The iOS and web engines always write `null` (`PlayerState.kt:80-84`). Never gate layout on it. |
 | `bufferedPositionMs` | On iOS it is set to `positionMs` — a v1 approximation, not a real buffer level (`AVPlayerEngine.kt:759`). A buffer-ahead indicator reads permanently zero there. It is also an **absolute timeline position** on every platform, not a duration ahead of `positionMs` (`PlayerState.kt:38-44`). |
-| `chapters` | Android and iOS only, both parsing the local container. Always empty on web. Populated **asynchronously**, as a second state emission after load (`ExoPlayerEngine.kt:610`, `AVPlayerEngine.kt:605`). |
+| `chapters` | From the `chaptersUrl` WebVTT sidecar on all three engines, streams included; otherwise parsed from a local MP4/Matroska container on Android and iOS. Populated **asynchronously**, as a second state emission after load. |
 | `audioTracks`, `textTracks` | Populated on all three engines for adaptive streams. On web, a **progressive** source leaves both empty: `loadTracks()` runs only on the Shaka branch (`ShakaEngine.kt:462`) and from Shaka's own track events (`ShakaEngine.kt:349-351`), neither of which happens for native `<video>` playback. Any local file on web is progressive, so its audio and subtitle controls are inert. |
 | `adState` | Written by the Android and web engines for client-side ads only (`ExoPlayerEngine.kt:645-649`, `ShakaEngine.kt:597-602`). Never written on iOS by the SDK; `AVPlayerEngine.kt:367` exists solely for a host-supplied IMA adapter to push into. |
-| `currentTrack`, `availableTracks` | **Never written on any platform.** Reserved slots for video-rendition (quality) selection, which is not implemented. Audio and text track selection *is* implemented everywhere — these two fields are about video renditions only. |
+| `videoTracks` | Alternate renditions of the programme (a remaster beside an original), not the bitrate ladder. Reported on Android (one per DASH adaptation set) and web (labelled video streams); **never written on iOS**. Empty unless the manifest offers two or more labelled renditions. |
 
 ### Events
 
@@ -196,8 +168,8 @@ the three platforms. See [Analytics, QoS and the plugin seam](analytics.md).
 ### Ads
 
 - **Client-side (IMA):** Android and web. On iOS `AdConfig.ClientSide` is silently ignored; the
-  engine exposes `setAdContainer` / `updateAdState` (`AVPlayerEngine.kt:371,883`) so a host-written
-  IMA coordinator can drive ads, but no such coordinator ships.
+  engine exposes `setAdContainer` / `setAdState` (`AdContainer.ios.kt`) so a host-written IMA
+  coordinator can drive ads, but no such coordinator ships.
 - **Server-side (SSAI):** platform-agnostic and engine-independent, because no engine reads
   `AdConfig.ServerSide` at all. `AdController` is a class your app constructs and feeds. It works
   identically on every target that has an engine, because it does not touch one.

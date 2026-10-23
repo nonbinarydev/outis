@@ -51,12 +51,6 @@ kotlin {
         commonMain.dependencies {
             implementation("io.github.nonbinarydev:outis-core:0.1.0-alpha01")
             implementation("io.github.nonbinarydev:outis-ui:0.1.0-alpha01") // optional Compose chrome
-
-            // outis-core scopes these implementation() (core/build.gradle.kts:80-81) but both appear
-            // in its public API — StateFlow<PlayerState>, ImmutableMap<String, String> on
-            // MediaItem.headers — so declare them yourself or your own code will not compile.
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.1")
         }
     }
 }

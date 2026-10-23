@@ -61,7 +61,6 @@ import dev.nonbinary.outis.sample.diagnostics.DiagnosticsLog
 import dev.nonbinary.outis.sample.generated.SampleConfig
 import dev.nonbinary.outis.sample.generated.resources.Res
 import dev.nonbinary.outis.sample.generated.resources.outis_lockup
-import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import dev.nonbinary.outis.ui.PlayerView
 import dev.nonbinary.outis.ui.controls.DefaultControls
 import org.jetbrains.compose.resources.painterResource
@@ -102,7 +101,6 @@ fun App(appContext: AppContext, modifier: Modifier = Modifier) {
     }
 }
 
-@OptIn(ExperimentalPlayerUiApi::class)
 @Composable
 private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
     val player = remember { VideoPlayer(appContext) }

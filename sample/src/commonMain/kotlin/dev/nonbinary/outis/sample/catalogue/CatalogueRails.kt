@@ -31,8 +31,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
-import coil3.compose.AsyncImage
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import dev.nonbinary.outis.sample.containerCaveat
 import dev.nonbinary.outis.sample.drmSchemeCaveat
 

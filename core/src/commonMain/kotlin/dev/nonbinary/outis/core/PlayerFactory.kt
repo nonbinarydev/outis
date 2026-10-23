@@ -9,8 +9,8 @@ package dev.nonbinary.outis.core
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 
 /**
- * Construction-time configuration. Deliberately small and additive — new knobs arrive with
- * defaults so adding one never breaks callers.
+ * Construction-time configuration. New knobs arrive with defaults, so existing call sites keep
+ * compiling; before 1.0 a release that adds one still needs a recompile, and the CHANGELOG says so.
  */
 data class PlayerConfig(
     /**
@@ -164,5 +164,8 @@ data class BufferConfig(
 fun VideoPlayer(context: AppContext, config: PlayerConfig = PlayerConfig()): VideoPlayer =
     createPlatformPlayer(context, config)
 
-/** Per-platform construction. Actuals land with each engine (PR2 Android, PR4 iOS, PR5 Web). */
+/** Per-platform construction: the Media3, AVFoundation or Shaka engine. */
 internal expect fun createPlatformPlayer(context: AppContext, config: PlayerConfig): VideoPlayer
+
+/** The platform engine behind this player, for the platform bridges that reach past the common API. */
+internal val VideoPlayer.engine: VideoPlayer get() = this

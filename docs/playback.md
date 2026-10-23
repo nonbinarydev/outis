@@ -100,13 +100,13 @@ you care about deliberately. **iOS (AVPlayer)** maps only
 player.setMediaItem(item, autoPlay = true)   // prepare is folded in; starts when ready if autoPlay
 ```
 
-A `MediaItem` describes **what** to play. All fourteen parameters, in declaration order:
+A `MediaItem` describes **what** to play. All seventeen parameters, in declaration order:
 
 ```kotlin
 data class MediaItem(
     val source: MediaSource,                                            // required
     val mimeType: MimeType? = null,                                     // null => infer from the URL extension
-    val headers: ImmutableMap<String, String> = persistentMapOf(),
+    val headers: Map<String, String> = emptyMap(),                      // manifest/segment requests
     val drmConfig: DrmConfig? = null,                                   // see drm.md
     val videoConstraints: VideoConstraints? = null,                     // see §7
     // ----- load-time defaults (applied before first frame) -----
@@ -114,18 +114,19 @@ data class MediaItem(
     val preferredTextLanguage: String? = null,                          // BCP-47, e.g. "en"
     val captionsDefault: CaptionsDefaultMode = CaptionsDefaultMode.OFF, // OFF / ON / FOLLOW_SYSTEM
     val startPositionMs: Long? = null,                                  // resume / deep-link
-    val startMuted: Boolean = false,                                    // required for Web autoplay
+    val startMuted: Boolean = false,                                    // a muted start by design; web retries muted itself
     val loop: Boolean = false,                                          // restart at end; ignored for live
     // -----
     val adConfig: AdConfig? = null,                                     // see ads-client-side.md / ads-server-side.md
     val metadata: MediaMetadata? = null,                                // title/subtitle/artwork for overlays
     val chapterThumbnails: Boolean = false,                             // see local-files.md
+    val chaptersUrl: String? = null,                                    // WebVTT chapters sidecar, any engine
+    val thumbnailsUrl: String? = null,                                  // WebVTT trickplay sidecar, any engine
+    val analytics: PlaybackMetadata? = null,                            // see analytics.md
 )
 ```
 
-`headers` is an `ImmutableMap` from `kotlinx.collections.immutable`. `:core` declares that dependency
-as `implementation`, not `api`, so you must add `kotlinx-collections-immutable` to your own build
-before you can call `persistentMapOf` — see [troubleshooting.md](troubleshooting.md).
+`headers` is a plain `Map`, so `mapOf("Authorization" to "Bearer $token")` is all it takes.
 
 ### Source and container
 
@@ -169,7 +170,7 @@ player.setMediaItem(
     MediaItem(
         source = MediaSource.Url("https://cdn.example.com/live/master.m3u8"),
         mimeType = MimeType.HLS,
-        headers = persistentMapOf("Authorization" to "Bearer $token"),
+        headers = mapOf("Authorization" to "Bearer $token"),
         metadata = MediaMetadata(title = "Channel 1", subtitle = "Live"),
     ),
     autoPlay = true,
@@ -246,10 +247,9 @@ scope.launch {
 | `videoSize: VideoSize?` | Decoded frame dimensions. **Android only** — the iOS and Web engines always leave this `null`, so never gate layout on it. |
 | `mediaItem: MediaItem?` | What's loaded, so late subscribers read "what's playing" without replaying events. |
 | `error: PlayerError?` | Non-null after a fatal error, and **sticky** until the next load or release. See [§8](#8-error-handling-and-recovery). |
-| `audioTracks`, `textTracks`, `selectedAudioTrackId`, `selectedTextTrackId` | See [§5](#5-track-selection-audio-and-subtitles). |
-| `chapters: ImmutableList<Chapter>` | Embedded chapter markers from a **local** container, sorted by start. Populated on Android and iOS; always empty on Web. They arrive **asynchronously**, as a second state emission after load — see [local-files.md](local-files.md). |
+| `audioTracks`, `textTracks`, `videoTracks` and their `selected…TrackId`s | See [§5](#5-track-selection-audio-and-subtitles). |
+| `chapters: List<Chapter>` | Chapter markers, sorted by start: from the `chaptersUrl` WebVTT sidecar on any engine, otherwise embedded in a **local** MP4/Matroska file (Android and iOS). They arrive **asynchronously**, as a second state emission after load — see [local-files.md](local-files.md). |
 | `adState: AdState?` | Client-side ad playback, written by the engine on Android and Web only. `null` outside an ad. Server-side ads do **not** populate this — see [ads-server-side.md](ads-server-side.md). |
-| `currentTrack`, `availableTracks` | **Reserved.** Video rendition/quality selection is not implemented; nothing ever writes these. |
 
 ### `events: SharedFlow<PlayerEvent>` — analytics and one-shot reactions
 
@@ -273,7 +273,7 @@ scope.launch {
 
 All three engines emit `BufferingStarted` / `BufferingEnded`, `SeekStarted(targetMs)` /
 `SeekCompleted`, `FirstFrameRendered`, `MediaItemTransition(item)`, `PlaybackStateChanged(state)`,
-`IsPlayingChanged(isPlaying)`, `TracksChanged(audioTracks, textTracks)`,
+`IsPlayingChanged(isPlaying)`, `TracksChanged(audioTracks, textTracks, videoTracks)`,
 `NativePlayerAttached(handle)`, `Ended` and `FatalError(error)`. `BufferingStarted` also fires for the
 *initial* buffering of a new item, so don't count every one as a rebuffer — use `FirstFrameRendered`
 to tell startup from rebuffering.
@@ -330,8 +330,10 @@ player.clearTextTrack()           // subtitles OFF (selectedTextTrackId becomes 
 ```
 
 `selectedTextTrackId == null` means subtitles **off**, not "unknown". `selectedAudioTrackId == null`
-means the opposite — the engine has not reported a selection yet. `TrackType.VIDEO` exists in the
-enum but engines ignore selection of a video track. Cue *rendering* is a surface concern: the `:ui`
+means the opposite — the engine has not reported a selection yet. `videoTracks` are alternate
+*versions* of the programme — a remaster beside an original transfer — never the bitrate ladder, which the
+engine adapts within on its own; Android and web report them, iOS reports none yet, and most streams
+have none. Cue *rendering* is a surface concern: the `:ui`
 `PlayerSurface` renders the selected text track natively, and the overlay's subtitle and audio
 buttons drive the calls above for you — see [ui.md](ui.md).
 

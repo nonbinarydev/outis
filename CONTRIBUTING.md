@@ -81,7 +81,9 @@ Prose documentation lives in `docs/`. Two rules that matter more than style:
 - **New `PlayerState` and config fields arrive with defaults.**
 - At alpha, source-additive changes may still be *binary*-incompatible, because adding a field to a
   data class changes `copy` and `componentN` arity. Consumers recompile. This is called out in
-  [CHANGELOG.md](CHANGELOG.md) whenever it happens.
+  [CHANGELOG.md](CHANGELOG.md) whenever it happens. From 1.0 the previous constructor and `copy` stay
+  behind as hidden overloads instead — see [ADR-0009](docs/decisions/0009-public-model-stays-data-classes.md).
+- **Append data-class fields; never reorder them.** `componentN()` makes their order part of the ABI.
 
 ## Branching
 

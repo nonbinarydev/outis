@@ -10,6 +10,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.ui.focus.FocusRequester
 import dev.nonbinary.outis.core.VideoPlayer
+import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import dev.nonbinary.outis.ui.window.PlayerWindow
 
 /**
@@ -21,6 +22,7 @@ import dev.nonbinary.outis.ui.window.PlayerWindow
  * (e.g. `PlayPauseButton()`), and as a free function taking [state]/[window] for use outside any
  * overlay (the "controls beside the video" pattern). See the building-block functions.
  */
+@ExperimentalPlayerUiApi
 @Stable
 interface PlayerControlsScope {
     /** The snapshot every control reads from — position, buffering, tracks, visibility and scrub state. */

@@ -11,15 +11,8 @@ import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.track.MediaTrack
-import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
 
-/**
- * Immutable snapshot of everything a UI needs to render the player, carried on [VideoPlayer.state].
- *
- * A few fields exist now only to keep the published contract stable as the roadmap (ads, tracks,
- * QoS) lands — they are reserved data slots, never behaviour. See the field docs.
- */
+/** Immutable snapshot of everything a UI needs to render the player, carried on [VideoPlayer.state]. */
 data class PlayerState(
     /**
      * Coarse engine lifecycle stage. Orthogonal to [isPlaying] and [playWhenReady]: `READY` only means the
@@ -103,12 +96,6 @@ data class PlayerState(
      * for this to return to `null` on its own.
      */
     val error: PlayerError? = null,
-
-    // --- Reserved for the roadmap; always default/empty in v1 ---
-    /** Reserved — populated when track/quality selection ships. */
-    val currentTrack: VideoFormat? = null,
-    /** Reserved — populated when video track/quality selection ships. */
-    val availableTracks: ImmutableList<VideoFormat> = persistentListOf(),
     /**
      * Ad playback state — `null` when no ad is active. For **client-side** ads (IMA/CSAI) the engine
      * populates this from the ad SDK; for **server-side** ads the app's `AdController` produces the same
@@ -121,12 +108,12 @@ data class PlayerState(
      * Audio renditions offered by the current asset, in manifest order; empty until the manifest is parsed
      * and for single-audio content that exposes no alternatives.
      */
-    val audioTracks: ImmutableList<MediaTrack> = persistentListOf(),
+    val audioTracks: List<MediaTrack> = emptyList(),
     /**
      * Subtitle/caption tracks offered by the current asset, in manifest order. Only *selectable* tracks —
      * burnt-in subtitles are invisible here. Empty until the manifest is parsed.
      */
-    val textTracks: ImmutableList<MediaTrack> = persistentListOf(),
+    val textTracks: List<MediaTrack> = emptyList(),
     /**
      * [MediaTrack.id] of the active audio track, or `null` when the engine hasn't reported a selection yet
      * (**not** "no audio"). Unlike [selectedTextTrackId], `null` here never means "off".
@@ -139,7 +126,7 @@ data class PlayerState(
      * *not* the bitrate ladder, which the engine picks between on its own. Empty unless the manifest
      * offers a genuine choice. Populated on Android and web; iOS does not report renditions yet.
      */
-    val videoTracks: ImmutableList<MediaTrack> = persistentListOf(),
+    val videoTracks: List<MediaTrack> = emptyList(),
     /** [MediaTrack.id] of the active video rendition, or `null` before the engine reports one. */
     val selectedVideoTrackId: String? = null,
 
@@ -149,13 +136,13 @@ data class PlayerState(
      * and iOS, both parsing the local container via
      * [dev.nonbinary.outis.core.chapters.ChapterExtractor].
      */
-    val chapters: ImmutableList<Chapter> = persistentListOf(),
+    val chapters: List<Chapter> = emptyList(),
     /**
      * Trickplay seek-preview thumbnails, sorted by start; empty unless
      * [dev.nonbinary.outis.core.source.MediaItem.thumbnailsUrl] is set. Loaded from the WebVTT sidecar on
      * every engine (streams included) — see [dev.nonbinary.outis.core.thumbnails.VttThumbnails].
      */
-    val thumbnails: ImmutableList<ThumbnailCue> = persistentListOf(),
+    val thumbnails: List<ThumbnailCue> = emptyList(),
 )
 
 /**
@@ -208,7 +195,7 @@ enum class VideoRange {
     DOLBY_VISION,
 }
 
-/** A selectable/active rendition. Reserved — populated when track selection ships. */
+/** The video rendition being decoded, as [PlayerEvent.BitrateChanged] reports it. */
 data class VideoFormat(
     /** Peak bandwidth of the rendition in **bits per second**, or `null` when the manifest omits it. */
     val bitrate: Int? = null,

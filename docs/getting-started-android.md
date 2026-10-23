@@ -98,21 +98,14 @@ dependencies {
     implementation("io.github.nonbinarydev:outis-core:0.1.0-alpha01")
     implementation("io.github.nonbinarydev:outis-ui:0.1.0-alpha01")   // optional Compose UI
 
-    // Outis scopes these implementation(), but both appear in its public API signatures,
-    // so you must declare them yourself. See the note below.
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.1")
-
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 ```
 
-**Why the two kotlinx lines.** `core/build.gradle.kts:80-81` declares kotlinx-coroutines and
-kotlinx-collections-immutable with `implementation(...)`, not `api(...)`, so they are not on your
-compile classpath — but `VideoPlayer.state` is a `StateFlow<PlayerState>`, `VideoPlayer.events` is a
-`SharedFlow<PlayerEvent>` (`VideoPlayer.kt:36,42`), and `MediaItem.headers` is an
-`ImmutableMap<String, String>` (`MediaItem.kt:36`). You cannot collect state or set a request header
-without them.
+**No kotlinx lines.** `VideoPlayer.state` and `.events` are coroutine flows, so `:core` declares
+kotlinx-coroutines as `api` and it reaches your compile classpath with `outis-core`. The model's
+collections are plain `List` and `Map` ([ADR-0008](decisions/0008-public-collections-are-plain-list-and-map.md)),
+so request headers are an ordinary `mapOf(...)`.
 
 `outis-ui` is optional. `:core` is a complete player API; `:ui` is one opinionated Compose chrome on
 top of it. If you skip it, see section 8.
@@ -287,7 +280,8 @@ Notes on the code above, each verified against source:
   itself and only the PiP button shows. Pass `onToggleFullscreen = { desired -> ... }` once you have
   somewhere to put a fullscreen presentation.
 - `@OptIn(ExperimentalPlayerUiApi::class)` is only silencing a warning — the marker is declared at
-  `RequiresOptIn.Level.WARNING` (`ExperimentalPlayerUiApi.kt:10`), so the code compiles without it.
+  `RequiresOptIn.Level.WARNING`, so the code compiles without it. See [Opting in](ui.md#opting-in)
+  for the module-wide form.
 - The stream URL is a third-party Apple test asset, used here only so the snippet runs; substitute
   your own.
 

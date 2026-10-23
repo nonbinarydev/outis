@@ -43,43 +43,30 @@ To pick the right scheme per platform at runtime, branch on the target — see
 
 ## 2. The `DrmConfig` API
 
-### A build dependency you must add first
-
-`DrmConfig.licenseRequestHeaders` is typed `ImmutableMap<String, String>`
-(`DrmConfig.kt:49`), and `:core` declares kotlinx-collections-immutable as `implementation`, not
-`api` (`core/build.gradle.kts:81`). It is therefore **not** on your compile classpath. Without this
-line you cannot set a single license header:
-
-```kotlin
-// your module's build.gradle.kts, in the same source set that builds MediaItems
-implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.1")
-```
-
-Version `0.5.1` is what `:core` is built against (`gradle/libs.versions.toml:16`). Every example below
-assumes it, plus:
+Every example below assumes:
 
 ```kotlin
 import dev.nonbinary.outis.core.source.*
-import kotlinx.collections.immutable.persistentMapOf
 ```
 
 ### The full declaration
 
-All eight parameters, in order (`DrmConfig.kt:31-84`):
+All nine parameters, in order:
 
 ```kotlin
 data class DrmConfig(
-    val scheme: DrmScheme,                        // WIDEVINE / PLAYREADY / FAIRPLAY
-    val licenseServerUrl: String,                 // where the CDM's challenge is POSTed
+    val scheme: DrmScheme,                        // WIDEVINE / PLAYREADY / FAIRPLAY / CLEARKEY
+    val licenseServerUrl: String? = null,         // where the CDM's challenge is POSTed; null for CLEARKEY
     val certificateUrl: String? = null,           // FairPlay FPS application certificate; ignored otherwise
-    val licenseRequestHeaders: ImmutableMap<String, String> = persistentMapOf(),
+    val clearKeys: Map<String, String> = emptyMap(),             // CLEARKEY only: hex keyId -> hex key
+    val licenseRequestHeaders: Map<String, String> = emptyMap(),
     val multiSession: Boolean = false,            // multiple concurrent key sessions (Android only)
     val widevineLevel: WidevineLevel = WidevineLevel.AUTO,   // Widevine only; see §3
     val licenseRequestInterceptor: ((LicenseRequest) -> LicenseRequest)? = null,   // see §6
     val licenseResponseInterceptor: ((ByteArray) -> ByteArray)? = null,            // see §6
 )
 
-enum class DrmScheme { WIDEVINE, PLAYREADY, FAIRPLAY }
+enum class DrmScheme { WIDEVINE, PLAYREADY, FAIRPLAY, CLEARKEY }
 
 enum class WidevineLevel { AUTO, L1, L3 }
 
@@ -104,7 +91,7 @@ player.setMediaItem(
         drmConfig = DrmConfig(
             scheme = DrmScheme.WIDEVINE,
             licenseServerUrl = "https://license.example.com/widevine",
-            licenseRequestHeaders = persistentMapOf("X-Auth-Token" to token),
+            licenseRequestHeaders = mapOf("X-Auth-Token" to token),
         ),
     ),
     autoPlay = true,
@@ -125,7 +112,7 @@ Same shape for both — only the `scheme` changes:
 val drm = DrmConfig(
     scheme = DrmScheme.WIDEVINE,                 // or DrmScheme.PLAYREADY
     licenseServerUrl = "https://license.example.com/wv",
-    licenseRequestHeaders = persistentMapOf("Authorization" to "Bearer $token"),
+    licenseRequestHeaders = mapOf("Authorization" to "Bearer $token"),
 )
 ```
 
@@ -184,7 +171,7 @@ val fairPlay = DrmConfig(
     scheme = DrmScheme.FAIRPLAY,
     licenseServerUrl = "https://license.example.com/fairplay",     // takes the SPC, returns the CKC
     certificateUrl = "https://license.example.com/fairplay.cer",   // FPS application certificate
-    licenseRequestHeaders = persistentMapOf("X-Auth-Token" to token),
+    licenseRequestHeaders = mapOf("X-Auth-Token" to token),
 )
 
 player.setMediaItem(
@@ -222,7 +209,7 @@ Most production license servers gate on an auth token. Put it in `licenseRequest
 DrmConfig(
     scheme = DrmScheme.WIDEVINE,
     licenseServerUrl = "https://license.example.com/wv",
-    licenseRequestHeaders = persistentMapOf(
+    licenseRequestHeaders = mapOf(
         "Authorization" to "Bearer $jwt",
         "X-Custom-Header" to "value",
     ),
@@ -271,7 +258,7 @@ import kotlin.io.encoding.Base64
 val drm = DrmConfig(
     scheme = DrmScheme.WIDEVINE,
     licenseServerUrl = "https://mpx.example.com/license",
-    licenseRequestHeaders = persistentMapOf("Authorization" to "Bearer $jwt"),
+    licenseRequestHeaders = mapOf("Authorization" to "Bearer $jwt"),
 
     // Move the challenge into the URL and send an empty body.
     licenseRequestInterceptor = { request ->
@@ -335,7 +322,7 @@ expect fun drmFor(licenseBase: String, token: String): DrmConfig
 actual fun drmFor(licenseBase: String, token: String) = DrmConfig(
     scheme = DrmScheme.WIDEVINE,
     licenseServerUrl = "$licenseBase/widevine",
-    licenseRequestHeaders = persistentMapOf("X-Auth-Token" to token),
+    licenseRequestHeaders = mapOf("X-Auth-Token" to token),
 )
 
 // iosMain (and Safari, if you detect it on Web)
@@ -343,7 +330,7 @@ actual fun drmFor(licenseBase: String, token: String) = DrmConfig(
     scheme = DrmScheme.FAIRPLAY,
     licenseServerUrl = "$licenseBase/fairplay",
     certificateUrl = "$licenseBase/fairplay.cer",
-    licenseRequestHeaders = persistentMapOf("X-Auth-Token" to token),
+    licenseRequestHeaders = mapOf("X-Auth-Token" to token),
 )
 ```
 

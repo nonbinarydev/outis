@@ -67,7 +67,6 @@ import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.thumbnails.thumbnailAt
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import dev.nonbinary.outis.ui.formatTime
-import kotlinx.collections.immutable.ImmutableList
 import kotlin.math.roundToInt
 
 /** Default rates offered by [PlaybackSpeedButton], as multipliers of normal speed. */
@@ -208,7 +207,7 @@ fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
 @Composable
 private fun ThumbnailPreview(
     cue: ThumbnailCue,
-    all: ImmutableList<ThumbnailCue>,
+    all: List<ThumbnailCue>,
     fraction: Float,
     trackWidth: Dp,
 ) {

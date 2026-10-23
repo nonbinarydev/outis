@@ -29,8 +29,6 @@ import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -325,12 +323,14 @@ internal class AVPlayerEngine(
                 playWhenReady = autoPlay,
                 isMuted = muted,
                 playbackState = PlaybackState.BUFFERING,
-                audioTracks = persistentListOf(),
-                textTracks = persistentListOf(),
+                audioTracks = emptyList(),
+                textTracks = emptyList(),
                 selectedAudioTrackId = null,
                 selectedTextTrackId = null,
-                chapters = persistentListOf(),
-                thumbnails = persistentListOf(),
+                videoTracks = emptyList(),
+                selectedVideoTrackId = null,
+                chapters = emptyList(),
+                thumbnails = emptyList(),
             )
         }
         emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
@@ -401,7 +401,7 @@ internal class AVPlayerEngine(
      * [PlayerState.adState] so the shared chrome blocks seeking during ads. The iOS counterpart of the
      * Media3 engine deriving ad state internally on Android: here the content [player] is paused/resumed by
      * the coordinator (IMA iOS uses content pause/resume, not a stitched timeline), so no position guarding
-     * is needed. `null` clears it (content resumed). Driven via the public [updateAdState] bridge.
+     * is needed. `null` clears it (content resumed). Driven via the public `setAdState` bridge.
      */
     internal fun setAdState(adState: AdState?) = onMain {
         _state.update { it.copy(adState = adState) }
@@ -447,10 +447,14 @@ internal class AVPlayerEngine(
                 videoSize = null,
                 videoRange = VideoRange.SDR,
                 error = null,
-                audioTracks = persistentListOf(),
-                textTracks = persistentListOf(),
+                audioTracks = emptyList(),
+                textTracks = emptyList(),
                 selectedAudioTrackId = null,
                 selectedTextTrackId = null,
+                videoTracks = emptyList(),
+                selectedVideoTrackId = null,
+                chapters = emptyList(),
+                thumbnails = emptyList(),
             )
         }
     }
@@ -610,13 +614,13 @@ internal class AVPlayerEngine(
         val text = buildTracks(item, textGroup, TrackType.TEXT)
         _state.update {
             it.copy(
-                audioTracks = audio.toPersistentList(),
-                textTracks = text.toPersistentList(),
+                audioTracks = audio.toList(),
+                textTracks = text.toList(),
                 selectedAudioTrackId = audio.firstOrNull { t -> t.isSelected }?.id,
                 selectedTextTrackId = text.firstOrNull { t -> t.isSelected }?.id,
             )
         }
-        emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
+        emit { p, t -> _state.value.tracksChanged(p, t) }
     }
 
     /**
@@ -631,7 +635,7 @@ internal class AVPlayerEngine(
             if (thumbs.isEmpty()) return@launch
             onMain {
                 if (!released && _state.value.mediaItem === item) {
-                    _state.update { it.copy(thumbnails = thumbs.toPersistentList()) }
+                    _state.update { it.copy(thumbnails = thumbs.toList()) }
                 }
             }
         }
@@ -645,7 +649,7 @@ internal class AVPlayerEngine(
                 if (chapters.isEmpty()) return@launch
                 onMain {
                     if (!released && _state.value.mediaItem === item) {
-                        _state.update { it.copy(chapters = chapters.toPersistentList()) }
+                        _state.update { it.copy(chapters = chapters.toList()) }
                     }
                 }
             }
@@ -673,7 +677,7 @@ internal class AVPlayerEngine(
             onMain {
                 // Only apply if this is still the current item (a newer setMediaItem must not be clobbered).
                 if (!released && _state.value.mediaItem === item) {
-                    _state.update { it.copy(chapters = chapters.toPersistentList()) }
+                    _state.update { it.copy(chapters = chapters.toList()) }
                 }
             }
         }
@@ -705,17 +709,17 @@ internal class AVPlayerEngine(
                     it.copy(
                         isSelected = trackOptions[it.id]?.second == audioSel
                     )
-                }.toPersistentList(),
+                },
                 textTracks = st.textTracks.map {
                     it.copy(
                         isSelected = trackOptions[it.id]?.second == textSel
                     )
-                }.toPersistentList(),
+                },
                 selectedAudioTrackId = st.audioTracks.firstOrNull { trackOptions[it.id]?.second == audioSel }?.id,
                 selectedTextTrackId = st.textTracks.firstOrNull { trackOptions[it.id]?.second == textSel }?.id,
             )
         }
-        emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
+        emit { p, t -> _state.value.tracksChanged(p, t) }
     }
 
     /**
@@ -987,31 +991,6 @@ internal class AVPlayerEngine(
         session.setActive(true, error = null)
     }
 }
-
-/**
- * Push client-side-ad (CSAI) state into [player]'s [PlayerState.adState], or `null` to clear it once the ad
- * break ends. Called by an iOS IMA adapter that owns the Google IMA SDK: that SDK is UIView/
- * UIViewController-centric and pulled in via CocoaPods/cinterop, so it lives in the integration layer (the
- * app or a dedicated module) rather than the pod-free core — this bridge is how it drives the shared chrome,
- * the iOS parallel of Android's `VideoPlayer.setAdViewProvider`. The coordinator pauses/resumes the content
- * player itself (IMA iOS' content pause/resume model). A no-op for any [VideoPlayer] that isn't the AVPlayer engine.
- */
-fun VideoPlayer.updateAdState(adState: AdState?) {
-    (this as? AVPlayerEngine)?.setAdState(adState)
-}
-
-/**
- * Register the iOS ad-container surface — the `AVPlayerViewController` created by the `:ui` PlayerSurface —
- * with the engine, or `null` to detach it. An iOS IMA adapter reads it back via [adContainer] to anchor
- * IMA's ad UI (`IMAAdDisplayContainer`: its view + presenting view controller) over the video. The iOS
- * parallel of Android's `VideoPlayer.setAdViewProvider`; a no-op for any non-AVPlayer [VideoPlayer].
- */
-fun VideoPlayer.setAdContainer(controller: UIViewController?) {
-    (this as? AVPlayerEngine)?.setAdContainer(controller)
-}
-
-/** The registered ad-container view controller (see [setAdContainer]), or `null`. Used by the iOS IMA adapter. */
-fun VideoPlayer.adContainer(): UIViewController? = (this as? AVPlayerEngine)?.adContainer()
 
 /** A [ChapterReader] over a local file via POSIX read/lseek, so the shared [ChapterExtractor] runs on iOS too. */
 private class PosixChapterReader(

@@ -6,7 +6,10 @@
 
 package dev.nonbinary.outis.core.ads
 
+import dev.nonbinary.outis.core.ExperimentalPlayerApi
+
 /** A SCTE-35-signalled ad avail parsed from an HLS media playlist. */
+@ExperimentalPlayerApi
 data class HlsAdCue(
     /**
      * The DATERANGE `ID` attribute when present, otherwise a synthesised `"daterange-n"` / `"cue-n"`

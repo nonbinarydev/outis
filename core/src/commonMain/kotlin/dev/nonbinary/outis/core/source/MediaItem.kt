@@ -6,11 +6,10 @@
 
 package dev.nonbinary.outis.core.source
 
+import dev.nonbinary.outis.core.ExperimentalPlayerApi
 import dev.nonbinary.outis.core.ads.AdBreak
 import dev.nonbinary.outis.core.ads.AdConfig
 import dev.nonbinary.outis.core.analytics.PlaybackMetadata
-import kotlinx.collections.immutable.ImmutableMap
-import kotlinx.collections.immutable.persistentMapOf
 
 /**
  * What to play. Honours [source], [mimeType], [headers] and [drmConfig] (Widevine/PlayReady on
@@ -34,7 +33,7 @@ data class MediaItem(
      * Request headers applied when fetching the manifest/segments (auth tokens, etc.). Honoured
      * on Android, iOS and Web.
      */
-    val headers: ImmutableMap<String, String> = persistentMapOf(),
+    val headers: Map<String, String> = emptyMap(),
     /** DRM parameters; `null` for clear content. */
     val drmConfig: DrmConfig? = null,
     /** Optional ceiling on adaptive video selection; `null` => unconstrained. */
@@ -114,6 +113,7 @@ data class MediaItem(
 )
 
 /** The SSAI ad breaks on this item, or empty if it has none. */
+@ExperimentalPlayerApi
 fun MediaItem.serverSideBreaks(): List<AdBreak> = (adConfig as? AdConfig.ServerSide)?.breaks ?: emptyList()
 
 /** Initial caption/subtitle visibility for a [MediaItem]. */

@@ -6,6 +6,8 @@
 
 package dev.nonbinary.outis.core.ads
 
+import dev.nonbinary.outis.core.ExperimentalPlayerApi
+
 private val DATERANGE_ID = Regex("""ID="([^"]+)"""")
 private val PLANNED_DURATION = Regex("""PLANNED-DURATION=([0-9.]+)""")
 private val CUE_OUT_DURATION = Regex("""#EXT-X-CUE-OUT(?::(?:DURATION=)?([0-9.]+))?""")
@@ -21,6 +23,7 @@ private val CUE_OUT_DURATION = Regex("""#EXT-X-CUE-OUT(?::(?:DURATION=)?([0-9.]+
  * The Unified Streaming reference stream emits BOTH per avail, so when any DATERANGE is present the
  * CUE-OUT lines are ignored to avoid double-counting. Returns one [HlsAdCue] per avail, in playlist order.
  */
+@ExperimentalPlayerApi
 fun parseHlsAdCues(mediaPlaylist: String): List<HlsAdCue> {
     val preferDateRange = mediaPlaylist.contains("#EXT-X-DATERANGE") &&
         (mediaPlaylist.contains("SCTE35-OUT") || mediaPlaylist.contains("PLANNED-DURATION"))

@@ -100,9 +100,9 @@ interface VideoPlayer {
     // and is guarded by VideoPlayerAdditiveContractTest.
 
     /**
-     * Select an audio or text track from [PlayerState.audioTracks] / [PlayerState.textTracks].
-     * Fire-and-forget: the engine applies the change and re-emits the track lists +
-     * [PlayerEvent.TracksChanged]; the selection lands on [state] (don't assume it optimistically).
+     * Select a track from [PlayerState.audioTracks], [PlayerState.textTracks] or
+     * [PlayerState.videoTracks]. Fire-and-forget: the engine applies the change and re-emits the track
+     * lists + [PlayerEvent.TracksChanged]; the selection lands on [state] (don't assume it optimistically).
      */
     fun selectTrack(track: MediaTrack) {}
 

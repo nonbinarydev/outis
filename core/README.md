@@ -108,13 +108,14 @@ Both insertion models ship, and they work differently:
   playlists. See [../docs/ads-server-side.md](../docs/ads-server-side.md).
 - **Client-side (CSAI)** — Google IMA, wired inside the engines on **Android and Web only**. Surfaced
   through `PlayerState.adState`, whose populated fields differ between those two engines. iOS has the
-  bridge (`updateAdState`, `setAdContainer`, `adContainer`) but no adapter ships. See
+  bridge (`setAdState`, `setAdContainer`, `adContainer`) but no adapter ships. See
   [../docs/ads-client-side.md](../docs/ads-client-side.md).
+
+The ad model, its parsers and the platform ad bridges are `@ExperimentalPlayerApi`: warning-level, and
+the part of `:core` expected to change shape before 1.0.
 
 ## Reserved for the roadmap (present but unused in v1)
 
-- **Video-quality selection** — `PlayerState.{currentTrack, availableTracks}`, `VideoFormat`
-  (audio/text selection *is* shipped; video-rendition selection is not).
 - **Offline** — `MediaSource.LocalFile` plays today, but there is no download manager to produce those
   files.
 - **QoS events on non-Android engines** — `BitrateChanged` / `BandwidthSample` / `DroppedFrames` are

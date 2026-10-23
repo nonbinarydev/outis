@@ -17,8 +17,8 @@ dependencies {
 }
 ```
 
-`outis-ui` declares `api(project(":core"))`, so `outis-core` comes with it
-(`ui/build.gradle.kts:58`) — you do not need to add both.
+`outis-ui` declares `api(project(":core"))`, so `outis-core` comes with it — you do not need to add
+both.
 
 ## Contents
 
@@ -37,19 +37,24 @@ dependencies {
 
 ## Opting in
 
-Most of the module is annotated `@ExperimentalPlayerUiApi`. The marker is declared at
-`RequiresOptIn.Level.WARNING` (`ExperimentalPlayerUiApi.kt:10`), so using it without opting in
-compiles — you just get a warning. Add `@OptIn(ExperimentalPlayerUiApi::class)` to silence it.
+The whole public surface of `:ui` is annotated `@ExperimentalPlayerUiApi`: `PlayerView`,
+`PlayerSurface`, `DefaultControls`, `ControlsScaffold`, every building block, and the state and window
+types (`PlayerControlsState`, `PlayerControlsScope`, `PlayerWindow`, `SurfaceType`). `:core` has its
+own marker, `@ExperimentalPlayerApi`, on the parts expected to change shape first — the ad model with
+its parsers and platform bridges.
 
-Annotated: `PlayerView`, `PlayerSurface` (the `expect` and all three actuals), `DefaultControls`,
-`ControlsScaffold`, and every building block in `BasicControls.kt`, `TrackControls.kt` and
-`WindowControls.kt`.
+Both markers are declared at `RequiresOptIn.Level.WARNING`, so using the API without opting in
+compiles — you just get a warning. Silence it per declaration with
+`@OptIn(ExperimentalPlayerUiApi::class)`, or once for the whole module:
 
-Not annotated, despite being part of the same surface: `PlayerControlsState` and
-`rememberPlayerControlsState` (`PlayerControlsState.kt:43, 241`), `PlayerControlsScope`
-(`PlayerControlsScope.kt:23`), `PlayerWindow` (`PlayerWindow.kt:23`), `SurfaceType`
-(`SurfaceType.kt:10`) and `rememberPlayerWindow` (`PlayerWindow.android.kt:47`). Treat them as equally
-experimental; the missing markers are an oversight in the source, not a stability promise.
+```kotlin
+kotlin {
+    compilerOptions {
+        optIn.add("dev.nonbinary.outis.ui.ExperimentalPlayerUiApi")
+        optIn.add("dev.nonbinary.outis.core.ExperimentalPlayerApi")
+    }
+}
+```
 
 ## The four tiers
 
@@ -272,10 +277,9 @@ public so video can go anywhere in your layout — an overlay, a rail, a mini-pl
 `ContentScale.Inside`, `FillHeight`, `FillWidth` and any custom `ContentScale` all fall into the "else"
 branch on all three platforms and behave as fit.
 
-Android and iOS additionally register the surface with the engine for client-side ads: the Media3
-`PlayerView` is handed over as an `AdViewProvider` (`PlayerSurface.android.kt:66`) and the
-`AVPlayerViewController` as an ad container (`PlayerSurface.ios.kt:65`). Both are cleared in
-`onRelease`. That is the extent of the UI module's ad involvement — see
+Android and iOS additionally register the surface with the engine for client-side ads through
+`setAdContainer`: on Android the Media3 `PlayerView`'s ad view group, with its overlay views as
+friendly obstructions; on iOS the `AVPlayerViewController`. Both are cleared in `onRelease`. That is the extent of the UI module's ad involvement — see
 [what the shipped controls do not do](#what-the-shipped-controls-do-not-do).
 
 The iOS interop is created with `UIKitInteropProperties(interactionMode = null)`, i.e.
@@ -403,7 +407,7 @@ as a free function and does not take a `PlayerControlsState` at all.
 | `AudioButton(state, modifier)` | yes | **Self-hides** when there are fewer than two audio tracks. Deliberately no "Off" entry. |
 | `FullscreenButton(state, window, modifier)` | yes | **Self-hides** when `window.onToggleFullscreen == null`. Reports the requested value; the icon flips only once the host feeds `isFullscreen` back. |
 | `PipButton(state, window, modifier)` | yes | **Self-hides** unless `isPipSupported` **and** `onEnterPip != null`. Entry only — the system window owns exit. |
-| `TrackList(tracks, selectedId, onSelect, modifier, onOff = null)` | **no** | Standalone selectable list for custom shells. Takes an `ImmutableList<MediaTrack>` directly; pass `onOff` to get an "Off" row. |
+| `TrackList(tracks, selectedId, onSelect, modifier, onOff = null)` | **no** | Standalone selectable list for custom shells. Takes a `List<MediaTrack>` directly; pass `onOff` to get an "Off" row. |
 | — | `DefaultControls(modifier)` | Scope-only; delegates to `ControlsScaffold`. |
 | — | `ControlsScaffold(modifier, top, center, bottom)` | Scope-only. See [tier 2](#tier-2--keep-the-layout-swap-one-region). |
 
@@ -591,10 +595,11 @@ somewhere to render (see [`PlayerSurface`](#playersurface)).
 `ui/src`. Chapter markers, a chapter list and thumbnail previews are all yours to build, including
 decoding the thumbnail bytes. See [local files and chapters](local-files.md).
 
-**No video-quality selector.** `SubtitleButton` and `AudioButton` cover text and audio tracks only.
-`PlayerState.currentTrack` / `availableTracks` are reserved and never written by any engine, so there is
-nothing for a quality menu to bind to. Constrain renditions through `MediaItem.videoConstraints`
-instead.
+**No rendition or quality selector.** `SubtitleButton` and `AudioButton` cover text and audio tracks
+only. Alternate renditions (Android and web) are on `PlayerControlsState.videoTracks` /
+`selectedVideoTrackId`, and `TrackList` renders them like any other list, so a control of your own is a
+few lines. The bitrate ladder itself is not selectable; constrain it through
+`MediaItem.videoConstraints`.
 
 **No volume slider.** `MuteButton` toggles the flag; `state.volume` is exposed but no shipped control
 sets it. Call `state.player.setVolume(…)` and pair it with `state.notifyInteraction()`.

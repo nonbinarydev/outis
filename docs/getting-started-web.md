@@ -159,9 +159,8 @@ fun main() {
 `ComposeViewport` **clears the container element** when it creates the composition, so do not put
 your own markup inside `#composeApp`.
 
-`@ExperimentalPlayerUiApi` is a warning-level opt-in
-(`ui/src/commonMain/kotlin/dev/nonbinary/outis/ui/ExperimentalPlayerUiApi.kt:10`), so the `@OptIn` is
-optional; it only silences the warning. `@ExperimentalComposeUiApi` on `ComposeViewport` is
+`@ExperimentalPlayerUiApi` is a warning-level opt-in (see [Opting in](ui.md#opting-in)), so the
+`@OptIn` is optional; it only silences the warning. `@ExperimentalComposeUiApi` on `ComposeViewport` is
 Compose's own and is required.
 
 `PlayerView` takes `surfaceType` and `showSubtitles` parameters that the web `PlayerSurface` accepts
