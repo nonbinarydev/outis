@@ -54,6 +54,8 @@ First release. Not yet published to Maven Central.
 
 **Local files and chapters**
 
+- Chapters from three sources, first match wins: `MediaItem.chapters` declared by the app, a
+  `chaptersUrl` WebVTT sidecar, then the container. The first two work on every platform and for streams.
 - Embedded chapter extraction for MP4/M4V (QuickTime `chap` text tracks with a Nero `chpl` fallback)
   and Matroska, parsed in pure Kotlin over small ranged reads. Wired on Android and iOS.
 - Optional per-chapter thumbnails from an MP4 chapter image track, with size and count budgets.
@@ -101,8 +103,8 @@ First release. Not yet published to Maven Central.
 - **No `iosX64` target**, so Intel Macs cannot run the simulator build.
 - iOS cannot play DASH, or HLS carrying in-band parameter sets (`avc3`); progressive MP4 needs
   `faststart`.
-- Embedded chapters are unavailable on web, which has no local-file API. Chapters from a `chaptersUrl`
-  WebVTT sidecar work on all three platforms.
+- Embedded chapters are unavailable on web, which has no local-file API. Declared chapters and a
+  `chaptersUrl` WebVTT sidecar work on all three platforms.
 
 [Unreleased]: https://github.com/nonbinarydev/outis/compare/v0.1.0-alpha01...HEAD
 [0.1.0-alpha01]: https://github.com/nonbinarydev/outis/releases/tag/v0.1.0-alpha01

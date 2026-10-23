@@ -8,7 +8,8 @@ page.
 
 Two things dominate this subject and neither is obvious from the API: **local playback is a two-and-a-
 half platform feature** (it works on Android and iOS; on Web the documented type cannot reach a file
-at all), and **chapters arrive asynchronously**, as a second state emission some time after load.
+at all), and **chapters read from the file arrive asynchronously**, as a second state emission some time
+after load.
 
 ---
 
@@ -121,12 +122,16 @@ or show "SSA" versus "PGS", in your own track picker.
 
 ## 5. Chapters
 
-`PlayerState.chapters` (`PlayerState.kt`) holds the chapter markers embedded in the container,
-sorted by start time. They come from a shared parser in `commonMain`,
-`dev.nonbinary.outis.core.chapters.ChapterExtractor`, which does small ranged reads over the file rather
-than loading it: Media3 exposes no chapter API, so the Android engine runs the parser over a
-`RandomAccessFile` (`ExoPlayerEngine.kt`), and the iOS engine runs the same parser over a
-POSIX-backed reader (`AVPlayerEngine.kt`). Web never populates the field.
+`PlayerState.chapters` (`PlayerState.kt`) holds chapter markers sorted by start time, from the first of
+three sources an item has:
+
+1. **`MediaItem.chapters`**, chapters the app declares. They work on every platform and for any source,
+   are in state as soon as the item is set, and the other two sources are then not read.
+2. **`MediaItem.chaptersUrl`**, a WebVTT chapters sidecar, fetched by all three engines, streams included.
+3. **The container.** A shared parser in `commonMain` (`ChapterExtractor.kt`) does small ranged reads
+   over a local file rather than loading it: Media3 exposes no chapter API, so the Android engine runs
+   the parser over a `RandomAccessFile` (`ExoPlayerEngine.kt`), and the iOS engine runs the same parser
+   over a POSIX-backed reader (`AVPlayerEngine.kt`). Web reads no container.
 
 ```kotlin
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -145,7 +150,7 @@ scope.launch {
 | Field | Meaning |
 |---|---|
 | `startMs: Long` | Start on the content timeline, in ms. Always present. |
-| `title: String?` | Title if the container carried one; `null` for a start-point-only marker. |
+| `title: String?` | Title if the source carried one; `null` for a start-point-only marker. |
 | `endMs: Long?` | The **next** chapter's `startMs`. See the rule below. |
 | `thumbnail: ByteArray?` | Raw preview-image bytes; `null` unless you opted in and the file has an image track. §6. |
 
@@ -153,28 +158,28 @@ scope.launch {
 chapters decoded twice from the same file compare equal and do not look like a state change. That also
 means both are O(image size) when thumbnails are loaded — do not put chapters in a hot recomposition key.
 
-### The five rules that will bite you
+### The four rules that will bite you
+
+They apply to chapters read from a sidecar or the file. Declared chapters arrive with the item, already
+sorted, and none of this applies to them.
 
 1. **They arrive asynchronously.** `setMediaItem` clears `chapters` to empty
-   (`ExoPlayerEngine.kt`, `AVPlayerEngine.kt`) and kicks off a background parse;
-   the parsed list lands as a **second state emission**, after the first frame in most cases
-   (`ExoPlayerEngine.kt`, `AVPlayerEngine.kt`). Code that reads `player.state.value.chapters`
-   once after load will nearly always see an empty list. Collect the flow.
-2. **A file with no chapters produces no second emission at all** — the engines skip the update when the
-   result is empty (`ExoPlayerEngine.kt`, `AVPlayerEngine.kt`). There is no "parsing finished,
-   nothing found" signal, so do not wait for one.
-3. **Parse failures are silent.** Any malformed or unreadable container yields an empty list, never a
-   `PlayerError` and never an event (`ChapterExtractor.kt`; both engines wrap the call in
-   `runCatching`). Chapters must never break playback. The cost is that "no chapters" and "broken file"
-   are indistinguishable to you.
-4. **The last chapter's `endMs` is always `null`.** `endMs` is derived purely by pairing each chapter
-   with the next one's start (`ChapterExtractor.kt`); nothing fills in the media duration, and no
-   parser reads a container-declared end. Compute the final segment yourself from
-   `PlayerState.durationMs` when you need it, and handle `durationMs == null`.
-5. **`stop()` does not clear them.** It clears the track lists and the media item but leaves `chapters`
-   populated from the previous file (`ExoPlayerEngine.kt`, `AVPlayerEngine.kt`). They are
-   cleared at the next `setMediaItem`. If your chrome survives `stop()`, gate the chapter rail on
-   `mediaItem != null` too.
+   (`ExoPlayerEngine.kt`, `AVPlayerEngine.kt`, `ShakaEngine.kt`) and starts a background fetch or parse;
+   the result lands as a **second state emission**, after the first frame in most cases. Code that reads
+   `player.state.value.chapters` once after load will nearly always see an empty list. Collect the flow.
+2. **A source with no chapters produces no second emission at all** — the engines skip the update when
+   the result is empty. There is no "finished, nothing found" signal, so do not wait for one.
+3. **Failures are silent.** A sidecar that fails to load or parse, or a malformed or unreadable
+   container, yields an empty list, never a `PlayerError` and never an event (`ChapterExtractor.kt`;
+   the engines wrap the call in `runCatching`). Chapters must never break playback. The cost is that
+   "no chapters" and "broken source" are indistinguishable to you.
+4. **The last container chapter's `endMs` is always `null`.** `endMs` is derived purely by pairing each
+   chapter with the next one's start (`ChapterExtractor.kt`); nothing fills in the media duration, and
+   no parser reads a container-declared end. Compute the final segment yourself from
+   `PlayerState.durationMs` when you need it, and handle `durationMs == null`. Sidecar chapters take
+   their ends from the cue timings.
+
+`stop()` clears `chapters` along with the media item and the track lists.
 
 One more, less likely to bite but worth knowing: the publish step is guarded by a **reference** check
 against the current item (`ExoPlayerEngine.kt`, `AVPlayerEngine.kt`). Load item A, then a new but
@@ -214,13 +219,14 @@ player.setMediaItem(
 ```
 
 `MediaItem.chapterThumbnails` (`MediaItem.kt`) pulls each chapter's preview image from an MP4
-chapter **image** track into `Chapter.thumbnail`. It is honoured on Android and iOS; it does nothing on
-Web, and nothing for Matroska or a title-only MP4 — those formats carry no per-chapter images, so
+chapter **image** track into `Chapter.thumbnail`. It is honoured on Android and iOS when the chapters come
+from the container; it does nothing on Web, nothing when `chapters` or `chaptersUrl` supplies the
+chapters, and nothing for Matroska or a title-only MP4 — those formats carry no per-chapter images, so
 `thumbnail` stays `null` and the titles are unaffected either way.
 
 **The bytes are raw and you decode them.** They are usually JPEG but the format is not guaranteed
-(`Chapter.kt`), and `outis-ui` renders neither chapter markers nor thumbnails — a grep for
-"chapter" over `ui/src` returns nothing. Everything chapter-related is yours to draw.
+(`Chapter.kt`). `outis-ui` draws a tick on the scrubber at each chapter start and nothing more: titles, a
+chapter list and the thumbnails are yours to draw.
 
 **The budget** (`ChapterExtractor.kt`), which is what you actually need to reason about before
 enabling this on a multi-gigabyte file:
@@ -263,7 +269,8 @@ Listed so you can plan around them rather than search for them.
   (`MediaItem.kt`) is app-supplied only and is for display, never playback.
 - **Sideloaded subtitle files.** No `MediaItem` field for an `.srt`/`.vtt` sidecar.
 - **A codec or format field on `MediaTrack`.**
-- **Chapters on Web.** No browser API for embedded chapters; the field stays empty.
+- **Embedded chapters on Web.** No browser API reads them. Declare the chapters, or ship a WebVTT
+  sidecar, which works there.
 
 ---
 
@@ -271,5 +278,6 @@ Listed so you can plan around them rather than search for them.
 
 - [playback.md](playback.md) — loading, transport, `PlayerState` and track selection in full.
 - [platform-support.md](platform-support.md) — every per-platform capability claim, in one place.
-- [ui.md](ui.md) — the Compose chrome, which has no chapter support of its own.
+- [ui.md](ui.md) — the Compose chrome, which marks chapter starts on the scrubber and does nothing else
+  with them.
 - [troubleshooting.md](troubleshooting.md) — symptom → cause → fix.

@@ -10,6 +10,7 @@ import dev.nonbinary.outis.core.ExperimentalPlayerApi
 import dev.nonbinary.outis.core.ads.AdBreak
 import dev.nonbinary.outis.core.ads.AdConfig
 import dev.nonbinary.outis.core.analytics.PlaybackMetadata
+import dev.nonbinary.outis.core.chapters.Chapter
 
 /**
  * What to play. Honours [source], [mimeType], [headers] and [drmConfig] (Widevine/PlayReady on
@@ -85,7 +86,8 @@ public data class MediaItem(
      * Also extract per-chapter preview images (MP4 chapter **image** track, e.g. Subler-written JPEGs) into
      * [dev.nonbinary.outis.core.chapters.Chapter.thumbnail]. Off by default — it reads the image samples,
      * which is extra IO/memory. No effect when the file has no image track (Matroska, title-only MP4); titles
-     * are unaffected either way. Honoured on Android and iOS (local files); ignored on Web (no chapters there).
+     * are unaffected either way. Honoured on Android and iOS for local files whose chapters come from the
+     * container — not when [chapters] or [chaptersUrl] supplies them, and never on Web.
      */
     val chapterThumbnails: Boolean = false,
     /**
@@ -93,7 +95,7 @@ public data class MediaItem(
      * [dev.nonbinary.outis.core.PlayerState.chapters] — the only chapter source that works for streamed
      * sources (HLS/DASH) and on Web, since it needs no local container. When null, the engine falls back
      * to chapters embedded in a local MP4/M4V/MKV (Android + iOS local files only). A `.vtt` here takes
-     * precedence over any embedded chapters.
+     * precedence over any embedded chapters, and is not read at all when [chapters] is set.
      */
     val chaptersUrl: String? = null,
     /**
@@ -110,6 +112,13 @@ public data class MediaItem(
      * slices sessions by.
      */
     val analytics: PlaybackMetadata? = null,
+    /**
+     * Chapters the app already knows, from its own catalogue for instance. When set, they are
+     * [dev.nonbinary.outis.core.PlayerState.chapters] from the moment the item is set, on every engine and for
+     * any source, and neither [chaptersUrl] nor the container is read; an empty list means no chapters.
+     * `null` leaves chapters to [chaptersUrl], then to the chapters embedded in a local file.
+     */
+    val chapters: List<Chapter>? = null,
 )
 
 /** The SSAI ad breaks on this item, or empty if it has none. */

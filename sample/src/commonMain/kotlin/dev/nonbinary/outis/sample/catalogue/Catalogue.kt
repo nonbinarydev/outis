@@ -8,6 +8,7 @@ package dev.nonbinary.outis.sample.catalogue
 
 import dev.nonbinary.outis.core.ads.AdConfig
 import dev.nonbinary.outis.core.analytics.PlaybackMetadata
+import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.source.DrmConfig
 import dev.nonbinary.outis.core.source.DrmScheme
 import dev.nonbinary.outis.core.source.MediaItem
@@ -62,7 +63,12 @@ data class CatalogueItem(
     /** WebVTT chapters sidecar URL — populates chapter markers (works for streamed sources too). */
     val chaptersUrl: String? = null,
     val thumbnailsUrl: String? = null,
+    /** Chapters declared inline. They win over [chaptersUrl], which older sample builds still read instead. */
+    val chapters: List<CatalogueChapter>? = null,
 )
+
+@Serializable
+data class CatalogueChapter(val startMs: Long, val title: String? = null, val endMs: Long? = null)
 
 @Serializable
 data class CatalogueDrm(
@@ -100,6 +106,7 @@ fun CatalogueItem.toMediaItem(startMuted: Boolean = false, series: String? = nul
         )
     },
     chaptersUrl = chaptersUrl,
+    chapters = chapters?.map { Chapter(startMs = it.startMs, title = it.title, endMs = it.endMs) },
     thumbnailsUrl = thumbnailsUrl,
     adConfig = ads?.takeIf { it.type == "clientSide" }?.adTagUri?.let { AdConfig.ClientSide(adTagUri = it) },
     // The descriptive [label] is the human name (the terse [title] is just the card caption, e.g. "AVC").

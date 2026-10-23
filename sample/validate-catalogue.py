@@ -16,6 +16,24 @@ DRM_SCHEMES = {"WIDEVINE", "PLAYREADY", "FAIRPLAY", "CLEARKEY"}
 REQUIRED_ITEM_FIELDS = ("id", "title", "label", "url", "mimeType")
 
 
+def chapter_errors(at: str, chapters) -> list[str]:
+    """Declared chapters: a list of {startMs, title?, endMs?}, in milliseconds."""
+    if chapters is None:
+        return []
+    if not isinstance(chapters, list):
+        return [f"{at}: chapters must be a list"]
+    errors = []
+    for i, ch in enumerate(chapters):
+        start, end = ch.get("startMs"), ch.get("endMs")
+        if not isinstance(start, int) or isinstance(start, bool) or start < 0:
+            errors.append(f"{at}: chapters[{i}].startMs must be a non-negative integer")
+        elif end is not None and (not isinstance(end, int) or isinstance(end, bool) or end < start):
+            errors.append(f"{at}: chapters[{i}].endMs must be an integer no smaller than startMs")
+        if "title" in ch and not isinstance(ch["title"], str):
+            errors.append(f"{at}: chapters[{i}].title must be a string")
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -59,8 +77,11 @@ def main() -> int:
             if not str(item.get("url", "")).startswith("https://"):
                 errors.append(f"{at}: url must be https")
 
-            if item.get("chaptersUrl") and not str(item["chaptersUrl"]).startswith("https://"):
-                errors.append(f"{at}: chaptersUrl must be https")
+            for key in ("chaptersUrl", "thumbnailsUrl"):
+                if item.get(key) and not str(item[key]).startswith("https://"):
+                    errors.append(f"{at}: {key} must be https")
+
+            errors.extend(chapter_errors(at, item.get("chapters")))
 
             if "poster" in item and item["poster"] not in posters:
                 errors.append(f"{at}: poster {item['poster']!r} is not declared in posters")

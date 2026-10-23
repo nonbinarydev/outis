@@ -334,8 +334,8 @@ filesystem path, so local-file playback on web needs a URL the page origin can a
 |---|---|
 | `PlayerState.videoSize` | Always `null` on web — the engine only ever writes `null` (`ShakaEngine.kt`). Never gate layout on it. |
 | `CaptionsDefaultMode.FOLLOW_SYSTEM` | Treated as `OFF` on web; there is no universal caption-accessibility signal (`MediaItem.kt`). |
-| DRM | Widevine in Chrome, Edge and Firefox; PlayReady in Edge; FairPlay in Safari. A DRM failure at load time surfaces as `PlayerError.Category.SOURCE`, not `DRM` — see [DRM](drm.md). |
-| Chapters | Not extracted on web. `PlayerState.chapters` stays empty. |
+| DRM | Widevine in Chrome, Edge and Firefox; PlayReady in Edge; FairPlay in Safari. A scheme the browser lacks fails before loading, as `PlayerError.Category.DRM`; a failure during the load takes Shaka's own category, so a key-system error is `DRM` too — see [DRM](drm.md). |
+| Chapters | Declared `MediaItem.chapters` and a `chaptersUrl` WebVTT sidecar both work; chapters embedded in a file are never read on web. |
 
 Everything else — sources, transport, state and events, tracks, live, quality caps — behaves as
 described in [Playback](playback.md).

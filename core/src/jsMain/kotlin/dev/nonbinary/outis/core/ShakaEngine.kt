@@ -7,6 +7,7 @@
 package dev.nonbinary.outis.core
 
 import dev.nonbinary.outis.core.ads.AdConfig
+import dev.nonbinary.outis.core.chapters.declaredChapters
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
@@ -213,15 +214,16 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
                 playbackState = PlaybackState.BUFFERING,
                 audioTracks = emptyList(), textTracks = emptyList(), videoTracks = emptyList(),
                 selectedAudioTrackId = null, selectedTextTrackId = null, selectedVideoTrackId = null,
-                chapters = emptyList(),
+                chapters = item.declaredChapters,
                 thumbnails = emptyList(),
             )
         }
         emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
         emit { p, t -> PlayerEvent.BufferingStarted(p, t) }
 
-        // WebVTT chapters sidecar — the only chapter source on Web (no local-container parsing here).
-        item.chaptersUrl?.let { sidecar ->
+        // A WebVTT sidecar is the only chapter source Web reads (no local-container parsing here), and only
+        // when the item declares none.
+        item.chaptersUrl?.takeIf { item.chapters == null }?.let { sidecar ->
             scope.launch {
                 val chapters = loadSidecarChapters(sidecar)
                 if (!released && generation == loadGeneration && chapters.isNotEmpty()) {

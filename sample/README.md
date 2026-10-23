@@ -142,13 +142,16 @@ Each item:
 | `title` | yes | Compact card label. |
 | `label` | yes | Fuller label for the hero and overlay. |
 | `url` | yes | Manifest or file URL. |
-| `mimeType` | yes | `HLS`, `DASH` or `MP4`, mapping to `MimeType`. |
+| `mimeType` | yes | `HLS`, `DASH`, `MP4` or `WEBM`, mapping to `MimeType`. |
 | `tags` | no | Badge strings. |
 | `poster` | no | Key into `posters`. |
 | `tint` | no | Hex colour for a solid tile when there is no poster. Mutually exclusive with `poster`. |
-| `drm` | no | `scheme` (`WIDEVINE`, `PLAYREADY`, `FAIRPLAY`), `licenseServerUrl`, and `certificateUrl` for FairPlay. |
+| `drm` | no | `scheme` (`WIDEVINE`, `PLAYREADY`, `FAIRPLAY`, `CLEARKEY`), `licenseServerUrl`, `certificateUrl` for FairPlay, and `keys` (hex key id to hex key) for Clear Key, which has no server. |
 | `ads` | no | `type: "clientSide"` with `adTagUri`, or `type: "serverSide"` with `breaks`. |
 | `scte35MasterUrl` | no | Playlist to poll for live SCTE-35 cue-points. |
+| `chaptersUrl` | no | WebVTT chapters sidecar. |
+| `chapters` | no | Chapters declared inline, each `startMs`, optional `title` and `endMs`. They win over `chaptersUrl`, so keep the sidecar for sample builds that predate the field. |
+| `thumbnailsUrl` | no | WebVTT trickplay-thumbnails sidecar. |
 | `note` | no | Why this entry exists, or what it will not do on which platform. |
 
 **DRM is declarative on purpose.** `DrmConfig` also carries `licenseRequestInterceptor` and

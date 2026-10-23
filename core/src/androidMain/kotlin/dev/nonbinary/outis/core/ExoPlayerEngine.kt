@@ -46,6 +46,7 @@ import dev.nonbinary.outis.core.ads.AdObstruction
 import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
+import dev.nonbinary.outis.core.chapters.declaredChapters
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
@@ -186,12 +187,10 @@ internal class ExoPlayerEngine(
                 selectedTextTrackId = null,
                 videoTracks = emptyList(),
                 selectedVideoTrackId = null,
-                chapters = emptyList(),
+                chapters = item.declaredChapters,
                 thumbnails = emptyList(),
             )
         }
-        // Media3 surfaces no chapter API, so parse embedded chapters from the local container off-thread
-        // (mp4/m4v QuickTime+Nero, mkv Matroska) and publish them to PlayerState. Remote sources skip this.
         extractChaptersAsync(item)
         loadThumbnailsAsync(item)
         // Fail fast on a DRM scheme this device can't satisfy, rather than handing ExoPlayer an
@@ -686,7 +685,9 @@ internal class ExoPlayerEngine(
     }
 
     private fun extractChaptersAsync(item: MediaItem) {
+        if (item.chapters != null) return // declared chapters are already in state, and win
         // A WebVTT sidecar wins over embedded chapters and is the only source that works for remote/streams.
+        // Media3 surfaces no chapter API, so embedded ones are parsed from the local container off-thread.
         item.chaptersUrl?.let { sidecar ->
             scope.launch(ioDispatcher) {
                 val chapters = loadSidecarChapters(sidecar)

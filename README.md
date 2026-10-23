@@ -51,7 +51,8 @@ Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo
 | Audio / subtitle track selection | ✅ | ✅ | ✅ |
 | Client-side ads (IMA) | ✅ | ❌ | ✅ (adaptive sources only) |
 | Server-side ads (SSAI) | app-driven | app-driven | app-driven |
-| Embedded chapters (MP4 / Matroska) | ✅ | ✅ | ❌ |
+| Chapters, declared or from a WebVTT sidecar | ✅ | ✅ | ✅ |
+| Chapters embedded in a local file | ✅ (MP4, Matroska) | ✅ (MP4) | ❌ |
 | Picture-in-Picture | ✅ (`rememberPlayerWindow`) | host-supplied | host-supplied |
 
 The DRM split is the unavoidable one: Widevine has no CDM on Apple platforms, FairPlay is Apple-only. SSAI is

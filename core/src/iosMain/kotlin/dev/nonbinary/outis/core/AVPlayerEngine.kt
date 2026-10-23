@@ -12,6 +12,7 @@ import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
+import dev.nonbinary.outis.core.chapters.declaredChapters
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
@@ -323,7 +324,7 @@ internal class AVPlayerEngine(
                 selectedTextTrackId = null,
                 videoTracks = emptyList(),
                 selectedVideoTrackId = null,
-                chapters = emptyList(),
+                chapters = item.declaredChapters,
                 thumbnails = emptyList(),
             )
         }
@@ -647,6 +648,7 @@ internal class AVPlayerEngine(
     }
 
     private fun extractChaptersFor(item: MediaItem) {
+        if (item.chapters != null) return // declared chapters are already in state, and win
         // A WebVTT sidecar wins over embedded chapters and is the only source that works for remote/HLS.
         item.chaptersUrl?.let { sidecar ->
             scope.launch(Dispatchers.Default) {

@@ -243,7 +243,8 @@ let item = MediaItem(
     chapterThumbnails: false,
     chaptersUrl: nil,
     thumbnailsUrl: nil,
-    analytics: nil
+    analytics: nil,
+    chapters: nil
 )
 player.setMediaItem(item: item, autoPlay: true)
 ```

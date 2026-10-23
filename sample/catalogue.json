@@ -22,7 +22,15 @@
       "tags" : [ "VOD", "HLS", "4K" ],
       "chaptersUrl" : "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/text/chapters.vtt",
       "thumbnailsUrl" : "https://pub-a930c32af9a24738aec886ca10d1787e.r2.dev/media/thumbnails/thumbnails.vtt",
-      "note" : "Our own encode, self-hosted on R2: a 240p–2160p H.264 ladder with an HEVC rung, English/Commentary/Surround audio, en/es/ar/ja subtitles, and a burned-in info board."
+      "chapters" : [
+        { "startMs" : 0, "endMs" : 122400, "title" : "A Peaceful Morning" },
+        { "startMs" : 122400, "endMs" : 268933, "title" : "The Rodent Trio" },
+        { "startMs" : 268933, "endMs" : 385600, "title" : "The Turning Point" },
+        { "startMs" : 385600, "endMs" : 495000, "title" : "Revenge" },
+        { "startMs" : 495000, "endMs" : 618767, "title" : "Credits" },
+        { "startMs" : 618767, "endMs" : 634566, "title" : "Post-Credits Gag" }
+      ],
+      "note" : "Our own encode, self-hosted on R2: a 240p–2160p H.264 ladder with an HEVC rung, English/Commentary/Surround audio, en/es/ar/ja subtitles, and a burned-in info board. Its chapters are declared in the catalogue; the other Big Buck Bunny entries read the same ones from a WebVTT sidecar."
     }, {
       "id" : "bbb-dash",
       "title" : "Adaptive",

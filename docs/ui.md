@@ -591,9 +591,9 @@ overlay never reads either. If you monetise, you gate seeking and draw ad UI you
 for this. The module's entire ad involvement is handing the platform surface to the engine so IMA has
 somewhere to render (see [`PlayerSurface`](#playersurface)).
 
-**No chapter UI.** `PlayerState.chapters` and `MediaItem.chapterThumbnails` have no consumer in
-`ui/src`. Chapter markers, a chapter list and thumbnail previews are all yours to build, including
-decoding the thumbnail bytes. See [local files and chapters](local-files.md).
+**Chapters are scrubber ticks, nothing more.** The scrubber marks each chapter start
+(`BasicControls.kt`); nothing shows a chapter's title, lists chapters, or decodes `Chapter.thumbnail`.
+Those are yours to build. See [local files and chapters](local-files.md).
 
 **No rendition or quality selector.** `SubtitleButton` and `AudioButton` cover text and audio tracks
 only. Alternate renditions (Android and web) are on `PlayerControlsState.videoTracks` /

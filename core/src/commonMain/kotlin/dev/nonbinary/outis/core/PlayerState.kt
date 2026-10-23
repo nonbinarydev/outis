@@ -134,10 +134,11 @@ public data class PlayerState(
     val selectedVideoTrackId: String? = null,
 
     /**
-     * Chapter markers, sorted by start. Read from the
-     * [dev.nonbinary.outis.core.source.MediaItem.chaptersUrl] WebVTT sidecar on every engine; without one,
-     * from the chapters embedded in a local MP4/M4V (QuickTime/Nero) or Matroska file on Android and iOS.
-     * Empty when neither yields any. Arrives asynchronously, after the load.
+     * Chapter markers, sorted by start: the item's own [dev.nonbinary.outis.core.source.MediaItem.chapters]
+     * when it declares them, present as soon as the item is set. Otherwise read from the
+     * [dev.nonbinary.outis.core.source.MediaItem.chaptersUrl] WebVTT sidecar on every engine and, without one,
+     * from the chapters embedded in a local MP4/M4V (QuickTime/Nero) or Matroska file on Android and iOS;
+     * those arrive asynchronously, after the load. Empty when no source yields any.
      */
     val chapters: List<Chapter> = emptyList(),
     /**
