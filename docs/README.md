@@ -35,6 +35,7 @@ Per-subsystem references. Read them in any order; each is self-contained.
 | [Local files and chapters](local-files.md) | `MediaSource.LocalFile`; `PlayerState.chapters` from declared chapters, a WebVTT sidecar, or the mp4 and Matroska parsing on Android and iOS; and chapter thumbnails with their size budget. |
 | [Analytics, QoS and the plugin seam](analytics.md) | `PlayerComponent` and `PlayerHost`, the `nativePlayerHandle` escape hatch and what it actually is per platform, and which QoS events each engine emits — three of them are Android-only. |
 | [Mux Data adapter](analytics-mux.md) | The ready-made Mux QoS adapter: add the module (and Mux's non-Central repo), register `MuxAnalytics`, map per-item metadata, and inject the env key safely. Android, iOS and web. |
+| [Firebase / GA4 usage adapter](analytics-firebase.md) | What viewers watch, in GA4: the three events it reports and their parameters, logging the app's own events, and the consent switch, with what each platform needs besides. Android, iOS and web. |
 
 ## Reference
 

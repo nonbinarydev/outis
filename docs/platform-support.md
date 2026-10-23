@@ -37,29 +37,30 @@ Building the Apple targets requires macOS. Building the Android and JS targets d
 implementation("io.github.nonbinarydev:outis-core:0.1.0-alpha01")
 implementation("io.github.nonbinarydev:outis-ui:0.1.0-alpha01")              // optional
 implementation("io.github.nonbinarydev:outis-analytics-mux:0.1.0-alpha01")   // optional
+implementation("io.github.nonbinarydev:outis-analytics-firebase:0.1.0-alpha01")   // optional
 ```
 
-`io.github.nonbinarydev:outis-bom` aligns all three: import it with `project.dependencies.platform(...)` and
+`io.github.nonbinarydev:outis-bom` aligns all four: import it with `project.dependencies.platform(...)` and
 drop the versions from the lines above.
 
 Nothing has been published to Maven Central yet, so these coordinates do not resolve today.
 
 ### Published targets
 
-| Target | `outis-core` | `outis-ui` | `outis-analytics-mux` |
-|---|---|---|---|
-| `android` | Yes | Yes | Yes |
-| `iosArm64` | Yes | Yes | Yes |
-| `iosSimulatorArm64` | Yes | Yes | Yes |
-| `js(IR)` | Yes | Yes | Yes |
-| `jvm` | Yes (no engine — see below) | No | No |
-| `wasmJs` | Yes (no engine — see below) | No | No |
+| Target | `outis-core` | `outis-ui` | `outis-analytics-mux` | `outis-analytics-firebase` |
+|---|---|---|---|---|
+| `android` | Yes | Yes | Yes | Yes |
+| `iosArm64` | Yes | Yes | Yes | Yes |
+| `iosSimulatorArm64` | Yes | Yes | Yes | Yes |
+| `js(IR)` | Yes | Yes | Yes | Yes |
+| `jvm` | Yes (no engine — see below) | No | No | No |
+| `wasmJs` | Yes (no engine — see below) | No | No | No |
 
-Verified against `core/build.gradle.kts`, `ui/build.gradle.kts` and `analytics/mux/build.gradle.kts`.
-`outis-bom` is a platform with no code; it aligns the three versions.
+Verified against `core/build.gradle.kts`, `ui/build.gradle.kts`, `analytics/mux/build.gradle.kts` and
+`analytics/firebase/build.gradle.kts`. `outis-bom` is a platform with no code; it aligns the four versions.
 
 The target sets are **not** the same, and that asymmetry is the most common first build failure. A
-shared module that declares `jvm()` or `wasmJs()` and puts `outis-ui` or `outis-analytics-mux` in
+shared module that declares `jvm()` or `wasmJs()` and puts `outis-ui` or an analytics adapter in
 `commonMain` will fail to resolve them for those source sets. Put them in the source sets that actually
 have them, or drop the extra targets.
 

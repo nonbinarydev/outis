@@ -88,9 +88,16 @@ First release. Not yet published to Maven Central.
 - `MuxAnalytics`, a `PlayerComponent` that binds Mux Data's own SDK to the engine's native player on
   Android, iOS and Web, with per-video metadata from `MediaItem.analytics`.
 
+**Analytics (`outis-analytics-firebase`)**
+
+- `FirebaseUsageAnalytics`, a `PlayerComponent` that reports usage to Google Analytics 4: `video_start`,
+  `video_complete` and `video_error` with the item's `PlaybackMetadata`, through Firebase on Android and
+  iOS and gtag.js on the web. `logEvent` reports the app's own events, and `setCollectionEnabled` applies
+  the viewer's consent to Firebase as a whole.
+
 **Distribution**
 
-- `outis-bom`, which aligns `outis-core`, `outis-ui` and `outis-analytics-mux` to one version.
+- `outis-bom`, which aligns `outis-core`, `outis-ui` and the two analytics adapters to one version.
 
 ### Known limitations
 

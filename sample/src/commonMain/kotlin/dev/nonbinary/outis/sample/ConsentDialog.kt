@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -35,6 +36,9 @@ import dev.nonbinary.outis.sample.consent.ConsentCategory
 import dev.nonbinary.outis.sample.consent.ConsentManager
 
 private val DIALOG_MAX_WIDTH = 560.dp
+
+// Published from site/privacy.html by the Pages workflow.
+private const val PRIVACY_NOTICE_URL = "https://nonbinarydev.github.io/outis/privacy.html"
 
 /**
  * Consent for the analytics SDKs, serving both roles.
@@ -80,10 +84,12 @@ fun ConsentDialog(manager: ConsentManager, firstRun: Boolean, onClose: () -> Uni
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
-                    "This demo can send anonymous playback data to help improve it. You choose what is " +
-                        "shared, and can change it any time from Player settings.",
+                    "This demo can send playback data to help improve it, and usage data to show what is " +
+                        "watched. You choose what is shared, and can change it any time from Player settings.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                val uriHandler = LocalUriHandler.current
+                TextButton(onClick = { uriHandler.openUri(PRIVACY_NOTICE_URL) }) { Text("Privacy notice") }
 
                 ConsentCategory.entries.forEach { category ->
                     CategoryRow(

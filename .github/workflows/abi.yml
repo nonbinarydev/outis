@@ -2,8 +2,8 @@
 # directory. The dumps are the reviewable record of the public surface: a diff there is an API change,
 # intended or not. For an intended change, run `./gradlew updateKotlinAbi` and commit the dumps with it.
 #
-# Linux compiles every klib target except :analytics:mux's iOS ones, whose cinterop needs macOS; their
-# part of the dump is inferred from the other targets. Android-only declarations are not dumped at all:
+# Linux compiles every klib target except the analytics adapters' iOS ones, whose cinterop needs macOS;
+# their part of the dump is inferred from the other targets. Android-only declarations are not dumped at all:
 # Kotlin 2.4.10's ABI validation reads the legacy Android target, not the AGP KMP library one.
 
 name: ABI

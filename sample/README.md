@@ -69,8 +69,9 @@ your team ID is never committed.
 ## Analytics and consent
 
 The sample doubles as the reference wiring for the optional [Mux Data](../docs/analytics-mux.md) QoS
-adapter (`:analytics:mux`) and for the consent gate any analytics SDK needs. Neither is part of the SDK —
-`:core` and `:ui` ship no analytics dependency; this is the app's own integration.
+adapter (`:analytics:mux`), the [Firebase / GA4](../docs/analytics-firebase.md) usage adapter
+(`:analytics:firebase`), Crashlytics on the app hosts, and the consent gate all of them need. None of it
+is part of the SDK — `:core` and `:ui` ship no analytics dependency; this is the app's own integration.
 
 ### Enabling Mux
 
@@ -84,6 +85,33 @@ disabled. Supply the key — the client-side *environment* key, not a Mux API to
 
 An empty key bakes an empty constant and the adapter is simply never attached.
 
+### Firebase
+
+Usage analytics (GA4) and, on Android and iOS, crash reports (Crashlytics). A plain checkout is
+Firebase-free: each platform turns it on only when given its own configuration, none of which is
+committed, because each identifies a real Firebase project.
+
+- **Android:** download the app's `google-services.json` from the Firebase console (package
+  `dev.nonbinary.outis.sample`) into `sample/android/`; `google-services.json.example` shows its shape.
+  Only then does the build apply the Google services and Crashlytics plugins.
+- **iOS:** put the app's `GoogleService-Info.plist` in `sample/iosApp/iosApp/` (see the `.example`) and
+  run `pod install`. A build phase bundles the file when it is there, and the app configures Firebase only
+  when it finds it. Crash reports arrive unsymbolicated until the Crashlytics dSYM upload is set up, which
+  this host does not do yet.
+- **Web:** a GA4 measurement id, by the same precedence as the Mux key: a `ga4.id=G-…` line in
+  `local.properties`, or `-Pga4.id=G-…`. [`pages.yml`](../.github/workflows/pages.yml) reads it from the
+  `GA4_MEASUREMENT_ID` repository variable. The build rejects anything that is not shaped like `G-…`,
+  since it becomes part of a script URL.
+
+Then, with **Marketing** consent, the adapter reports `video_start`, `video_complete` and `video_error`,
+and the sample adds `select_content` when the viewer picks a video: the catalogue id only, never a
+custom stream's URL. On the web, gtag.js is not even loaded before that consent; a revoke silences it at
+once. Crash reports follow **Performance** consent from the next launch, because Crashlytics applies a
+change then; reports from a session without consent are deleted, not sent.
+
+The public demo's [privacy notice](../site/privacy.html) describes all of this for visitors, and the
+consent dialog links to it. It is a draft for the operator to complete, not legal advice.
+
 ### Consent
 
 The demo reports to third-party analytics, so it carries the consent gate a public deployment needs —
@@ -91,11 +119,12 @@ and, being a reference, it demonstrates the *mechanism* rather than hardcoding a
 is modelled as **purpose categories**, not per-SDK:
 
 - **Essential** — always on: playback, and the on-device diagnostics log (which never leaves the device).
-- **Performance** — Mux QoS. Gated by default.
-- **Marketing** — usage analytics (e.g. GA4). Always gated.
+- **Performance** — Mux QoS, and Crashlytics in the apps. Gated by default.
+- **Marketing** — usage analytics (GA4). Always gated.
 
 An adapter attaches only while its category is granted (`addComponent` on grant, `removeComponent` on
-revoke), and nothing collects before a first-run choice. The choice persists per platform (localStorage /
+revoke), and nothing collects before a first-run choice: Firebase's own collection is off by default in
+the Android manifest and the iOS `Info.plist`, and consent turns it on. The choice persists per platform (localStorage /
 SharedPreferences / `NSUserDefaults`) so it survives a reload, and is revisitable from **Player settings →
 Privacy & data**.
 

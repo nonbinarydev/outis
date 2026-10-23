@@ -11,11 +11,9 @@ import dev.nonbinary.outis.core.AppContext
 import platform.UIKit.UIViewController
 
 /**
- * Entry point for an iOS host application: present this from SwiftUI with a
- * `UIViewControllerRepresentable`, or set it as the window's root view controller.
- *
- * No Xcode project ships in this repository yet, so nothing calls this — it exists so the iOS target
- * compiles the same shared code the other platforms run, which is what makes this a meaningful
- * portability check rather than a web-only sample.
+ * Entry point for the iOS host (`sample/iosApp`), which presents it from SwiftUI with a
+ * `UIViewControllerRepresentable`. [onCrashReportingConsent] is how the host's Crashlytics learns the
+ * viewer's choice; Swift receives its argument as a `KotlinBoolean`.
  */
-fun mainViewController(): UIViewController = ComposeUIViewController { App(AppContext()) }
+fun mainViewController(onCrashReportingConsent: (Boolean) -> Unit): UIViewController =
+    ComposeUIViewController { App(AppContext(), onCrashReportingConsent = onCrashReportingConsent) }

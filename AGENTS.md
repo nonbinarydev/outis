@@ -14,6 +14,9 @@ Outis is a Kotlin Multiplatform video player SDK — one engine-agnostic playbac
 | `:core` | yes (`outis-core`) | The playback API and the three engines. No UI, no DI, no HTTP client. |
 | `:ui` | yes (`outis-ui`) | Optional Compose Multiplatform surface and controls over `:core`. |
 | `:sample` | no | The demo. Compose Multiplatform app: catalogue, custom-stream form, dialogs. |
+| `:analytics:mux` | yes (`outis-analytics-mux`) | Optional Mux Data QoS adapter; binds Mux's SDK to the native player (ADR-0003). |
+| `:analytics:firebase` | yes (`outis-analytics-firebase`) | Optional GA4 usage adapter; translates the cross-engine `PlayerEvent`s (ADR-0011). |
+| `:bom` | yes (`outis-bom`) | Version alignment for the published modules. A new published module goes in here too. |
 | `:sample:android` | no | The installable Android host for `:sample`, phones and Android TV (the KMP Android plugin builds libraries only). |
 
 `:core` uses a **custom source-set hierarchy** (`webMain` shared by `jsMain`/`wasmJsMain`), so its
@@ -82,4 +85,6 @@ Some versions are held deliberately; read the comment before changing them.
 
 - On-device Android, a real iOS build, and browser behaviour are verified by the maintainer, not by
   you. State plainly what needs on-device or in-browser checking rather than claiming it works.
-- iOS has no Xcode host in this repo yet, so the iOS engine is compile-verified only.
+- The iOS host (`sample/iosApp`) needs macOS, Xcode and CocoaPods, as does the analytics adapters' iOS
+  cinterop, so neither builds on Linux. `:core` and `:ui` compile their iOS klibs there, which is all an
+  iOS check from Linux proves.

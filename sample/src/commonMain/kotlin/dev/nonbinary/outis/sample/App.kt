@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.ktor3.KtorNetworkFetcherFactory
+import dev.nonbinary.outis.analytics.firebase.FirebaseUsageAnalytics
 import dev.nonbinary.outis.analytics.mux.MuxAnalytics
 import dev.nonbinary.outis.analytics.mux.MuxConfig
 import dev.nonbinary.outis.core.AppContext
@@ -52,12 +54,15 @@ import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.VideoPlayer
 import dev.nonbinary.outis.core.ads.AdController
 import dev.nonbinary.outis.sample.ads.rememberServerSideAds
+import dev.nonbinary.outis.sample.analytics.logSelection
+import dev.nonbinary.outis.sample.analytics.rememberUsageAnalytics
 import dev.nonbinary.outis.sample.catalogue.CatalogueItem
 import dev.nonbinary.outis.sample.catalogue.CatalogueRepository
 import dev.nonbinary.outis.sample.catalogue.CatalogueState
 import dev.nonbinary.outis.sample.catalogue.toMediaItem
 import dev.nonbinary.outis.sample.consent.ConsentCategory
 import dev.nonbinary.outis.sample.consent.ConsentManager
+import dev.nonbinary.outis.sample.consent.ConsentState
 import dev.nonbinary.outis.sample.di.sampleModule
 import dev.nonbinary.outis.sample.diagnostics.DiagnosticsLog
 import dev.nonbinary.outis.sample.generated.SampleConfig
@@ -81,10 +86,13 @@ private val LOCKUP_MIN_HEIGHT = 48.dp
 private val LOCKUP_GAP = 24.dp
 private val STATUS_GAP = 16.dp
 
-/** The sample's one screen, as phones, tablets, iOS and the web show it. */
+/**
+ * The sample's one screen, as phones, tablets, iOS and the web show it. [onCrashReportingConsent] hears
+ * whether the viewer allows crash reports, for a host that runs its own crash reporter.
+ */
 @Composable
-fun App(appContext: AppContext, modifier: Modifier = Modifier) {
-    SampleHost(appContext) { AppContent(appContext, modifier) }
+fun App(appContext: AppContext, modifier: Modifier = Modifier, onCrashReportingConsent: (Boolean) -> Unit = {}) {
+    SampleHost(appContext) { AppContent(appContext, onCrashReportingConsent, modifier) }
 }
 
 /**
@@ -115,7 +123,11 @@ internal fun SampleHost(appContext: AppContext, content: @Composable () -> Unit)
 }
 
 @Composable
-private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
+private fun AppContent(
+    appContext: AppContext,
+    onCrashReportingConsent: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val player = remember { VideoPlayer(appContext) }
     DisposableEffect(player) {
         onDispose { player.release() }
@@ -142,7 +154,7 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
     val consent = koinInject<ConsentManager>()
     val consentState by consent.state.collectAsState()
 
-    MuxQosBinding(player, appContext, consentState.isGranted(ConsentCategory.PERFORMANCE))
+    val usage = rememberConsentedIntegrations(player, appContext, consentState, onCrashReportingConsent)
 
     // First item of the first rail, once the catalogue arrives. Keyed on the state so it runs on the
     // transition to Ready rather than on every recomposition, and never overrides a user's choice.
@@ -211,6 +223,7 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
             selected = selected,
             onSelect = {
                 selected = it
+                usage?.logSelection(it)
                 showSource = false
             },
             onDismissSource = { showSource = false },
@@ -236,6 +249,23 @@ private fun AppContent(appContext: AppContext, modifier: Modifier = Modifier) {
 }
 
 /**
+ * Everything that waits on consent: Mux and the host's crash reporter on Performance, GA4 on Marketing.
+ * Returns the usage adapter, for the sample's own events, while Marketing consent stands.
+ */
+@Composable
+private fun rememberConsentedIntegrations(
+    player: VideoPlayer,
+    appContext: AppContext,
+    consent: ConsentState,
+    onCrashReportingConsent: (Boolean) -> Unit,
+): FirebaseUsageAnalytics? {
+    val performance = consent.isGranted(ConsentCategory.PERFORMANCE)
+    MuxQosBinding(player, appContext, performance)
+    CrashReportingBinding(performance, onCrashReportingConsent)
+    return rememberUsageAnalytics(player, appContext, consent.isGranted(ConsentCategory.MARKETING))
+}
+
+/**
  * Binds the Mux QoS adapter to [player] while Performance consent stands. The adapter is built only when
  * a build supplies an env key (otherwise null and skipped). Revoking consent disposes the effect, which
  * removes the component and does not re-add — so collection stops live, not on the next launch.
@@ -251,6 +281,16 @@ private fun MuxQosBinding(player: VideoPlayer, appContext: AppContext, performan
         if (mux != null && performanceGranted) player.addComponent(mux)
         onDispose { mux?.let(player::removeComponent) }
     }
+}
+
+/**
+ * Hands the Performance decision to the host, which runs the crash reporter: Crashlytics is native to the
+ * apps, out of the shared code's reach.
+ */
+@Composable
+private fun CrashReportingBinding(granted: Boolean, onConsent: (Boolean) -> Unit) {
+    val report by rememberUpdatedState(onConsent)
+    LaunchedEffect(granted) { report(granted) }
 }
 
 /** Controls that also show [ads], when the item has server-side ads. */

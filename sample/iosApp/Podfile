@@ -1,9 +1,12 @@
 # The OutisSample Kotlin framework is embedded via the Xcode run-script phase
-# (:sample:embedAndSignAppleFrameworkForXcode); CocoaPods is used only to link Mux's iOS Data SDK, which
-# the :analytics:mux cinterop binds against. After running `pod install`, open iosApp.xcworkspace.
+# (:sample:embedAndSignAppleFrameworkForXcode); CocoaPods links the vendor SDKs its analytics adapters bind
+# against: Mux's iOS Data SDK (:analytics:mux) and Firebase Analytics (:analytics:firebase), plus
+# Crashlytics for the host itself. After running `pod install`, open iosApp.xcworkspace.
 platform :ios, '15.3'
 
 target 'iosApp' do
   use_frameworks!
   pod 'Mux-Stats-AVPlayer', '~> 4.15'
+  pod 'FirebaseAnalytics', '~> 12.19'
+  pod 'FirebaseCrashlytics', '~> 12.19'
 end

@@ -27,6 +27,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Outis">
 
+        <!-- Firebase, in a build that has it, collects nothing until the viewer consents: the shared UI turns
+             analytics on with Marketing consent, and MainActivity turns crash reports on with Performance. -->
+        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+        <meta-data android:name="firebase_crashlytics_collection_enabled" android:value="false" />
+
         <!--
             supportsPictureInPicture is what actually permits enterPictureInPictureMode(). Without it
             the system rejects every call with IllegalStateException, which :ui catches and reports as

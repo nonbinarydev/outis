@@ -8,6 +8,7 @@ under the namespace `io.github.nonbinarydev`.
 | `:core` | `io.github.nonbinarydev:outis-core` | `-android`, `-iosarm64`, `-iossimulatorarm64`, `-js`, `-jvm`†, `-wasm-js`† |
 | `:ui` | `io.github.nonbinarydev:outis-ui` | `-android`, `-iosarm64`, `-iossimulatorarm64`, `-js` |
 | `:analytics:mux` | `io.github.nonbinarydev:outis-analytics-mux` | `-android`, `-iosarm64`, `-iossimulatorarm64`, `-js` |
+| `:analytics:firebase` | `io.github.nonbinarydev:outis-analytics-firebase` | `-android`, `-iosarm64`, `-iossimulatorarm64`, `-js` |
 | `:bom` | `io.github.nonbinarydev:outis-bom` | none — a POM-only platform |
 
 † API only: no playback engine, and `VideoPlayer(...)` throws
@@ -171,8 +172,9 @@ deployment manually in the Portal UI — worth doing while the process is new.
 
 ## Versioning
 
-The version lives in `core/build.gradle.kts`, `ui/build.gradle.kts`, `analytics/mux/build.gradle.kts` and
-`bom/build.gradle.kts`, currently `0.1.0-alpha01`. Keep the four in step.
+The version lives in `core/build.gradle.kts`, `ui/build.gradle.kts`, `analytics/mux/build.gradle.kts`,
+`analytics/firebase/build.gradle.kts` and `bom/build.gradle.kts`, currently `0.1.0-alpha01`. Keep the
+five in step.
 
 **Published coordinates are immutable.** A version can never be re-uploaded or amended, so the artifact
 set for a version — which targets ship, whether javadoc jars are real or empty — is frozen at first

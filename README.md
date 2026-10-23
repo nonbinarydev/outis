@@ -126,6 +126,7 @@ fun start(appContext: AppContext): VideoPlayer {
 | [Ads — server-side](docs/ads-server-side.md) | `AdController`, MediaTailor avails, SCTE-35 cues, beaconing. |
 | [Local files and chapters](docs/local-files.md) | On-device playback, embedded chapters and thumbnails. |
 | [Analytics and QoS](docs/analytics.md) | `PlayerComponent`, the native handle, which events fire where. |
+| Analytics adapters: [Mux](docs/analytics-mux.md) · [Firebase / GA4](docs/analytics-firebase.md) | Ready-made modules: Mux for quality of service, GA4 for what viewers watch. |
 | [Platform support](docs/platform-support.md) | Requirements, published targets, per-platform gaps. |
 | [Troubleshooting](docs/troubleshooting.md) | Symptom, cause, fix. |
 | Module reference | [`outis-core`](core/README.md) · [`outis-ui`](ui/README.md) — the per-module API notes that ship to Maven Central. |

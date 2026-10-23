@@ -53,7 +53,11 @@ jobs:
             :core:detektJsMain :core:detektWasmJsMain \
             :ui:detektMetadataCommonMain \
             :ui:detektAndroidMain :ui:detektAndroidHostTest \
-            :ui:detektJsMain
+            :ui:detektJsMain \
+            :analytics:mux:detektMetadataCommonMain :analytics:mux:detektAndroidMain \
+            :analytics:mux:detektJsMain \
+            :analytics:firebase:detektMetadataCommonMain :analytics:firebase:detektAndroidMain \
+            :analytics:firebase:detektJsMain :analytics:firebase:detektJsTest
 
       # Runs even on failure: a red build is exactly when the findings are worth reading.
       # The merged file, not the reports directory: each detekt task emits its own SARIF, and code

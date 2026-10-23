@@ -20,6 +20,7 @@ dependencies {
         api(project(":core"))
         api(project(":ui"))
         api(project(":analytics:mux"))
+        api(project(":analytics:firebase"))
     }
 }
 

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Outis demo</title>
+<meta name="description" content="What the Outis demo collects, when, and how to change your choice.">
+<style>
+  :root { --ink:#1B1A21; --muted:#6E6B76; --rule:#DEDCD4; --paper:#F7F6F1; --card:#fff; --accent:#7B3FAE; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#E9E7E1; --muted:#95918A; --rule:#2E2C36; --paper:#15141A; --card:#1D1C23; --accent:#B583D9; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); line-height:1.6;
+         font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:720px; margin:0 auto; padding:64px 24px 96px; }
+  h1 { font-size:15px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted);
+       font-weight:600; margin:0 0 12px; }
+  h2 { font-size:18px; margin:40px 0 8px; }
+  p.lede { font-size:20px; margin:0 0 32px; text-wrap:balance; }
+  table { border-collapse:collapse; width:100%; font-size:15px; margin:0 0 16px; }
+  th, td { text-align:left; vertical-align:top; padding:10px 12px; border-bottom:1px solid var(--rule); }
+  th { font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:13.5px; }
+  a { color:var(--accent); }
+  footer { margin-top:48px; font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Privacy</h1>
+  <p class="lede">The Outis demo plays video. Its analytics and crash reports run only after you agree,
+  and you can change your mind at any time.</p>
+
+  <p>This covers the <a href="demo/">web demo</a> and the Android and iOS sample apps built from the
+  same code. The Outis library itself collects nothing; only the demo uses analytics.</p>
+
+  <h2>What is collected, and when</h2>
+  <table>
+    <thead><tr><th>Choice</th><th>What</th><th>Who receives it</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Essential<br>always on</td>
+        <td>Nothing about you leaves your device. The diagnostics log and your privacy choice are
+        stored on the device. Fetching the stream list and the videos reveals your IP address to their
+        hosts, as any web request does.</td>
+        <td>GitHub Pages and the video hosts, for the requests themselves</td>
+      </tr>
+      <tr>
+        <td>Ad examples<br>when you play one</td>
+        <td>The web demo loads Google's ad SDK on every visit, which reveals your IP address to Google.
+        Playing a video with client-side ads asks Google's ad servers for the ads, and they may set
+        cookies of their own.</td>
+        <td>Google (<a href="https://policies.google.com/privacy">privacy</a>)</td>
+      </tr>
+      <tr>
+        <td>Performance<br>only if you agree</td>
+        <td>How well each video plays: startup time, stalls, quality and errors, with the video, your
+        device and browser type, an approximate location and a random viewer id kept on your device.
+        In the apps, also crash reports: what failed, the device model and system version, and an
+        installation id.</td>
+        <td>Mux (<a href="https://www.mux.com/privacy">privacy</a>); for crash reports, Google
+        Firebase Crashlytics (<a href="https://firebase.google.com/support/privacy">privacy</a>)</td>
+      </tr>
+      <tr>
+        <td>Marketing<br>only if you agree</td>
+        <td>Which videos are chosen, started, finished or fail, and how long a visit lasts, linked by a
+        random identifier: a cookie (<code>_ga</code>) on the web, an app-instance id in the apps.
+        Never the address of a stream you type in yourself.</td>
+        <td>Google Analytics (<a href="https://policies.google.com/privacy">privacy</a>)</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Until you choose, nothing in the last two rows is collected.</p>
+
+  <h2>Changing your choice</h2>
+  <p>Open <strong>Player settings → Privacy &amp; data</strong> in the demo. A change takes effect at
+  once, except that the apps' crash reporting follows it from their next launch. Reports from a session
+  you have not agreed to are deleted, not sent.</p>
+
+  <h2>Questions</h2>
+  <p>Ask on the project's <a href="https://github.com/nonbinarydev/outis/issues">issue tracker</a>.</p>
+
+  <footer>
+    <a href="./">Outis</a>
+  </footer>
+</div>
+</body>
+</html>

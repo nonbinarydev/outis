@@ -11,7 +11,7 @@
 # their own comment would fight over the same thread.
 #
 # :ui's tests are host tests of its controls state, run on the JVM with Android's stubs, so they ride in
-# the Linux job.
+# the Linux job. So do :analytics:firebase's, on Node: its iOS side needs CocoaPods.
 
 name: PR tests
 
@@ -41,7 +41,7 @@ jobs:
           - name: JVM, JS and Wasm
             os: ubuntu-latest
             key: linux
-            tasks: ":core:jvmTest :core:jsNodeTest :core:jsBrowserTest :core:wasmJsNodeTest :core:wasmJsBrowserTest :ui:testAndroidHostTest"
+            tasks: ":core:jvmTest :core:jsNodeTest :core:jsBrowserTest :core:wasmJsNodeTest :core:wasmJsBrowserTest :ui:testAndroidHostTest :analytics:firebase:jsNodeTest"
           - name: iOS simulator
             os: macos-latest
             key: apple
@@ -74,6 +74,7 @@ jobs:
           path: |
             core/build/test-results/
             ui/build/test-results/
+            analytics/firebase/build/test-results/
           if-no-files-found: warn
           retention-days: 7
 

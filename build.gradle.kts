@@ -19,6 +19,9 @@ plugins {
     alias(libs.plugins.kotlinComposeCompiler) apply false
     alias(libs.plugins.vanniktech.mavenPublish) apply false
     alias(libs.plugins.detekt) apply false
+    // Applied by :sample:android only when a Firebase config is present, so they must already be here.
+    alias(libs.plugins.googleServices) apply false
+    alias(libs.plugins.firebaseCrashlytics) apply false
     alias(libs.plugins.dokka)
 }
 
@@ -27,6 +30,7 @@ dependencies {
     dokka(project(":core"))
     dokka(project(":ui"))
     dokka(project(":analytics:mux"))
+    dokka(project(":analytics:firebase"))
 }
 
 dokka {
