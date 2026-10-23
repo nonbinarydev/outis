@@ -140,6 +140,11 @@ dropped frames will show Android data and nothing else.
 `PlaybackRecovered` is emitted where an engine heals a stall by itself: Android after a recoverable
 error, and iOS after the stall self-heal re-seeks. The web engine has no equivalent path.
 
+`FirstFrameRendered` is emitted everywhere but marks different moments. Android reports a frame
+actually rendered, and reports it again when the surface is re-attached; iOS (item ready to play) and
+web (`HAVE_CURRENT_DATA`) report the earlier moment a frame is available, once per item. Startup time
+measured against it reads slightly short on iOS and web, so compare platforms with care.
+
 ## The native player handle
 
 For a vendor SDK that binds to the concrete player, `nativePlayerHandle` is the escape hatch. What it

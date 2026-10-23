@@ -33,8 +33,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.nonbinary.outis.core.source.DrmSupport
 import dev.nonbinary.outis.sample.containerCaveat
 import dev.nonbinary.outis.sample.drmSchemeCaveat
+import dev.nonbinary.outis.sample.rememberDrmSupport
 
 private val CARD_WIDTH = 190.dp
 private const val HEX_RGB_DIGITS = 6
@@ -61,6 +63,7 @@ fun CatalogueRails(
     onSelect: (CatalogueItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val drmSupport = rememberDrmSupport()
     LazyColumn(modifier = modifier, contentPadding = PaddingValues(vertical = 8.dp)) {
         items(catalogue.rails, key = { it.id }) { rail ->
             Column(modifier = Modifier.padding(bottom = 20.dp)) {
@@ -86,6 +89,7 @@ fun CatalogueRails(
                             item,
                             selected = item.id == selectedId,
                             posterUrl = item.poster?.let { catalogue.posters[it] },
+                            drmSupport = drmSupport,
                             onClick = { onSelect(item) },
                         )
                     }
@@ -96,7 +100,13 @@ fun CatalogueRails(
 }
 
 @Composable
-private fun CatalogueCard(item: CatalogueItem, selected: Boolean, posterUrl: String?, onClick: () -> Unit) {
+private fun CatalogueCard(
+    item: CatalogueItem,
+    selected: Boolean,
+    posterUrl: String?,
+    drmSupport: DrmSupport?,
+    onClick: () -> Unit,
+) {
     val accent = MaterialTheme.colorScheme.primary
     Column(modifier = Modifier.width(CARD_WIDTH)) {
         Box(
@@ -152,7 +162,7 @@ private fun CatalogueCard(item: CatalogueItem, selected: Boolean, posterUrl: Str
         // Selectable regardless: seeing the SDK report an unsupported scheme/container is the point, and
         // the hint can be wrong where a disabled card could not be un-wronged. DRM caveat wins over the
         // container one (a scheme mismatch is the more specific problem).
-        (item.drm?.scheme?.let(::drmSchemeCaveat) ?: item.mimeType?.let(::containerCaveat))?.let {
+        (item.drm?.scheme?.let { drmSchemeCaveat(it, drmSupport) } ?: item.mimeType?.let(::containerCaveat))?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.labelSmall,

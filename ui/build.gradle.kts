@@ -155,7 +155,7 @@ mavenPublishing {
     configure(KotlinMultiplatform(javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml")))
 
     // Central Portal (the old OSSRH/Nexus flow is retired). Signing is required by Central; the key
-    // comes from ~/.gradle/gradle.properties locally, or ORG_GRADLE_PROJECT_signingInMemoryKey in CI.
+    // comes from secrets.properties via local-signing.gradle.kts, or ORG_GRADLE_PROJECT_signingInMemoryKey.
     publishToMavenCentral()
     signAllPublications()
 

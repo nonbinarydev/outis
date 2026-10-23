@@ -15,12 +15,14 @@ import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
 import dev.nonbinary.outis.core.source.DrmConfig
 import dev.nonbinary.outis.core.source.DrmScheme
+import dev.nonbinary.outis.core.source.KeySystems
 import dev.nonbinary.outis.core.source.LicenseRequest
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
 import dev.nonbinary.outis.core.source.VideoConstraints
 import dev.nonbinary.outis.core.source.WidevineLevel
+import dev.nonbinary.outis.core.source.unsupportedDrmError
 import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
@@ -507,6 +509,22 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
             startNativePlayback(url, item.startPositionMs)
             return js("Promise.resolve()")
         }
+        // Ask the browser for the key system before Shaka does, so a scheme it lacks fails as a DRM error
+        // that names the scheme, before anything is fetched.
+        val drm = item.drmConfig ?: return loadWithShaka(generation, item, url)
+        return KeySystems.supports(drm.scheme, preflightRobustness(drm)).then<dynamic> { supported ->
+            when {
+                released || generation != loadGeneration -> js("Promise.resolve()")
+                supported -> loadWithShaka(generation, item, url)
+                else -> {
+                    emitErrorOnce(unsupportedDrmError(drm))
+                    js("Promise.resolve()")
+                }
+            }
+        }
+    }
+
+    private fun loadWithShaka(generation: Int, item: MediaItem, url: String): dynamic {
         usingShaka = true
         configureDrm(item.drmConfig)
         configureRestrictions(item.videoConstraints)
@@ -529,10 +547,8 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
                 }
                 Unit
             },
-            { _ ->
-                if (!released && generation == loadGeneration) {
-                    emitErrorOnce(PlayerError(PlayerError.Category.SOURCE, message = "Failed to load media"))
-                }
+            { error ->
+                if (!released && generation == loadGeneration) emitErrorOnce(loadFailure(error))
                 Unit
             },
         )
@@ -848,12 +864,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
             // Keys supplied inline (hex keyId:key) — no license server. Shaka takes them via `clearKeys`.
             drm.clearKeys.forEach { (keyId, key) -> clearKeys[keyId] = key }
         } else if (drm != null) {
-            val keySystem = when (drm.scheme) {
-                DrmScheme.WIDEVINE -> "com.widevine.alpha"
-                DrmScheme.PLAYREADY -> "com.microsoft.playready"
-                DrmScheme.FAIRPLAY -> "com.apple.fps"
-                DrmScheme.CLEARKEY -> error("ClearKey is handled above")
-            }
+            val keySystem = KeySystems.of(drm.scheme)
             servers[keySystem] = drm.licenseServerUrl
             // FairPlay requires the FPS application certificate; let Shaka fetch it.
             if (drm.scheme == DrmScheme.FAIRPLAY && drm.certificateUrl != null) {
@@ -1175,14 +1186,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
     }
 
     private fun onShakaError(detail: dynamic) {
-        val category = when (detail?.category) {
-            1 -> PlayerError.Category.NETWORK
-            3 -> PlayerError.Category.DECODER
-            4 -> PlayerError.Category.SOURCE
-            6 -> PlayerError.Category.DRM
-            else -> PlayerError.Category.UNKNOWN
-        }
-        emitErrorOnce(PlayerError(category, code = (detail?.code as? Int)?.toString(), message = "Shaka error"))
+        emitErrorOnce(shakaPlayerError(detail))
     }
 
     private fun onMediaElementError() {
@@ -1251,3 +1255,27 @@ private fun isProgressive(item: MediaItem, url: String): Boolean = when (item.mi
 
 /** Monotonic clock in ms (browser performance.now). */
 private fun monotonicMillis(): Long = (js("performance.now()") as Double).toLong()
+
+/** A `shaka.util.Error`, classified by its category. */
+private fun shakaPlayerError(error: dynamic): PlayerError {
+    val category = when (error?.category) {
+        1 -> PlayerError.Category.NETWORK
+        3 -> PlayerError.Category.DECODER
+        4 -> PlayerError.Category.SOURCE
+        6 -> PlayerError.Category.DRM
+        else -> PlayerError.Category.UNKNOWN
+    }
+    val code = (error?.code as? Int)?.toString()
+    return PlayerError(category, code = code, message = "Shaka error ${code.orEmpty()}".trim(), nativeCause = error)
+}
+
+/** Why `load()` rejected: Shaka's own error when it gave one, else a source failure. */
+private fun loadFailure(error: dynamic): PlayerError = if (error?.category == null) {
+    PlayerError(PlayerError.Category.SOURCE, message = "Failed to load media", nativeCause = error)
+} else {
+    shakaPlayerError(error)
+}
+
+/** The weakest video robustness [drm]'s Widevine level accepts; empty, for any, otherwise. */
+private fun preflightRobustness(drm: DrmConfig): String =
+    if (drm.scheme == DrmScheme.WIDEVINE) widevineRobustness(drm.widevineLevel).first.firstOrNull().orEmpty() else ""

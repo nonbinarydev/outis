@@ -9,16 +9,16 @@ package dev.nonbinary.outis.core.ads
 import dev.nonbinary.outis.core.ExperimentalPlayerApi
 
 /**
- * Ad-insertion config for a [dev.nonbinary.outis.core.source.MediaItem]. Server-side today (the
- * KMP-friendly path: the player just plays a normally-stitched stream and the SDK tracks cue-points over
- * it); a client-side (IMA/CSAI) variant — an ad-tag URL plus per-platform ad rendering — slots in beside
- * it later behind the same [AdState]/[AdEvent] contract.
+ * Ad-insertion config for a [dev.nonbinary.outis.core.source.MediaItem]: server-side, where the stream is
+ * already stitched and an [AdController] the app drives tracks the breaks, or client-side, where the
+ * platform IMA SDK stitches ads in the engine. Either way the chrome reads one [AdState].
  */
 sealed interface AdConfig {
     /**
-     * Server-side ad insertion. The stream is already stitched, so playback is unchanged; [breaks] are
-     * the ad cue-points (from a MediaTailor/DAI tracking response, SCTE-35 markers, …) that the SDK
-     * tracks over the timeline to drive ad UI, emit [AdEvent]s and block seeking through unwatched ads.
+     * Server-side ad insertion. The stream is already stitched, so playback is unchanged and no engine
+     * reads this; [breaks] are the ad cue-points (from a MediaTailor/DAI tracking response, SCTE-35
+     * markers, …) for an [AdController] to track over the timeline — driving ad UI, emitting [AdEvent]s
+     * and blocking seeks through unwatched ads.
      */
     data class ServerSide(
         /**
@@ -32,9 +32,9 @@ sealed interface AdConfig {
     /**
      * Client-side ad insertion (CSAI): the player stitches ads itself from a VAST/VMAP [adTagUri] via the
      * platform IMA SDK. IMA owns the ad lifecycle — fetch, playback, and the skip/countdown/click-through
-     * UI it renders over the video — and the engine surfaces it through the same [AdState]/[AdEvent]
-     * contract (so the chrome blocks seeking during ads identically). **Android today** (Media3 IMA
-     * extension); iOS (IMA iOS) and Web (IMA HTML5) adapters follow.
+     * UI it renders over the video — and the engine mirrors it into
+     * [dev.nonbinary.outis.core.PlayerState.adState]. **Android** (Media3 IMA extension) and **web**
+     * (Shaka's ad manager, HLS/DASH only); ignored on iOS, where no IMA adapter ships.
      */
     data class ClientSide(
         /**
@@ -95,7 +95,7 @@ data class Ad(
     val skipOffsetMs: Long? = null,
     /**
      * Landing page to open if the viewer taps the ad, or `null` when the creative has none (in which case
-     * the chrome should render no click-through affordance). Opening it is the host app's job — the SDK
+     * your chrome should render no click-through affordance). Opening it is the host app's job — the SDK
      * never navigates on its own.
      */
     val clickThroughUrl: String? = null,

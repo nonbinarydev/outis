@@ -100,9 +100,13 @@ kotlin {
     }
 }
 
+apply(from = rootProject.file("gradle/local-signing.gradle.kts"))
+
 mavenPublishing {
     coordinates(group.toString(), "outis-analytics-mux", version.toString())
     configure(KotlinMultiplatform(javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml")))
+    // Signed like :core and :ui: secrets.properties via local-signing.gradle.kts, or
+    // ORG_GRADLE_PROJECT_signingInMemoryKey.
     publishToMavenCentral()
     signAllPublications()
 

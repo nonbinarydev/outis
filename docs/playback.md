@@ -334,7 +334,9 @@ All three engines emit `BufferingStarted` / `BufferingEnded`, `SeekStarted(targe
 `IsPlayingChanged(isPlaying)`, `TracksChanged(audioTracks, textTracks, videoTracks)`,
 `NativePlayerAttached(handle)`, `Ended` and `FatalError(error)`. `BufferingStarted` also fires for the
 *initial* buffering of a new item, so don't count every one as a rebuffer — use `FirstFrameRendered`
-to tell startup from rebuffering.
+to tell startup from rebuffering. It marks a frame actually rendered on Android (and fires again when
+the surface is re-attached), but the earlier item-ready moment on iOS and web, so startup measured
+against it reads slightly short there.
 
 Two groups are **not** emitted everywhere:
 

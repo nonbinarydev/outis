@@ -27,7 +27,10 @@ data class PlayerState(
      * play" from "deliberately paused" — the overlay's play/pause icon binds to this, not [isPlaying].
      */
     val playWhenReady: Boolean = false,
-    /** Content position in ms. Never ad time — ad position will live on [adState] when ads ship. */
+    /**
+     * Content position in ms, never ad time: during a client-side ad break Android holds the last content
+     * position. The web engine has no such guard, so do not rely on it there mid-break.
+     */
     val positionMs: Long = 0,
     /**
      * How far ahead media is buffered, in ms, expressed as an **absolute timeline position** (not a

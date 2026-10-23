@@ -7,7 +7,6 @@
 package dev.nonbinary.outis.core
 
 import android.content.Context
-import android.media.MediaDrm
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -58,6 +57,8 @@ import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
 import dev.nonbinary.outis.core.source.WidevineLevel
+import dev.nonbinary.outis.core.source.isDrmSchemeSupported
+import dev.nonbinary.outis.core.source.unsupportedDrmError
 import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
@@ -194,12 +195,11 @@ internal class ExoPlayerEngine(
         extractChaptersAsync(item)
         loadThumbnailsAsync(item)
         // Fail fast on a DRM scheme this device can't satisfy, rather than handing ExoPlayer an
-        // undecryptable source that limps along as black/silent playback. FairPlay is Apple-only (no
-        // Android CDM at all); Widevine/PlayReady need a device CDM that many phones lack.
-        unsupportedDrmLabel(item.drmConfig)?.let { scheme ->
+        // undecryptable source that limps along as black/silent playback.
+        item.drmConfig?.takeUnless { isDrmSchemeSupported(it.scheme) }?.let { drm ->
             exo.stop()
             exo.clearMediaItems()
-            val drmError = PlayerError(PlayerError.Category.DRM, message = "$scheme DRM isn't supported on this device")
+            val drmError = unsupportedDrmError(drm)
             _state.update { it.copy(error = drmError, playbackState = PlaybackState.IDLE, isPlaying = false) }
             emit { p, t -> PlayerEvent.FatalError(drmError, p, t) }
             return@onPlayerThread
@@ -876,19 +876,6 @@ private fun DrmConfig.toExoDrmConfiguration(): ExoMediaItem.DrmConfiguration? {
         .setLicenseRequestHeaders(licenseRequestHeaders)
         .setMultiSession(multiSession)
         .build()
-}
-
-/**
- * The display name of [drm]'s scheme if this device can't satisfy it (so the caller can fail fast with a
- * clear error), or null when it's playable. FairPlay has no Android CDM at all; Widevine, PlayReady and
- * ClearKey are queried against the platform via [MediaDrm.isCryptoSchemeSupported].
- */
-private fun unsupportedDrmLabel(drm: DrmConfig?): String? = when (drm?.scheme) {
-    null -> null
-    DrmScheme.FAIRPLAY -> "FairPlay"
-    DrmScheme.WIDEVINE -> if (MediaDrm.isCryptoSchemeSupported(C.WIDEVINE_UUID)) null else "Widevine"
-    DrmScheme.PLAYREADY -> if (MediaDrm.isCryptoSchemeSupported(C.PLAYREADY_UUID)) null else "PlayReady"
-    DrmScheme.CLEARKEY -> if (MediaDrm.isCryptoSchemeSupported(C.CLEARKEY_UUID)) null else "ClearKey"
 }
 
 /**

@@ -7,6 +7,7 @@ under the namespace `io.github.nonbinarydev`.
 |---|---|
 | `:core` | `io.github.nonbinarydev:outis-core` |
 | `:ui` | `io.github.nonbinarydev:outis-ui` |
+| `:analytics:mux` | `io.github.nonbinarydev:outis-analytics-mux` |
 
 There are **two credential paths**, and it is worth understanding why before setting either up:
 
@@ -85,11 +86,24 @@ in a separate directory, so an attacker needs both.
 ### 4. Environment variables — for the actual release
 
 Only needed when uploading to Central. `scripts/publish-env.sh` holds references rather than secrets
-and is safe to read:
+and is safe to read. It reads the key file from `~/.secrets/outis-signing-key.asc` (override with
+`OUTIS_SIGNING_KEY_FILE`) and three macOS keychain items, which you create once — each command
+prompts for the value:
+
+```bash
+security add-generic-password -a "$USER" -s outis-signing -w            # the key passphrase
+security add-generic-password -a "$USER" -s outis-central-username -w   # the token username (step 2)
+security add-generic-password -a "$USER" -s outis-central-password -w   # the token password (step 2)
+```
+
+Then, in the terminal you release from:
 
 ```bash
 source scripts/publish-env.sh
 ```
+
+If any item or the key file is missing, it names it, exports nothing and returns non-zero — a missing
+token fails here rather than as an opaque authentication error from Central.
 
 Or export the two Central variables by hand:
 
@@ -98,9 +112,9 @@ export ORG_GRADLE_PROJECT_mavenCentralUsername="<token username>"
 export ORG_GRADLE_PROJECT_mavenCentralPassword="<token password>"
 ```
 
-In CI, set the same names as repository secrets, plus `ORG_GRADLE_PROJECT_signingInMemoryKey`,
-`…KeyId` and `…KeyPassword` — environment variables take precedence over `secrets.properties`, so CI
-needs no local file.
+No CI workflow publishes yet. One would set the same names as repository secrets, plus
+`ORG_GRADLE_PROJECT_signingInMemoryKey`, `…KeyId` and `…KeyPassword` — environment variables take
+precedence over `secrets.properties`, so CI needs no local file.
 
 ---
 
@@ -151,7 +165,8 @@ deployment manually in the Portal UI — worth doing while the process is new.
 
 ## Versioning
 
-The version lives in `core/build.gradle.kts` and `ui/build.gradle.kts`, currently `0.1.0-alpha01`.
+The version lives in `core/build.gradle.kts`, `ui/build.gradle.kts` and
+`analytics/mux/build.gradle.kts`, currently `0.1.0-alpha01`. Keep the three in step.
 
 **Published coordinates are immutable.** A version can never be re-uploaded or amended, so the artifact
 set for a version — which targets ship, whether javadoc jars are real or empty — is frozen at first

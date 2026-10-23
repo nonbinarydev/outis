@@ -178,4 +178,21 @@ class VideoPlayerContractTest {
         assertTrue(handles.contains(first))
         assertTrue(handles.contains(rebuilt))
     }
+
+    @Test
+    fun mutingKeepsTheVolumeThatUnmutingRestores() = runTest {
+        val p = FakeVideoPlayer(backgroundScope)
+        p.setVolume(0.3f)
+
+        p.setMuted(true)
+        assertTrue(p.state.value.isMuted)
+        assertEquals(0.3f, p.state.value.volume) // muting does not zero the level
+
+        p.setVolume(0.6f) // a change while muted is kept, and does not unmute
+        assertTrue(p.state.value.isMuted)
+
+        p.setMuted(false)
+        assertFalse(p.state.value.isMuted)
+        assertEquals(0.6f, p.state.value.volume)
+    }
 }

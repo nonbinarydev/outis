@@ -14,9 +14,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Universal extension seam — the single attach point for analytics/QoS, ads, and anything else
- * the roadmap adds. v1 ships the seam with **zero** registered components; it costs nothing now
- * and cannot be added later without breaking the published contract.
+ * Universal extension seam — the single attach point for analytics/QoS and anything else bound to the
+ * player's lifetime. `outis-analytics-mux` is one; nothing is registered unless you register it.
  */
 interface PlayerComponent {
     /** Called when the component is registered. Wire up collectors on [PlayerHost.scope] here. */

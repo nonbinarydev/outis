@@ -119,9 +119,14 @@ Covered in full by the [DRM guide](drm.md). The per-platform facts:
 
 | | Android | iOS | Web |
 |---|---|---|---|
-| Widevine | Yes, probed via `MediaDrm.isCryptoSchemeSupported` (`ExoPlayerEngine.kt:768`) | No CDM exists on Apple platforms | Chrome, Edge, Firefox |
-| PlayReady | Only where the device ships a PlayReady CDM (`ExoPlayerEngine.kt:769`, `DrmConfig.kt:129-133`) — most Android phones ship Widevine only | No | Edge |
-| FairPlay | No — `unsupportedDrmLabel` returns `"FairPlay"` unconditionally (`ExoPlayerEngine.kt:767`) | Yes, `AVContentKeySession`; **requires** `DrmConfig.certificateUrl` | Safari |
+| Widevine | Where the device has the CDM — effectively all of them | No CDM exists on Apple platforms | Chrome, Edge, Firefox |
+| PlayReady | Only where the device ships a PlayReady CDM — most Android phones ship Widevine only | No | Edge |
+| FairPlay | No | Yes, `AVContentKeySession`, on devices — not the simulator; **requires** `DrmConfig.certificateUrl` | Safari |
+| Clear Key | Where the device has the CDM | Yes, over HLS | Chrome, Edge, Firefox |
+
+`drmSupport()` reports the device's own answer, and every engine checks it before loading a protected
+item: a scheme the device lacks fails at once as `Category.DRM`, naming the scheme. See
+[Checking what the device supports](drm.md#checking-what-the-device-supports).
 
 Two behaviours that are easy to misread as bugs:
 

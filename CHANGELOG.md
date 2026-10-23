@@ -48,6 +48,9 @@ First release. Not yet published to Maven Central.
   accept a raw challenge — engine-neutral, taking and returning only `ByteArray`, `String` and `Map`.
 - `WidevineLevel` for forcing the software CDM (the expired-L1-certificate workaround) on Android and
   Web. No-op on iOS, which has no client-settable security level.
+- `drmSupport()`, which asks the platform which schemes this device can decrypt and at what Widevine
+  security level. Every engine checks the same answer before loading a protected item, so a scheme the
+  device lacks fails at once as `Category.DRM`, naming the scheme, on all three platforms.
 
 **Local files and chapters**
 

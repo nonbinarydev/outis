@@ -96,12 +96,12 @@ class AdController(breaks: List<AdBreak>) {
         val adPos = (offset - acc).coerceAtLeast(0L)
 
         if (active.id != activeBreak?.id) {
+            completeActiveAd() // a jump straight from one break into another
             activeBreak = active
-            activeAd = null
             _events.tryEmit(AdEvent.BreakStarted(active))
         }
         if (current.id != activeAd?.id) {
-            activeAd?.let { _events.tryEmit(AdEvent.AdCompleted(it)) }
+            completeActiveAd()
             activeAd = current
             firedQuartiles.clear()
             _events.tryEmit(AdEvent.AdStarted(current, index, active.ads.size))
@@ -142,10 +142,9 @@ class AdController(breaks: List<AdBreak>) {
      */
     fun skipCurrentBreak(): Long? {
         val brk = activeBreak ?: return null
-        activeAd?.let { _events.tryEmit(AdEvent.AdCompleted(it)) }
+        completeActiveAd()
         watched += brk.id
         activeBreak = null
-        activeAd = null
         firedQuartiles.clear()
         _state.value = AdState(cuePoints = cuePoints())
         _events.tryEmit(AdEvent.BreakCompleted(brk))
@@ -189,15 +188,22 @@ class AdController(breaks: List<AdBreak>) {
         // distinctBy keeps a duplicated break id from completing twice, which the previous
         // check-then-mark loop got for free.
         val passed = breaks.filter { it.id !in watched && positionMs >= it.endMs }.distinctBy { it.id }
+        // Seeking back out of a break completes the ad it was on; the break itself stays unwatched.
+        if (passed.none { it.id == activeBreak?.id }) completeActiveAd()
         passed.forEach { brk ->
-            if (brk.id == activeBreak?.id) activeAd?.let { _events.tryEmit(AdEvent.AdCompleted(it)) }
+            if (brk.id == activeBreak?.id) completeActiveAd()
             watched += brk.id
             _events.tryEmit(AdEvent.BreakCompleted(brk))
         }
         if (passed.isNotEmpty() && breaks.all { it.id in watched }) _events.tryEmit(AdEvent.AllAdsCompleted)
         activeBreak = null
-        activeAd = null
         firedQuartiles.clear()
+    }
+
+    /** The playhead moved off [activeAd]: report it complete. */
+    private fun completeActiveAd() {
+        activeAd?.let { _events.tryEmit(AdEvent.AdCompleted(it)) }
+        activeAd = null
     }
 
     private fun emitQuartiles(ad: Ad, adPos: Long) {

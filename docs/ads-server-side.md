@@ -360,8 +360,12 @@ The flow is created as `MutableSharedFlow<AdEvent>(extraBufferCapacity = 32)` (`
 ### Deduplicate by ad id
 
 Seeking backwards into a break that is still unwatched re-enters it, and re-emits its `BreakStarted`,
-`AdStarted` and `Quartile` events (`AdController.kt:35-37`). If you bill or report on those, dedupe
-per session on `Ad.id`, which exists to be that key (`Ads.kt:76-79`).
+`AdStarted` and `Quartile` events. If you bill or report on those, dedupe per session on `Ad.id`,
+which exists to be that key.
+
+Every `AdStarted` is closed by an `AdCompleted`, whichever way the playhead leaves the ad: played
+through, skipped, seeked back out of the break, or jumped straight into another break. Seeking back
+out completes the ad but not the break, which stays unwatched.
 
 ## What `AdController` publishes on `state`
 

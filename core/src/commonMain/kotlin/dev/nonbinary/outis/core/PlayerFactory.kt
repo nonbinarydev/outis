@@ -49,7 +49,7 @@ data class PlayerConfig(
      * defaults. See [LiveConfig].
      */
     val liveConfig: LiveConfig? = null,
-    /** Components registered at construction. Empty in v1. */
+    /** Components registered at construction, such as an analytics adapter. */
     val components: List<PlayerComponent> = emptyList(),
     /**
      * Chooses which rendition of a SMIL source to play — a [MediaSource.Smil], or a `.smil` URL with no mime

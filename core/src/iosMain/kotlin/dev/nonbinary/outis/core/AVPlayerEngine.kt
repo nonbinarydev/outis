@@ -16,9 +16,12 @@ import dev.nonbinary.outis.core.chapters.loadSidecarChapters
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
+import dev.nonbinary.outis.core.source.DrmConfig
 import dev.nonbinary.outis.core.source.DrmScheme
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
+import dev.nonbinary.outis.core.source.deviceDrmSupport
+import dev.nonbinary.outis.core.source.unsupportedDrmError
 import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
@@ -229,6 +232,11 @@ internal class AVPlayerEngine(
     @Suppress("CyclomaticComplexMethod")
     override fun setMediaItem(item: MediaItem, autoPlay: Boolean) = onMain {
         val avPlayer = player ?: return@onMain
+        // Fail fast on DRM AVFoundation can't serve, rather than as a source error once it tries.
+        item.drmConfig?.let(::drmPreflightError)?.let { error ->
+            failLoad(item, error)
+            return@onMain
+        }
         removeItemObservers()
         endedFlag = false
         errorEmitted = false
@@ -1030,3 +1038,14 @@ private const val STALL_RECOVERY_COOLDOWN_MS = 15_000L // minimum gap between st
 
 /** Monotonic clock in ms for event timing (no wall-clock meaning). */
 private fun monotonicMillis(): Long = (CACurrentMediaTime() * 1000).toLong()
+
+/**
+ * Why [drm] cannot work here, known before AVFoundation is asked — Widevine and PlayReady have no Apple CDM,
+ * the simulator has no FairPlay, and FairPlay cannot start without its certificate — or `null` when it may.
+ */
+private fun drmPreflightError(drm: DrmConfig): PlayerError? = when {
+    drm.scheme !in deviceDrmSupport.schemes -> unsupportedDrmError(drm)
+    drm.scheme == DrmScheme.FAIRPLAY && drm.certificateUrl == null ->
+        PlayerError(PlayerError.Category.DRM, message = "FairPlay needs DrmConfig.certificateUrl")
+    else -> null
+}

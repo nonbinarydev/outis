@@ -88,7 +88,7 @@ interface VideoPlayer {
      */
     val nativePlayerHandle: Any?
 
-    /** Register an extension (analytics, ads, …). The seam exists in v1; nothing ships registered. */
+    /** Register an extension — an analytics adapter such as `outis-analytics-mux`, or your own. */
     fun addComponent(component: PlayerComponent)
 
     /** Detach a previously [added][addComponent] extension. A no-op if it was never registered. */
@@ -96,7 +96,7 @@ interface VideoPlayer {
 
     // --- Track selection -----------------------------------------------------------------------
     // ADDITIVE RULE: these MUST keep default bodies (never make them abstract). Doing so is a hard
-    // source-break for every implementer (ExoPlayerEngine, FakeVideoPlayer, future iOS/Web actuals)
+    // source-break for every implementer (the three engines, FakeVideoPlayer, an app's own player)
     // and is guarded by VideoPlayerAdditiveContractTest.
 
     /**
