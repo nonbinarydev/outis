@@ -105,10 +105,13 @@ The Shaka `Player` instance is not exposed at all. On web, a progressive source 
 | Progressive MP4 | Yes | Yes | Yes (native `<video>`) |
 | HLS | Yes | Yes, `avc1` only — AVPlayer rejects in-band-parameter-set `avc3` | Yes |
 | DASH | Yes | **No** — AVPlayer cannot play DASH at all | Yes |
+| SMIL listing HLS/DASH manifests | Yes — DASH preferred | Yes — HLS only | Yes — DASH preferred; the document host must allow CORS |
 
 The iOS limits are AVFoundation's, not Outis's; there is no workaround short of a second engine. If
 your Apple delivery is DASH, it will not play, and the failure surfaces as a source error rather than
-anything that names the container.
+anything that names the container. A SMIL document is resolved to one of its manifests before any
+engine sees it, so on iOS a SMIL listing only DASH fails as a source error too — see
+[SMIL](playback.md#smil).
 
 ### DRM
 

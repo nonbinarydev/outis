@@ -154,7 +154,7 @@ private val liveEngines = mutableSetOf<AVPlayerEngine>()
 @Suppress("LargeClass")
 internal class AVPlayerEngine(
     private val config: PlayerConfig,
-) : VideoPlayer {
+) : PlatformEngine {
 
     private val _state = MutableStateFlow(PlayerState(volume = config.initialVolume))
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
@@ -247,6 +247,8 @@ internal class AVPlayerEngine(
         val url = when (val source = item.source) {
             is MediaSource.Url -> NSURL(string = source.url)
             is MediaSource.LocalFile -> NSURL.fileURLWithPath(source.path)
+            // Unreachable: SmilResolvingPlayer swaps a SMIL source for its chosen rendition first.
+            is MediaSource.Smil -> NSURL(string = source.url)
         }
         // Manifest/segment request headers. AVFoundation reads them from the (private but long-stable)
         // "AVURLAssetHTTPHeaderFieldsKey" option; the public constant isn't exposed to Kotlin/Native, so
@@ -459,6 +461,17 @@ internal class AVPlayerEngine(
         }
     }
 
+    override fun failLoad(item: MediaItem, error: PlayerError) {
+        stop()
+        onMain {
+            if (player == null) return@onMain
+            errorEmitted = true
+            _state.update { it.copy(mediaItem = item, error = error) }
+            emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
+            emit { p, t -> PlayerEvent.FatalError(error, p, t) }
+        }
+    }
+
     override fun release() = onMain {
         if (released) return@onMain // idempotent; the flag is touched only on main
         released = true
@@ -658,6 +671,7 @@ internal class AVPlayerEngine(
         val path = when (val s = item.source) {
             is MediaSource.LocalFile -> s.path
             is MediaSource.Url -> if (s.url.startsWith("file://")) s.url.removePrefix("file://") else return
+            is MediaSource.Smil -> return
         }
         // Off the main thread: title parsing reads only small ranges, but thumbnail extraction
         // (MediaItem.chapterThumbnails) can read multi-MB image samples, which must not block the UI.

@@ -29,6 +29,9 @@ First release. Not yet published to Maven Central.
   carries `positionMs` and a monotonic `elapsedRealtimeMs`.
 - `MediaItem` and `MediaSource` covering remote URLs and local files, with `MimeType` routing between
   adaptive and progressive playback.
+- SMIL sources: a `MediaSource.Smil`, or a `.smil` URL, is fetched and resolved to one of the HLS or
+  DASH manifests it lists before any engine sees it. `PlayerConfig.smilSelector` chooses, defaulting to
+  the engine's own preference (ADR-0007).
 - `PlayerError` with a coarse cross-engine `Category` (`SOURCE`, `NETWORK`, `DRM`, `DECODER`,
   `RENDERER`, `UNKNOWN`), the engine's own `code`, and the untouched `nativeCause`.
 - Audio and subtitle track selection through `selectTrack` and `clearTextTrack`, with selection

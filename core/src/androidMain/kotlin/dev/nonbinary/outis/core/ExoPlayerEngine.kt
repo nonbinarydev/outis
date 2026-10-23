@@ -114,7 +114,7 @@ internal class ExoPlayerEngine(
      * deterministic dispatcher; the default is the only value production uses.
      */
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : VideoPlayer {
+) : PlatformEngine {
 
     private val _state = MutableStateFlow(PlayerState(volume = config.initialVolume))
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
@@ -332,6 +332,15 @@ internal class ExoPlayerEngine(
                 chapters = emptyList(),
                 thumbnails = emptyList(),
             )
+        }
+    }
+
+    override fun failLoad(item: MediaItem, error: PlayerError) {
+        stop()
+        onPlayerThread {
+            _state.update { it.copy(mediaItem = item, error = error) }
+            emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
+            emit { p, t -> PlayerEvent.FatalError(error, p, t) }
         }
     }
 
@@ -716,6 +725,7 @@ internal class ExoPlayerEngine(
     private fun localFilePath(item: MediaItem): String? = when (val s = item.source) {
         is MediaSource.LocalFile -> s.path
         is MediaSource.Url -> if (s.url.startsWith("file://")) s.url.removePrefix("file://") else null
+        is MediaSource.Smil -> null
     }
 
     // ---- IMA / CSAI ----
@@ -815,6 +825,8 @@ private fun MediaItem.toExoMediaItem(liveConfig: LiveConfig?): ExoMediaItem {
     val uri = when (val s = source) {
         is MediaSource.Url -> s.url
         is MediaSource.LocalFile -> s.path
+        // Unreachable: SmilResolvingPlayer swaps a SMIL source for its chosen rendition first.
+        is MediaSource.Smil -> s.url
     }
     return ExoMediaItem.Builder()
         .setUri(uri)

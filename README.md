@@ -44,6 +44,7 @@ Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo
 | **HLS** | ✅ | ✅ (`avc1` only — not in-band-param `avc3`) | ✅ |
 | **DASH** | ✅ | ❌ (AVPlayer is HLS-only) | ✅ |
 | **Live** (HLS/DASH) | ✅ | ✅ (HLS) | ✅ |
+| **SMIL** listing HLS/DASH manifests | ✅ | ✅ (picks HLS) | ✅ (host must allow CORS) |
 | **Widevine** DRM | ✅ | ❌ | ✅ (Chrome/Edge/Firefox) |
 | **PlayReady** DRM | ✅ (device CDM only) | ❌ | ✅ (Edge) |
 | **FairPlay** DRM | ❌ | ✅ | ✅ (Safari) |

@@ -12,8 +12,10 @@ Outis ships that bookkeeping as `AdController`, in `dev.nonbinary.outis.core.ads
 in `commonMain`, it does no I/O, it touches no engine, and it behaves identically on Android, iOS and
 Web — because it never talks to any of them.
 
-Everything on this page is `@ExperimentalPlayerApi`, a warning-level opt-in (see
-[Opting in](ui.md#opting-in)): the ad model is the part of `:core` expected to change shape before 1.0.
+`AdController`, its `AdEvent`s and the two cue parsers are `@ExperimentalPlayerApi`, a warning-level
+opt-in (see [Opting in](ui.md#opting-in)): they are expected to change shape before 1.0. The data they
+work on — `AdConfig`, `AdBreak`, `Ad`, `AdState` — is not marked, because `MediaItem` and `PlayerState`
+carry it.
 
 ## The SDK does not drive SSAI for you
 

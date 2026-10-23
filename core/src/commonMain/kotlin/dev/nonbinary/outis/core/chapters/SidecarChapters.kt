@@ -6,9 +6,11 @@
 
 package dev.nonbinary.outis.core.chapters
 
-/** Fetch a small text resource (the WebVTT sidecar). Returns null on any failure — chapters are optional. */
-internal expect suspend fun httpGetText(url: String): String?
+import dev.nonbinary.outis.core.net.HttpResult
+import dev.nonbinary.outis.core.net.httpGet
 
 /** Load + parse a WebVTT chapters sidecar; empty on any failure. */
-internal suspend fun loadSidecarChapters(url: String): List<Chapter> =
-    httpGetText(url)?.let { runCatching { VttChapters.parse(it) }.getOrDefault(emptyList()) } ?: emptyList()
+internal suspend fun loadSidecarChapters(url: String): List<Chapter> {
+    val sidecar = httpGet(url) as? HttpResult.Ok ?: return emptyList()
+    return runCatching { VttChapters.parse(sidecar.body) }.getOrDefault(emptyList())
+}

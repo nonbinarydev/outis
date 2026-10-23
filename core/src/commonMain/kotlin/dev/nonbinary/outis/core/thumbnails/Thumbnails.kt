@@ -6,7 +6,9 @@
 
 package dev.nonbinary.outis.core.thumbnails
 
-import dev.nonbinary.outis.core.chapters.httpGetText
+import dev.nonbinary.outis.core.net.HttpResult
+import dev.nonbinary.outis.core.net.httpGet
+import dev.nonbinary.outis.core.net.resolveUrl
 
 /**
  * One trickplay (seek-preview) thumbnail: the time span it covers and the crop rectangle within a sprite
@@ -60,13 +62,6 @@ object VttThumbnails {
         )
     }
 
-    private fun resolveUrl(base: String, ref: String): String =
-        if (ref.startsWith("http://") || ref.startsWith("https://")) {
-            ref
-        } else {
-            base.substringBeforeLast('/', "") + "/" + ref
-        }
-
     private fun parseTimestamp(raw: String?): Long? {
         val s = raw?.trim().orEmpty()
         if (s.isEmpty()) return null
@@ -111,5 +106,7 @@ fun List<ThumbnailCue>.thumbnailAt(positionMs: Long): ThumbnailCue? =
     lastOrNull { positionMs >= it.startMs } ?: firstOrNull()
 
 /** Load + parse a WebVTT thumbnails sidecar; empty on any failure. */
-internal suspend fun loadThumbnails(url: String): List<ThumbnailCue> =
-    httpGetText(url)?.let { runCatching { VttThumbnails.parse(it, url) }.getOrDefault(emptyList()) } ?: emptyList()
+internal suspend fun loadThumbnails(url: String): List<ThumbnailCue> {
+    val sidecar = httpGet(url) as? HttpResult.Ok ?: return emptyList()
+    return runCatching { VttThumbnails.parse(sidecar.body, sidecar.url) }.getOrDefault(emptyList())
+}

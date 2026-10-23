@@ -21,6 +21,20 @@ sealed interface MediaSource {
         val url: String,
     ) : MediaSource
 
+    /**
+     * A SMIL document listing the manifests one asset is published as — an HLS and a DASH over the same
+     * content, say. It is fetched (with [MediaItem.headers]) and one manifest is chosen by
+     * [dev.nonbinary.outis.core.PlayerConfig.smilSelector] before any engine sees the item, which then plays
+     * as a [Url] with the chosen rendition's format. That costs one round trip before the first frame.
+     *
+     * A [Url] whose path ends in `.smil` is treated as one when [MediaItem.mimeType] is `null`; for a SMIL
+     * source [MediaItem.mimeType] is not read at all.
+     */
+    data class Smil(
+        /** Absolute URL of the SMIL document. */
+        val url: String,
+    ) : MediaSource
+
     /** A local file produced by the (future) download manager. Reserved for offline. */
     data class LocalFile(
         /**

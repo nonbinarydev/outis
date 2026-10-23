@@ -40,8 +40,8 @@ both.
 The whole public surface of `:ui` is annotated `@ExperimentalPlayerUiApi`: `PlayerView`,
 `PlayerSurface`, `DefaultControls`, `ControlsScaffold`, every building block, and the state and window
 types (`PlayerControlsState`, `PlayerControlsScope`, `PlayerWindow`, `SurfaceType`). `:core` has its
-own marker, `@ExperimentalPlayerApi`, on the parts expected to change shape first — the ad model with
-its parsers and platform bridges.
+own marker, `@ExperimentalPlayerApi`, on the parts expected to change shape first: the SSAI
+`AdController`, the ad parsers, the platform ad bridges and SMIL renditions.
 
 Both markers are declared at `RequiresOptIn.Level.WARNING`, so using the API without opting in
 compiles — you just get a warning. Silence it per declaration with

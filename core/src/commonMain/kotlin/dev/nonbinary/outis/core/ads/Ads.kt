@@ -14,7 +14,6 @@ import dev.nonbinary.outis.core.ExperimentalPlayerApi
  * it); a client-side (IMA/CSAI) variant — an ad-tag URL plus per-platform ad rendering — slots in beside
  * it later behind the same [AdState]/[AdEvent] contract.
  */
-@ExperimentalPlayerApi
 sealed interface AdConfig {
     /**
      * Server-side ad insertion. The stream is already stitched, so playback is unchanged; [breaks] are
@@ -48,7 +47,6 @@ sealed interface AdConfig {
 }
 
 /** One ad break (pod) beginning at [startMs] on the content timeline, made of one or more [ads]. */
-@ExperimentalPlayerApi
 data class AdBreak(
     /**
      * Stable identity of the break. **Must be unique within a session** — [AdController] keys its
@@ -75,7 +73,6 @@ data class AdBreak(
 }
 
 /** A single ad within an [AdBreak]. [skipOffsetMs] `null` => unskippable. */
-@ExperimentalPlayerApi
 data class Ad(
     /**
      * Creative identity (VAST ad id, MediaTailor `adId`, …). Used to detect ad transitions and as the
@@ -105,7 +102,6 @@ data class Ad(
 )
 
 /** Snapshot of ad playback, derived from the playhead by [AdController]. */
-@ExperimentalPlayerApi
 data class AdState(
     /**
      * `true` while the playhead sits inside an unwatched break. **This, not [currentAd] being non-`null`,

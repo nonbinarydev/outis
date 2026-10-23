@@ -60,6 +60,7 @@ Small and additive; every field has a default.
 | `audioConfig: AudioConfig?` | `null` | Audio focus + become-noisy (Android), mix-with-others (iOS `AVAudioSession`). **No-op on Web**. |
 | `liveConfig: LiveConfig?` | `null` | Live tuning — target offset + catch-up speed (Android), target offset (iOS), low-latency mode (Web). |
 | `components: List<PlayerComponent>` | `[]` | Extensions registered at construction — see [analytics.md](analytics.md). |
+| `smilSelector: SmilSelector` | `SmilSelector.Platform` | Which rendition of a SMIL source to play — see [SMIL](#smil). |
 
 ### `BufferConfig`
 
@@ -130,15 +131,17 @@ data class MediaItem(
 
 ### Source and container
 
-- **`MediaSource`** is sealed: `MediaSource.Url("https://…")` for progressive MP4, HLS or DASH, or
-  `MediaSource.LocalFile("/absolute/path")` for an on-device file. `LocalFile` is **played by all
+- **`MediaSource`** is sealed: `MediaSource.Url("https://…")` for progressive MP4, HLS or DASH,
+  `MediaSource.LocalFile("/absolute/path")` for an on-device file, or `MediaSource.Smil("https://…")`
+  for a SMIL document listing an asset's manifests ([below](#smil)). `LocalFile` is **played by all
   three engines today** (Media3 `setUri`, `NSURL.fileURLWithPath`, and the native `<video>` on web) —
   a `LocalFile` is always treated as progressive, never adaptive. A `file://` URL is accepted by
   `MediaSource.Url` and recognised as local. See [local-files.md](local-files.md) for what each
   platform can actually read.
-- **`MimeType`** is `MP4`, `HLS` or `DASH`. Leave it `null` to infer from the URL extension (`.m3u8` →
-  HLS, `.mpd` → DASH, `.mp4`/`.webm` → progressive); set it explicitly for extension-less or signed
-  URLs. There is no `MimeType.MKV` — Matroska is a progressive local-file case.
+- **`MimeType`** is `MP4`, `HLS`, `DASH` or `WEBM`. Leave it `null` to infer from the URL extension
+  (`.m3u8` → HLS, `.mpd` → DASH, `.mp4`/`.webm` → progressive, `.smil` → a SMIL document); set it
+  explicitly for extension-less or signed URLs. There is no `MimeType.MKV` — Matroska is a progressive
+  local-file case.
 - **`headers`** apply to manifest and segment requests on Android, iOS and Web. Web caveat: a
   *progressive* MP4/WebM plays through the browser's native `<video>`, which cannot take custom
   request headers, so headers apply only to Shaka-managed HLS/DASH there.
@@ -182,6 +185,61 @@ player.setMediaItem(
 > must be `avc1`, not in-band-parameter-set `avc3`. See the
 > [capability matrix](../README.md#capability-matrix) and
 > [platform-support.md](platform-support.md).
+
+### SMIL
+
+Some backends publish a SMIL document per asset, listing the manifests it is packaged as — an HLS and
+a DASH over the same content. Hand the player the document and it picks one:
+
+```kotlin
+player.setMediaItem(MediaItem(MediaSource.Smil("https://api.example.com/assets/42")), autoPlay = true)
+
+// A URL whose path ends in .smil is recognised without the wrapper, when mimeType is null:
+player.setMediaItem(MediaItem(MediaSource.Url("https://cdn.example.com/42/index.smil")), autoPlay = true)
+```
+
+No engine reads SMIL, so the player fetches the document, picks a rendition, and loads it as an
+ordinary `MediaSource.Url` with the rendition's format as its `mimeType`. That costs one round trip
+before the first frame; if you already hold the document, resolve it yourself and pass the manifest
+URL instead.
+
+- **Which rendition.** `PlayerConfig.smilSelector` decides. The default, `SmilSelector.Platform`,
+  takes the first DASH or HLS rendition the engine plays — DASH before HLS on Android and the web, HLS
+  alone on iOS — trying the DRM scheme's format first: HLS for FairPlay, DASH for Widevine and
+  PlayReady. It never picks a progressive rendition, and prefers `video` elements to `audio` ones.
+  Vendors signal formats differently, so a selector of your own sees every attribute and `<param>` on
+  each element:
+
+  ```kotlin
+  @OptIn(ExperimentalPlayerApi::class)
+  val config = PlayerConfig(
+      smilSelector = SmilSelector { renditions, _ ->
+          renditions.firstOrNull { it.attributes["system-profile"] == "hls-fmp4" }
+      },
+  )
+  ```
+
+  Returning `null` fails the load.
+- **URLs.** A relative `src` resolves the way a browser resolves a link, against the document's base:
+  the URL it was served from after redirects, or a base the document sets (`<meta name="base">`,
+  `<meta base>`, Wowza's `httpBase`, `xml:base`). Only elements and attributes are read — a DOCTYPE
+  is skipped, so no entity it declares is ever expanded.
+- **Headers.** `MediaItem.headers` go with the document request. They stay on the item only when the
+  chosen rendition shares the document's origin, so a token meant for your API never reaches a
+  third-party CDN.
+- **While it resolves**, the previous item is already stopped and the state reads idle. `play()`,
+  `pause()` and `seekTo()` set the play intent and start position the rendition loads with.
+- **Failures.** An HTTP error status, a document that is not SMIL, or no rendition the selector
+  accepts fails the load as `SOURCE`; no response at all is `NETWORK`. The document request is made
+  once, with `RetryConfig.readTimeoutMs` (30 s by default) as its timeout. The failed state carries
+  the item as you set it, like any failed load.
+- **Once it resolves**, `PlayerState.mediaItem` and `MediaItemTransition` carry the resolved item —
+  the rendition's URL and format, and whichever headers were kept — not the SMIL item you set.
+- **Web:** the document is fetched with `fetch`, so its host must allow CORS, as a manifest host
+  already must.
+
+Wowza's older convention, a `<switch>` of progressive `mp4:` rungs with no manifest, is out of scope:
+playing one rung would lose adaptive bitrate ([ADR-0007](decisions/0007-smil-resolved-before-the-engine.md)).
 
 ---
 

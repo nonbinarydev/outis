@@ -111,8 +111,9 @@ Both insertion models ship, and they work differently:
   bridge (`setAdState`, `setAdContainer`, `adContainer`) but no adapter ships. See
   [../docs/ads-client-side.md](../docs/ads-client-side.md).
 
-The ad model, its parsers and the platform ad bridges are `@ExperimentalPlayerApi`: warning-level, and
-the part of `:core` expected to change shape before 1.0.
+`AdController`, the ad parsers and the platform ad bridges are `@ExperimentalPlayerApi`: warning-level,
+and the part of `:core` expected to change shape before 1.0. The ad data model is not marked, because
+`MediaItem` and `PlayerState` carry it.
 
 ## Reserved for the roadmap (present but unused in v1)
 

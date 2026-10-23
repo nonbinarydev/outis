@@ -189,7 +189,7 @@ private external object shaka {
 // other platforms: the player wiring, the DRM request/response filters, the ad manager bridge and
 // the state reconciler all bind to the same `shaka.Player` instance and its listener lifecycle.
 @Suppress("LargeClass")
-internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
+internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
 
     private val _state = MutableStateFlow(PlayerState(volume = config.initialVolume))
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
@@ -424,6 +424,8 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
         val url = when (val source = item.source) {
             is MediaSource.Url -> source.url
             is MediaSource.LocalFile -> source.path
+            // Unreachable: SmilResolvingPlayer swaps a SMIL source for its chosen rendition first.
+            is MediaSource.Smil -> source.url
         }
         if (item.startMuted) video.muted = true
         video.loop = item.loop
@@ -633,6 +635,8 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
 
     override fun stop() {
         if (released) return
+        ++loadGeneration // a load still in the chain must not start after this
+        clearPendingStartListener()
         video.pause()
         if (usingShaka) shakaPlayer.unload().catch { it } else video.removeAttribute("src")
         usingShaka = false
@@ -654,6 +658,15 @@ internal class ShakaEngine(private val config: PlayerConfig) : VideoPlayer {
                 chapters = emptyList(), thumbnails = emptyList(),
             )
         }
+    }
+
+    override fun failLoad(item: MediaItem, error: PlayerError) {
+        stop()
+        if (released) return
+        errorEmitted = true
+        _state.update { it.copy(mediaItem = item, error = error) }
+        emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
+        emit { p, t -> PlayerEvent.FatalError(error, p, t) }
     }
 
     // ---- client-side ads (CSAI) via Shaka's IMA HTML5 ad manager ----

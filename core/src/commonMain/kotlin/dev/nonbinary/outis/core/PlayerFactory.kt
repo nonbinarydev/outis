@@ -6,7 +6,11 @@
 
 package dev.nonbinary.outis.core
 
+import dev.nonbinary.outis.core.net.DEFAULT_HTTP_TIMEOUT_MS
 import dev.nonbinary.outis.core.plugin.PlayerComponent
+import dev.nonbinary.outis.core.source.MediaItem
+import dev.nonbinary.outis.core.source.MediaSource
+import dev.nonbinary.outis.core.source.SmilSelector
 
 /**
  * Construction-time configuration. New knobs arrive with defaults, so existing call sites keep
@@ -47,6 +51,12 @@ data class PlayerConfig(
     val liveConfig: LiveConfig? = null,
     /** Components registered at construction. Empty in v1. */
     val components: List<PlayerComponent> = emptyList(),
+    /**
+     * Chooses which rendition of a SMIL source to play — a [MediaSource.Smil], or a `.smil` URL with no mime
+     * type. Defaults to the engine's own preference, [SmilSelector.Platform].
+     */
+    @ExperimentalPlayerApi
+    val smilSelector: SmilSelector = SmilSelector.Platform,
 )
 
 /**
@@ -162,10 +172,23 @@ data class BufferConfig(
  * @param context platform application context ([AppContext]); only Android needs real data.
  */
 fun VideoPlayer(context: AppContext, config: PlayerConfig = PlayerConfig()): VideoPlayer =
-    createPlatformPlayer(context, config)
+    SmilResolvingPlayer(
+        engine = createPlatformPlayer(context, config),
+        selector = config.smilSelector,
+        timeoutMs = config.retryConfig?.readTimeoutMs ?: DEFAULT_HTTP_TIMEOUT_MS,
+    )
+
+/** A platform engine: a [VideoPlayer] that can also fail a load it never saw, as if it had rejected it. */
+internal interface PlatformEngine : VideoPlayer {
+    /**
+     * Report [item] as a failed load — idle, [error] on the state, `MediaItemTransition` then `FatalError`
+     * emitted — for a SMIL source that would not resolve.
+     */
+    fun failLoad(item: MediaItem, error: PlayerError)
+}
 
 /** Per-platform construction: the Media3, AVFoundation or Shaka engine. */
-internal expect fun createPlatformPlayer(context: AppContext, config: PlayerConfig): VideoPlayer
+internal expect fun createPlatformPlayer(context: AppContext, config: PlayerConfig): PlatformEngine
 
 /** The platform engine behind this player, for the platform bridges that reach past the common API. */
-internal val VideoPlayer.engine: VideoPlayer get() = this
+internal val VideoPlayer.engine: VideoPlayer get() = (this as? SmilResolvingPlayer)?.engine ?: this
