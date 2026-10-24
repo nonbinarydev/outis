@@ -13,7 +13,7 @@ the Compose canvas, the host page, and — on the `:core`-only route — the fac
 its `<video>` but never puts it in the document. This page covers all three, in that order, plus the
 two page-level side effects the Compose surface has on your DOM.
 
-The web engine is [Shaka Player](https://github.com/shaka-project/shaka-player) 4.16.50 driving an
+The web engine is [Shaka Player](https://github.com/shaka-project/shaka-player) 5.3.1 driving an
 HTML `<video>` element. Adaptive sources (HLS, DASH) go through Shaka; a single progressive file
 (mp4, webm) is played straight off `video.src`, which matters more than it sounds — see
 [Progressive sources take a different path](#8-progressive-sources-take-a-different-path).
@@ -22,9 +22,9 @@ HTML `<video>` element. Adaptive sources (HLS, DASH) go through Shaka; a single 
 
 `outis-core` publishes both `js` and `wasmJs`, but only `js` has an engine. On `wasmJs`,
 `createPlatformPlayer` throws `UnsupportedOperationException` the moment you construct a player
-(`core/src/wasmJsMain/kotlin/dev/nonbinary/outis/core/PlayerFactory.wasmJs.kt:12-13`); the target
+(`core/src/wasmJsMain/kotlin/dev/nonbinary/outis/core/PlayerFactory.wasmJs.kt`); the target
 exists so the engine-agnostic core compiles there, nothing more. `outis-ui` does not publish a
-`wasmJs` target at all (`ui/build.gradle.kts:27-53` declares android, iosArm64, iosSimulatorArm64
+`wasmJs` target at all (`ui/build.gradle.kts` declares android, iosArm64, iosSimulatorArm64
 and `js(IR)` only), so a `commonMain` dependency on it from a module that also targets `wasmJs` will
 not resolve.
 
@@ -67,14 +67,14 @@ org.jetbrains.compose.experimental.jscanvas.enabled=true
 ```
 
 Without it the Compose Multiplatform Gradle plugin does not configure Compose for the `js` target.
-This repository sets the same flag for the same reason (`gradle.properties:10`). It is a
+This repository sets the same flag for the same reason (`gradle.properties`). It is a
 Compose-plugin flag, not an Outis one, and `:core`-only consumers do not need it.
 
 ### You do not add `shaka-player` yourself
 
-`:core` declares `implementation(npm("shaka-player", "4.16.50"))` in its `jsMain` source set
-(`core/build.gradle.kts:152`), and the Kotlin/JS plugin records that in the artifact's published
-`package.json` — this repository's own build output shows `"shaka-player": "4.16.50"` under
+`:core` declares `shaka-player` as an npm dependency of its `jsMain` source set, at the version pinned
+in `gradle/libs.versions.toml` (`shakaPlayer`), and the Kotlin/JS plugin records that in the artifact's
+published `package.json` — this repository's own build output shows `"shaka-player": "5.3.1"` under
 `dependencies` for both `outis-core` and `outis-ui`. Your project's generated `package.json` picks it
 up transitively. Adding it again yourself only risks a version conflict.
 
@@ -159,13 +159,12 @@ fun main() {
 `ComposeViewport` **clears the container element** when it creates the composition, so do not put
 your own markup inside `#composeApp`.
 
-`@ExperimentalPlayerUiApi` is a warning-level opt-in
-(`ui/src/commonMain/kotlin/dev/nonbinary/outis/ui/ExperimentalPlayerUiApi.kt:10`), so the `@OptIn` is
-optional; it only silences the warning. `@ExperimentalComposeUiApi` on `ComposeViewport` is
+`@ExperimentalPlayerUiApi` is a warning-level opt-in (see [Opting in](ui.md#opting-in)), so the
+`@OptIn` is optional; it only silences the warning. `@ExperimentalComposeUiApi` on `ComposeViewport` is
 Compose's own and is required.
 
 `PlayerView` takes `surfaceType` and `showSubtitles` parameters that the web `PlayerSurface` accepts
-and never reads (`ui/src/jsMain/kotlin/dev/nonbinary/outis/ui/PlayerSurface.js.kt:61-62`) — they are
+and never reads (`ui/src/jsMain/kotlin/dev/nonbinary/outis/ui/PlayerSurface.js.kt`) — they are
 Android and iOS concerns. Text-track *selection* still works: `selectTrack` / `clearTextTrack` drive
 Shaka's text tracks on the adaptive path.
 
@@ -178,7 +177,7 @@ the button hides itself.
 Keyboard shortcuts are web-only and already wired: Space or K toggles play/pause, M mutes, F toggles
 fullscreen — registered as a `document` keydown listener and gated on the pointer being over the
 player, so Space still scrolls the page everywhere else
-(`ui/src/jsMain/kotlin/dev/nonbinary/outis/ui/PlayerKeyboard.js.kt:20-57`).
+(`ui/src/jsMain/kotlin/dev/nonbinary/outis/ui/PlayerKeyboard.js.kt`).
 
 ## 4. Two side effects on your page
 
@@ -188,24 +187,24 @@ that by rewriting styles on elements it does not own. Both effects are page-wide
 ### The overlay rewrites `z-index` on every direct child of `<body>`
 
 When `PlayerSurface` mounts the video it calls `raiseComposeHostsAbove`
-(`ui/src/jsMain/kotlin/dev/nonbinary/outis/ui/PlayerSurface.js.kt:138-146`), which walks
+(`ui/src/jsMain/kotlin/dev/nonbinary/outis/ui/PlayerSurface.js.kt`), which walks
 `document.body.children` and, for **every** direct child except the video:
 
 - sets `style.zIndex = "1"`;
 - sets `style.position = "relative"` if the computed position is `static`.
 
 The intent is to lift the Compose canvas above the `<video>` (which is given `z-index: 0` at
-`PlayerSurface.js.kt:86`) so the overlay composites on top while the video shows through the
-`BlendMode.Clear` hole punched at `PlayerSurface.js.kt:113`. But it is indiscriminate: your own
+`PlayerSurface.js.kt`) so the overlay composites on top while the video shows through the
+`BlendMode.Clear` hole punched at `PlayerSurface.js.kt`. But it is indiscriminate: your own
 body-level header, banner or modal root gets the same treatment. Consequences worth planning for:
 
 - Anything of yours that must paint above the player needs an explicit `z-index` greater than 1.
 - An element of yours that was `position: static` becomes positioned, which makes it a containing
   block for absolutely-positioned descendants. If your layout depends on `static`, do not put that
   element at the top level of `<body>` — nest it one level down.
-- The engine's own ad container is a body child too (`ShakaEngine.kt:242`), so it is flattened to
+- The engine's own ad container is a body child too (`ShakaAds.kt`), so it is flattened to
   `z-index: 1` as well; the engine re-asserts `z-index: 2` on it during ad breaks from its reconcile
-  poll (`ShakaEngine.kt:644-660`).
+  poll (`ShakaAds.sync`).
 
 The simplest way to stay out of the way of this is to keep `<body>` down to one container element
 and render your whole page inside the Compose viewport.
@@ -214,8 +213,8 @@ and render your whole page inside the Compose viewport.
 
 `PlayerSurface` appends the element to `document.body` and styles it `position: fixed`, `margin: 0`,
 `background-color: black`, `z-index: 0`, with `object-fit` derived from `contentScale`
-(`PlayerSurface.js.kt:83-90`). Its rect is then written directly from Compose layout in
-`onGloballyPositioned`, in CSS pixels (`PlayerSurface.js.kt:114-122`).
+(`PlayerSurface.js.kt`). Its rect is then written directly from Compose layout in
+`onGloballyPositioned`, in CSS pixels (`PlayerSurface.js.kt`).
 
 Because it is fixed and a child of `<body>`, it is **not clipped by, and does not scroll with, any
 DOM ancestor**. A player nested inside a scrollable DOM panel with `overflow: hidden` will still
@@ -224,21 +223,21 @@ the video, until the next Compose layout pass repositions it. Scroll inside Comp
 and keep the viewport container fixed to the window.
 
 Two smaller behaviours from the same file: the surface forces `controls = false` whenever it mounts
-the element (`PlayerSurface.js.kt:81`), and it sets `display: none` on the video while
+the element (`PlayerSurface.js.kt`), and it sets `display: none` on the video while
 `PlayerState.error != null` so a frozen frame does not show through the hole
-(`PlayerSurface.js.kt:104-107`). On dispose it removes the element from the DOM
-(`PlayerSurface.js.kt:93-98`).
+(`PlayerSurface.js.kt`). On dispose it removes the element from the DOM
+(`PlayerSurface.js.kt`).
 
 ## 5. Using `:core` alone — you must mount the `<video>` yourself
 
 `ShakaEngine` creates its `<video>` in a property initialiser
-(`core/src/jsMain/kotlin/dev/nonbinary/outis/core/ShakaEngine.kt:179-183`) with `controls = false`
+(`core/src/jsMain/kotlin/dev/nonbinary/outis/core/ShakaEngine.kt`) with `controls = false`
 and `playsinline`, attaches Shaka to it, and **never adds it to the document**. The only element the
-engine appends to `document.body` is the ad container (`ShakaEngine.kt:242`). Nothing renders until
+engine appends to `document.body` is the ad container (`ShakaAds.kt`). Nothing renders until
 you mount the element. This is the single most likely reason for "the player works but I see a black
 page" on the `:core`-only route.
 
-The element is `nativePlayerHandle` (`ShakaEngine.kt:190-191`):
+The element is `nativePlayerHandle` (`ShakaEngine.kt`):
 
 ```kotlin
 import dev.nonbinary.outis.core.AppContext
@@ -274,30 +273,30 @@ fun main() {
 Four things to know about that handle on web:
 
 - **Read it straight after construction.** `PlayerEvent.NativePlayerAttached` is emitted from the
-  engine's `init` block (`ShakaEngine.kt:248`) into a `SharedFlow` with `replay = 0`
-  (`ShakaEngine.kt:176`), so a collector you start afterwards will never see it. The event matters on
+  engine's `init` block (`ShakaEngine.kt`) into a `SharedFlow` with `replay = 0`
+  (`ShakaEngine.kt`), so a collector you start afterwards will never see it. The event matters on
   Android, where the engine can be rebuilt; on web the element is created once and reused.
 - **It is stable for the life of the player.** A failed load can wedge Shaka, and the engine then
-  recreates the `shaka.Player` (`ShakaEngine.kt:360-370`) — but it re-attaches the *same* `<video>`.
-- **It becomes `null` after `release()`** (`ShakaEngine.kt:671`). `release()` pauses the element,
+  recreates the `shaka.Player` (`ShakaEngine.kt`) — but it re-attaches the *same* `<video>`.
+- **It becomes `null` after `release()`** (`ShakaEngine.kt`). `release()` pauses the element,
   removes the ad container and destroys the Shaka player, but it does **not** remove the `<video>`
-  from the DOM (`ShakaEngine.kt:660-672`). If you mounted it, unmount it.
+  from the DOM (`ShakaEngine.kt`). If you mounted it, unmount it.
 - **Do not drive it directly.** The engine assigns `src`, calls `play()`/`pause()` and reconciles
   `PlayerState` from the element on a poll every `PlayerConfig.positionPollIntervalMs` (default
-  250 ms, `PlayerFactory.kt:26`; interval registered at `ShakaEngine.kt:246`). Styling, mounting and
+  250 ms, `PlayerFactory.kt`; interval registered at `ShakaEngine.kt`). Styling, mounting and
   `controls` are yours; playback is the player's.
 
 ## 6. Autoplay: use `startMuted`
 
 Browsers block autoplay with sound. `MediaItem.startMuted` sets `video.muted = true` before the load
-begins (`ShakaEngine.kt:402`) and reflects it in `PlayerState.isMuted` (`ShakaEngine.kt:409`). It only
-ever forces mute *on*; it never unmutes (`MediaItem.kt:63-67`). Unmute after a user gesture with
+begins (`ShakaEngine.kt`) and reflects it in `PlayerState.isMuted` (`ShakaEngine.kt`). It only
+ever forces mute *on*; it never unmutes (`MediaItem.kt`). Unmute after a user gesture with
 `player.setMuted(false)`, which restores the volume set by `setVolume` rather than ramping from zero.
 
 ## 7. Client-side ads need `ima3.js`
 
 Web CSAI runs through Shaka's ad manager, which wraps the IMA HTML5 SDK. The engine constructs the
-request with `js("new google.ima.AdsRequest()")` (`ShakaEngine.kt:590`), so the global `google.ima`
+request with `js("new google.ima.AdsRequest()")` (`ShakaAds.kt`), so the global `google.ima`
 must already exist. Add the loader to your `index.html`, before your module script:
 
 ```html
@@ -305,24 +304,24 @@ must already exist. Add the loader to your `index.html`, before your module scri
 ```
 
 The ad UI renders into a `<div>` the engine creates and keeps aligned over the video, flipping it to
-`pointer-events: auto` and re-asserting `z-index: 2` only during a break (`ShakaEngine.kt:235-242`
-and `644-660`) — so IMA's skip and click-through are reachable above the Compose canvas, and the
+`pointer-events: auto` and re-asserting `z-index: 2` only during a break (`ShakaAds.sync`) —
+so IMA's skip and click-through are reachable above the Compose canvas, and the
 overlay receives pointer events the rest of the time.
 
-Note that the shipped Compose controls have no ad awareness of their own: nothing in `ui/src` reads
-`PlayerState.adState`, and the scrubber is not locked during a break. Full detail, including which
+Note that the shipped Compose controls ignore client-side ads: nothing in `ui/src` reads
+`PlayerState.adState`, and the scrubber is not locked during an IMA break. Full detail, including which
 `AdState` fields Web actually populates, is in [Client-side ads](ads-client-side.md).
 
 ## 8. Progressive sources take a different path
 
-`isProgressive` (`ShakaEngine.kt:1001-1010`) routes `MimeType.MP4`, any `MediaSource.LocalFile`, and
+`isProgressive` (`ShakaEngine.kt`) routes `MimeType.MP4`, any `MediaSource.LocalFile`, and
 extension-matched `.mp4` / `.webm` URLs to `video.src` directly, bypassing Shaka. On that path:
 
 - **`MediaItem.headers` do not apply** — a browser `<video>` cannot carry custom request headers
-  (`ShakaEngine.kt:481-484`). They are honoured on the Shaka path only.
+  (`ShakaEngine.kt`). They are honoured on the Shaka path only.
 - **`AdConfig.ClientSide` is silently ignored** — ads are requested inside the Shaka load handler
-  (`ShakaEngine.kt:466`), which the progressive branch returns before reaching
-  (`ShakaEngine.kt:448-452`).
+  (`ShakaEngine.kt`), which the progressive branch returns before reaching
+  (`ShakaEngine.kt`).
 - **Audio and text tracks stay empty** — `loadTracks()` runs on the Shaka path only.
 
 `MediaSource.LocalFile.path` is assigned to `video.src` verbatim, and a browser cannot open a
@@ -333,10 +332,10 @@ filesystem path, so local-file playback on web needs a URL the page origin can a
 
 | Behaviour | Detail |
 |---|---|
-| `PlayerState.videoSize` | Always `null` on web — the engine only ever writes `null` (`ShakaEngine.kt:408`, `:568`). Never gate layout on it. |
-| `CaptionsDefaultMode.FOLLOW_SYSTEM` | Treated as `OFF` on web; there is no universal caption-accessibility signal (`MediaItem.kt:103-107`). |
-| DRM | Widevine in Chrome, Edge and Firefox; PlayReady in Edge; FairPlay in Safari. A DRM failure at load time surfaces as `PlayerError.Category.SOURCE`, not `DRM` — see [DRM](drm.md). |
-| Chapters | Not extracted on web. `PlayerState.chapters` stays empty. |
+| `PlayerState.videoSize` | Always `null` on web — the engine only ever writes `null` (`ShakaEngine.kt`). Never gate layout on it. |
+| `CaptionsDefaultMode.FOLLOW_SYSTEM` | Treated as `OFF` on web; there is no universal caption-accessibility signal (`MediaItem.kt`). |
+| DRM | Widevine in Chrome, Edge and Firefox; PlayReady in Edge; FairPlay in Safari. A scheme the browser lacks fails before loading, as `PlayerError.Category.DRM`; a failure during the load takes Shaka's own category, so a key-system error is `DRM` too — see [DRM](drm.md). |
+| Chapters | Declared `MediaItem.chapters` and a `chaptersUrl` WebVTT sidecar both work; chapters embedded in a file are never read on web. |
 
 Everything else — sources, transport, state and events, tracks, live, quality caps — behaves as
 described in [Playback](playback.md).

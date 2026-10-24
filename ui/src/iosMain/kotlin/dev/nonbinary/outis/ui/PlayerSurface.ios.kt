@@ -15,7 +15,7 @@ import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitViewController
 import dev.nonbinary.outis.core.PlayerEvent
 import dev.nonbinary.outis.core.VideoPlayer
-import dev.nonbinary.outis.core.setAdContainer
+import dev.nonbinary.outis.core.ads.setAdContainer
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AVFoundation.AVLayerVideoGravityResize
 import platform.AVFoundation.AVLayerVideoGravityResizeAspect
@@ -40,7 +40,7 @@ import platform.AVKit.AVPlayerViewController
 @OptIn(ExperimentalForeignApi::class)
 @ExperimentalPlayerUiApi
 @Composable
-actual fun PlayerSurface(
+public actual fun PlayerSurface(
     player: VideoPlayer,
     modifier: Modifier,
     contentScale: ContentScale,

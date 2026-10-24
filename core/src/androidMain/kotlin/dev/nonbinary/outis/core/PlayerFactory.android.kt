@@ -15,7 +15,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 
-internal actual fun createPlatformPlayer(context: AppContext, config: PlayerConfig): VideoPlayer =
+internal actual fun createPlatformPlayer(context: AppContext, config: PlayerConfig): PlatformEngine =
     ExoPlayerEngine(context.applicationContext, config)
 
 /**

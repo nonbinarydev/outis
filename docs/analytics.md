@@ -13,9 +13,11 @@ path on this page, and it is not a temporary gap — see [Which engine emits wha
 
 There are two ways to get analytics out of Outis, and they suit different goals:
 
-1. **A ready-made vendor adapter** — for Mux (and, later, others). You add a module and register it;
-   it binds the vendor's own SDK to the native player. Start here if your backend is Mux.
-   → [Mux Data adapter](analytics-mux.md)
+1. **A ready-made vendor adapter**. You add a module and register it. There are two, for two jobs:
+   - quality of service, through Mux's own SDK bound to the native player
+     → [Mux Data adapter](analytics-mux.md)
+   - usage, what viewers watch, through Firebase and GA4
+     → [Firebase / GA4 usage adapter](analytics-firebase.md)
 2. **Your own analytics off the event stream** — the rest of this page. Consume `PlayerEvent`s and
    send them wherever you like.
 
@@ -139,6 +141,11 @@ dropped frames will show Android data and nothing else.
 
 `PlaybackRecovered` is emitted where an engine heals a stall by itself: Android after a recoverable
 error, and iOS after the stall self-heal re-seeks. The web engine has no equivalent path.
+
+`FirstFrameRendered` is emitted everywhere but marks different moments. Android reports a frame
+actually rendered, and reports it again when the surface is re-attached; iOS (item ready to play) and
+web (`HAVE_CURRENT_DATA`) report the earlier moment a frame is available, once per item. Startup time
+measured against it reads slightly short on iOS and web, so compare platforms with care.
 
 ## The native player handle
 

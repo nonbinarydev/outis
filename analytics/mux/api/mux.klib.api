@@ -1,0 +1,36 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, js]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.nonbinarydev:mux>
+final class dev.nonbinary.outis.analytics.mux/MuxAnalytics : dev.nonbinary.outis.core.plugin/PlayerComponent { // dev.nonbinary.outis.analytics.mux/MuxAnalytics|null[0]
+    constructor <init>(dev.nonbinary.outis.core/AppContext, dev.nonbinary.outis.analytics.mux/MuxConfig) // dev.nonbinary.outis.analytics.mux/MuxAnalytics.<init>|<init>(dev.nonbinary.outis.core.AppContext;dev.nonbinary.outis.analytics.mux.MuxConfig){}[0]
+
+    final fun attach(dev.nonbinary.outis.core.plugin/PlayerHost) // dev.nonbinary.outis.analytics.mux/MuxAnalytics.attach|attach(dev.nonbinary.outis.core.plugin.PlayerHost){}[0]
+    final fun detach() // dev.nonbinary.outis.analytics.mux/MuxAnalytics.detach|detach(){}[0]
+}
+
+final class dev.nonbinary.outis.analytics.mux/MuxConfig { // dev.nonbinary.outis.analytics.mux/MuxConfig|null[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // dev.nonbinary.outis.analytics.mux/MuxConfig.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+
+    final val envKey // dev.nonbinary.outis.analytics.mux/MuxConfig.envKey|{}envKey[0]
+        final fun <get-envKey>(): kotlin/String // dev.nonbinary.outis.analytics.mux/MuxConfig.envKey.<get-envKey>|<get-envKey>(){}[0]
+    final val playerName // dev.nonbinary.outis.analytics.mux/MuxConfig.playerName|{}playerName[0]
+        final fun <get-playerName>(): kotlin/String? // dev.nonbinary.outis.analytics.mux/MuxConfig.playerName.<get-playerName>|<get-playerName>(){}[0]
+    final val playerSoftwareName // dev.nonbinary.outis.analytics.mux/MuxConfig.playerSoftwareName|{}playerSoftwareName[0]
+        final fun <get-playerSoftwareName>(): kotlin/String? // dev.nonbinary.outis.analytics.mux/MuxConfig.playerSoftwareName.<get-playerSoftwareName>|<get-playerSoftwareName>(){}[0]
+    final val viewerId // dev.nonbinary.outis.analytics.mux/MuxConfig.viewerId|{}viewerId[0]
+        final fun <get-viewerId>(): kotlin/String? // dev.nonbinary.outis.analytics.mux/MuxConfig.viewerId.<get-viewerId>|<get-viewerId>(){}[0]
+
+    final fun component1(): kotlin/String // dev.nonbinary.outis.analytics.mux/MuxConfig.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // dev.nonbinary.outis.analytics.mux/MuxConfig.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // dev.nonbinary.outis.analytics.mux/MuxConfig.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // dev.nonbinary.outis.analytics.mux/MuxConfig.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): dev.nonbinary.outis.analytics.mux/MuxConfig // dev.nonbinary.outis.analytics.mux/MuxConfig.copy|copy(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.nonbinary.outis.analytics.mux/MuxConfig.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.nonbinary.outis.analytics.mux/MuxConfig.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.nonbinary.outis.analytics.mux/MuxConfig.toString|toString(){}[0]
+}

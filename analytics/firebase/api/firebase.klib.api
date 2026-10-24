@@ -1,0 +1,19 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, js]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.nonbinarydev:firebase>
+final class dev.nonbinary.outis.analytics.firebase/FirebaseUsageAnalytics : dev.nonbinary.outis.core.plugin/PlayerComponent { // dev.nonbinary.outis.analytics.firebase/FirebaseUsageAnalytics|null[0]
+    constructor <init>(dev.nonbinary.outis.core/AppContext) // dev.nonbinary.outis.analytics.firebase/FirebaseUsageAnalytics.<init>|<init>(dev.nonbinary.outis.core.AppContext){}[0]
+
+    final fun attach(dev.nonbinary.outis.core.plugin/PlayerHost) // dev.nonbinary.outis.analytics.firebase/FirebaseUsageAnalytics.attach|attach(dev.nonbinary.outis.core.plugin.PlayerHost){}[0]
+    final fun detach() // dev.nonbinary.outis.analytics.firebase/FirebaseUsageAnalytics.detach|detach(){}[0]
+    final fun logEvent(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/Any> = ...) // dev.nonbinary.outis.analytics.firebase/FirebaseUsageAnalytics.logEvent|logEvent(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.Any>){}[0]
+
+    final object Companion { // dev.nonbinary.outis.analytics.firebase/FirebaseUsageAnalytics.Companion|null[0]
+        final fun setCollectionEnabled(dev.nonbinary.outis.core/AppContext, kotlin/Boolean) // dev.nonbinary.outis.analytics.firebase/FirebaseUsageAnalytics.Companion.setCollectionEnabled|setCollectionEnabled(dev.nonbinary.outis.core.AppContext;kotlin.Boolean){}[0]
+    }
+}

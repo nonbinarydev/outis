@@ -2239,10 +2239,10 @@ multicast-dns@^7.2.5:
     dns-packet "^5.2.2"
     thunky "^1.0.2"
 
-mux-embed@5.9.0:
-  version "5.9.0"
-  resolved "https://registry.yarnpkg.com/mux-embed/-/mux-embed-5.9.0.tgz#0bd61aa8df8f44478edefbf1bbafad243ec40573"
-  integrity sha512-wmunL3uoPhma/tWy8PrDPZkvJpXvSFBwbD3KkC4PG8Ztjfb1X3hRJwGUAQyRz7z99b/ovLm2UTTitrkvStjH4w==
+mux-embed@5.18.2:
+  version "5.18.2"
+  resolved "https://registry.yarnpkg.com/mux-embed/-/mux-embed-5.18.2.tgz#994ef9c6e9494c9e8c1edf6aec017dcbee49cc9d"
+  integrity sha512-LBH8+LazS5Iyy2ujTrwXNJt6QUUUHw7NHdRFrBfIlKTrEdL5ZrzesSsAdVVPKBjdP0OoDoVu2zoh+oT5PgFomw==
 
 negotiator@0.6.3:
   version "0.6.3"
@@ -2710,10 +2710,10 @@ setprototypeof@1.2.0, setprototypeof@~1.2.0:
   resolved "https://registry.yarnpkg.com/setprototypeof/-/setprototypeof-1.2.0.tgz#66c9a24a73f9fc28cbe66b09fed3d33dcaf1b424"
   integrity sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==
 
-shaka-player@4.16.50:
-  version "4.16.50"
-  resolved "https://registry.yarnpkg.com/shaka-player/-/shaka-player-4.16.50.tgz#25716289a051b899831e7b7720f13c36fb5a769e"
-  integrity sha512-jut4iX6JB2MBgadWVNa+pr95Vy81r3F6uF88/mIq9BXxLlK9InEBnNXM7vbOeU7QVzQK7OtgBqdOQONnjeJ+TA==
+shaka-player@5.3.1:
+  version "5.3.1"
+  resolved "https://registry.yarnpkg.com/shaka-player/-/shaka-player-5.3.1.tgz#68f0819c65c626a66d3f33bca2f99d0da089ee34"
+  integrity sha512-nlhxDfgQKXfc+ecNQos/l1epXILup8C3n7CrQSm43M47vAY1WDlpIAq448YDXTRHK5vZ/4JGiDfxOVkv7vwegg==
 
 shallow-clone@^3.0.0:
   version "3.0.1"

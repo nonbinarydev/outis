@@ -30,7 +30,7 @@ import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun PlayerControlsScope.VideoRangeBadge(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.VideoRangeBadge(modifier: Modifier = Modifier) {
     val label = when (state.videoRange) {
         VideoRange.SDR -> return
         VideoRange.HDR10 -> "HDR10"

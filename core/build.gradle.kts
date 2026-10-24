@@ -9,6 +9,7 @@ import com.vanniktech.maven.publish.KotlinMultiplatform
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
@@ -24,6 +25,14 @@ group = "io.github.nonbinarydev"
 version = "0.1.0-alpha01"
 
 kotlin {
+    explicitApi()
+
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation()
+
+    // AppContext is an expect class, still Beta in Kotlin; accepted deliberately (see its KDoc).
+    compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
+
     // JVM is an API/test-only target — the core types compile here so unit tests run fast on
     // the JVM. There is no JVM playback engine (desktop was dropped); the factory throws.
     jvm()
@@ -75,17 +84,17 @@ kotlin {
     }
 
     sourceSets {
+        all { languageSettings.optIn("dev.nonbinary.outis.core.ExperimentalPlayerApi") }
+
         val commonMain by getting {
             dependencies {
-                // `api`, not `implementation`: these two appear in this module's PUBLIC signatures, so
-                // consumers need them on their COMPILE classpath. `implementation` publishes into
-                // runtimeElements but not apiElements, so `player.state.collect { }` would fail with
-                // "Cannot access class 'kotlinx.coroutines.flow.StateFlow'" unless the consumer happened
-                // to declare the same library themselves.
-                //   StateFlow / SharedFlow / CoroutineScope  -> VideoPlayer.state, .events, PlayerHost
-                //   ImmutableList / ImmutableMap             -> PlayerState tracks + chapters, MediaItem.headers
+                // `api`, not `implementation`: StateFlow / SharedFlow / CoroutineScope appear in this
+                // module's PUBLIC signatures (VideoPlayer.state, .events, PlayerHost), so consumers need
+                // it on their COMPILE classpath. `implementation` publishes into runtimeElements but not
+                // apiElements, so `player.state.collect { }` would fail with "Cannot access class
+                // 'kotlinx.coroutines.flow.StateFlow'" unless the consumer declared it themselves.
+                // Public collections are plain List/Map (ADR-0008), so nothing else needs to be `api`.
                 api(libs.kotlinx.coroutines.core)
-                api(libs.kotlinx.collections.immutable)
 
                 // These three appear in no public signature, so they stay implementation-scoped.
                 implementation(libs.kotlinx.datetime)
@@ -105,12 +114,9 @@ kotlin {
 
         val androidMain by getting {
             dependencies {
-                // `api` because exactly one public declaration exposes a Media3 type:
-                // `VideoPlayer.setAdViewProvider(provider: AdViewProvider?)` (ExoPlayerEngine.kt), the
-                // documented entry point for hosting the CSAI ad overlay. AdViewProvider lives in
-                // media3-common, so only that artifact is promoted — the exoplayer artifacts below stay
-                // implementation-scoped so the engine itself is not part of this module's API.
-                api(libs.media3.common)
+                // No Media3 type appears in a public signature (the ad bridge takes a ViewGroup and Outis's
+                // own AdObstruction), so the whole engine stays implementation-scoped (ADR-0002).
+                implementation(libs.media3.common)
 
                 // KTX extensions (String.toUri). It would arrive transitively via media3, but this
                 // source set imports from it directly, and compiling against another module's
@@ -149,7 +155,7 @@ kotlin {
         val jsMain by getting {
             dependsOn(webMain)
             dependencies {
-                implementation(npm("shaka-player", "4.16.50"))
+                implementation(npm("shaka-player", libs.versions.shakaPlayer.get()))
             }
         }
         val wasmJsMain by getting { dependsOn(webMain) }
@@ -211,7 +217,7 @@ mavenPublishing {
     configure(KotlinMultiplatform(javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml")))
 
     // Central Portal (the old OSSRH/Nexus flow is retired). Signing is required by Central; the key
-    // comes from ~/.gradle/gradle.properties locally, or ORG_GRADLE_PROJECT_signingInMemoryKey in CI.
+    // comes from secrets.properties via local-signing.gradle.kts, or ORG_GRADLE_PROJECT_signingInMemoryKey.
     publishToMavenCentral()
     signAllPublications()
 

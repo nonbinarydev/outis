@@ -7,7 +7,6 @@
 package dev.nonbinary.outis.core
 
 import android.content.Context
-import android.media.MediaDrm
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -43,9 +42,11 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import dev.nonbinary.outis.core.ads.Ad
 import dev.nonbinary.outis.core.ads.AdConfig
+import dev.nonbinary.outis.core.ads.AdObstruction
 import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
+import dev.nonbinary.outis.core.chapters.declaredChapters
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
@@ -57,11 +58,11 @@ import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
 import dev.nonbinary.outis.core.source.WidevineLevel
+import dev.nonbinary.outis.core.source.isDrmSchemeSupported
+import dev.nonbinary.outis.core.source.unsupportedDrmError
 import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -115,7 +116,7 @@ internal class ExoPlayerEngine(
      * deterministic dispatcher; the default is the only value production uses.
      */
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : VideoPlayer {
+) : PlatformEngine {
 
     private val _state = MutableStateFlow(PlayerState(volume = config.initialVolume))
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
@@ -139,13 +140,13 @@ internal class ExoPlayerEngine(
     @Volatile private var released = false
 
     // ---- Client-side ad insertion (IMA/CSAI). The loader is created lazily on the first ClientSide item;
-    // the ad surface (the :ui Media3 PlayerView, itself an AdViewProvider) is pushed in via
-    // setAdViewProvider. IMA owns ad playback + its skip/countdown UI; we mirror its lifecycle into
-    // PlayerState.adState so the chrome blocks seeking during ads. Main-thread only. ----
+    // the ad surface is pushed in via setAdContainer. IMA owns ad playback + its skip/countdown UI; we
+    // mirror its lifecycle into PlayerState.adState so the chrome blocks seeking during ads.
+    // Main-thread only. ----
     @Volatile private var imaAdsLoader: ImaAdsLoader? = null
 
     @Volatile private var imaPlayerBound = false
-    private val adViewProvider = DelegatingAdViewProvider()
+    private val adViewProvider = ContainerAdViewProvider()
     private val imaAdEventListener = ImaAdEvent.AdEventListener { onImaAdEvent(it) }
 
     // Main-thread-only state.
@@ -180,25 +181,24 @@ internal class ExoPlayerEngine(
                 videoSize = null,
                 isMuted = item.startMuted || it.isMuted,
                 playbackState = PlaybackState.BUFFERING,
-                audioTracks = persistentListOf(),
-                textTracks = persistentListOf(),
+                audioTracks = emptyList(),
+                textTracks = emptyList(),
                 selectedAudioTrackId = null,
                 selectedTextTrackId = null,
-                chapters = persistentListOf(),
-                thumbnails = persistentListOf(),
+                videoTracks = emptyList(),
+                selectedVideoTrackId = null,
+                chapters = item.declaredChapters,
+                thumbnails = emptyList(),
             )
         }
-        // Media3 surfaces no chapter API, so parse embedded chapters from the local container off-thread
-        // (mp4/m4v QuickTime+Nero, mkv Matroska) and publish them to PlayerState. Remote sources skip this.
         extractChaptersAsync(item)
         loadThumbnailsAsync(item)
         // Fail fast on a DRM scheme this device can't satisfy, rather than handing ExoPlayer an
-        // undecryptable source that limps along as black/silent playback. FairPlay is Apple-only (no
-        // Android CDM at all); Widevine/PlayReady need a device CDM that many phones lack.
-        unsupportedDrmLabel(item.drmConfig)?.let { scheme ->
+        // undecryptable source that limps along as black/silent playback.
+        item.drmConfig?.takeUnless { isDrmSchemeSupported(it.scheme) }?.let { drm ->
             exo.stop()
             exo.clearMediaItems()
-            val drmError = PlayerError(PlayerError.Category.DRM, message = "$scheme DRM isn't supported on this device")
+            val drmError = unsupportedDrmError(drm)
             _state.update { it.copy(error = drmError, playbackState = PlaybackState.IDLE, isPlaying = false) }
             emit { p, t -> PlayerEvent.FatalError(drmError, p, t) }
             return@onPlayerThread
@@ -322,11 +322,24 @@ internal class ExoPlayerEngine(
                 pendingSeekTargetMs = null,
                 videoSize = null,
                 error = null,
-                audioTracks = persistentListOf(),
-                textTracks = persistentListOf(),
+                audioTracks = emptyList(),
+                textTracks = emptyList(),
                 selectedAudioTrackId = null,
                 selectedTextTrackId = null,
+                videoTracks = emptyList(),
+                selectedVideoTrackId = null,
+                chapters = emptyList(),
+                thumbnails = emptyList(),
             )
+        }
+    }
+
+    override fun failLoad(item: MediaItem, error: PlayerError) {
+        stop()
+        onPlayerThread {
+            _state.update { it.copy(mediaItem = item, error = error) }
+            emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
+            emit { p, t -> PlayerEvent.FatalError(error, p, t) }
         }
     }
 
@@ -348,7 +361,8 @@ internal class ExoPlayerEngine(
             }
             imaAdsLoader = null
             imaPlayerBound = false
-            adViewProvider.delegate = null
+            adViewProvider.container = null
+            adViewProvider.overlays = emptyList()
             player?.let { exo ->
                 exo.removeListener(playerListener)
                 exo.removeAnalyticsListener(analyticsListener)
@@ -511,15 +525,15 @@ internal class ExoPlayerEngine(
             }
             _state.update {
                 it.copy(
-                    audioTracks = audio.toPersistentList(),
-                    textTracks = text.toPersistentList(),
-                    videoTracks = video.toPersistentList(),
+                    audioTracks = audio.toList(),
+                    textTracks = text.toList(),
+                    videoTracks = video.toList(),
                     selectedAudioTrackId = audio.firstOrNull { t -> t.isSelected }?.id,
                     selectedTextTrackId = text.firstOrNull { t -> t.isSelected }?.id,
                     selectedVideoTrackId = video.firstOrNull { t -> t.isSelected }?.id,
                 )
             }
-            emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
+            emit { p, t -> _state.value.tracksChanged(p, t) }
         }
     }
 
@@ -666,17 +680,19 @@ internal class ExoPlayerEngine(
         scope.launch(ioDispatcher) {
             val thumbs = loadThumbnails(url)
             if (thumbs.isEmpty() || released) return@launch
-            _state.update { if (it.mediaItem === item) it.copy(thumbnails = thumbs.toPersistentList()) else it }
+            _state.update { if (it.mediaItem === item) it.copy(thumbnails = thumbs.toList()) else it }
         }
     }
 
     private fun extractChaptersAsync(item: MediaItem) {
+        if (item.chapters != null) return // declared chapters are already in state, and win
         // A WebVTT sidecar wins over embedded chapters and is the only source that works for remote/streams.
+        // Media3 surfaces no chapter API, so embedded ones are parsed from the local container off-thread.
         item.chaptersUrl?.let { sidecar ->
             scope.launch(ioDispatcher) {
                 val chapters = loadSidecarChapters(sidecar)
                 if (chapters.isEmpty() || released) return@launch
-                _state.update { if (it.mediaItem === item) it.copy(chapters = chapters.toPersistentList()) else it }
+                _state.update { if (it.mediaItem === item) it.copy(chapters = chapters.toList()) else it }
             }
             return
         }
@@ -703,13 +719,14 @@ internal class ExoPlayerEngine(
             }.getOrDefault(emptyList())
             if (chapters.isEmpty() || released) return@launch
             // Only apply if this is still the current item (a newer setMediaItem must not be clobbered).
-            _state.update { if (it.mediaItem === item) it.copy(chapters = chapters.toPersistentList()) else it }
+            _state.update { if (it.mediaItem === item) it.copy(chapters = chapters.toList()) else it }
         }
     }
 
     private fun localFilePath(item: MediaItem): String? = when (val s = item.source) {
         is MediaSource.LocalFile -> s.path
         is MediaSource.Url -> if (s.url.startsWith("file://")) s.url.removePrefix("file://") else null
+        is MediaSource.Smil -> null
     }
 
     // ---- IMA / CSAI ----
@@ -728,10 +745,11 @@ internal class ExoPlayerEngine(
         }
     }
 
-    /** Push the :ui ad-overlay surface (the Media3 PlayerView) into the loader, or null to detach it. */
+    /** Where IMA draws its ad UI, and the views over the video it should not count against the ad. */
     @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
-    internal fun setAdViewProvider(provider: AdViewProvider?) {
-        adViewProvider.delegate = provider
+    internal fun setAdContainer(container: ViewGroup?, obstructions: List<AdObstruction>) {
+        adViewProvider.container = container
+        adViewProvider.overlays = if (container == null) emptyList() else obstructions.map { it.toAdOverlayInfo() }
     }
 
     /** Mirror IMA's ad lifecycle into [PlayerState.adState] so the chrome can block seeking during ads. */
@@ -768,24 +786,27 @@ internal class ExoPlayerEngine(
         )
     }
 
-    /** An [AdViewProvider] that forwards to the surface's PlayerView once attached; a no-op until then. */
+    /** An [AdViewProvider] over the container [setAdContainer] registered; an unattached layout until then. */
     @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
-    private inner class DelegatingAdViewProvider : AdViewProvider {
-        @Volatile var delegate: AdViewProvider? = null
+    private inner class ContainerAdViewProvider : AdViewProvider {
+        @Volatile var container: ViewGroup? = null
+
+        @Volatile var overlays: List<AdOverlayInfo> = emptyList()
         private val empty by lazy { FrameLayout(appContext) }
-        override fun getAdViewGroup(): ViewGroup = delegate?.adViewGroup ?: empty
-        override fun getAdOverlayInfos(): List<AdOverlayInfo> = delegate?.adOverlayInfos ?: emptyList()
+        override fun getAdViewGroup(): ViewGroup = container ?: empty
+        override fun getAdOverlayInfos(): List<AdOverlayInfo> = overlays
     }
 }
 
-/**
- * Hand the ad-overlay surface — the Media3 `PlayerView`, which implements [AdViewProvider] — to the
- * player's IMA ad loader, or `null` to detach it. Called by the `:ui` Android surface; a no-op
- * for any [VideoPlayer] that isn't the Media3 engine.
- */
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
-fun VideoPlayer.setAdViewProvider(provider: AdViewProvider?) {
-    (this as? ExoPlayerEngine)?.setAdViewProvider(provider)
+private fun AdObstruction.toAdOverlayInfo(): AdOverlayInfo {
+    val purpose = when (purpose) {
+        AdObstruction.Purpose.CONTROLS -> AdOverlayInfo.PURPOSE_CONTROLS
+        AdObstruction.Purpose.CLOSE_AD -> AdOverlayInfo.PURPOSE_CLOSE_AD
+        AdObstruction.Purpose.OTHER -> AdOverlayInfo.PURPOSE_OTHER
+        AdObstruction.Purpose.NOT_VISIBLE -> AdOverlayInfo.PURPOSE_NOT_VISIBLE
+    }
+    return AdOverlayInfo.Builder(view, purpose).apply { reason?.let(::setDetailedReason) }.build()
 }
 
 private const val IMA_TAG = "PlayerIMA"
@@ -805,6 +826,8 @@ private fun MediaItem.toExoMediaItem(liveConfig: LiveConfig?): ExoMediaItem {
     val uri = when (val s = source) {
         is MediaSource.Url -> s.url
         is MediaSource.LocalFile -> s.path
+        // Unreachable: SmilResolvingPlayer swaps a SMIL source for its chosen rendition first.
+        is MediaSource.Smil -> s.url
     }
     return ExoMediaItem.Builder()
         .setUri(uri)
@@ -854,19 +877,6 @@ private fun DrmConfig.toExoDrmConfiguration(): ExoMediaItem.DrmConfiguration? {
         .setLicenseRequestHeaders(licenseRequestHeaders)
         .setMultiSession(multiSession)
         .build()
-}
-
-/**
- * The display name of [drm]'s scheme if this device can't satisfy it (so the caller can fail fast with a
- * clear error), or null when it's playable. FairPlay has no Android CDM at all; Widevine, PlayReady and
- * ClearKey are queried against the platform via [MediaDrm.isCryptoSchemeSupported].
- */
-private fun unsupportedDrmLabel(drm: DrmConfig?): String? = when (drm?.scheme) {
-    null -> null
-    DrmScheme.FAIRPLAY -> "FairPlay"
-    DrmScheme.WIDEVINE -> if (MediaDrm.isCryptoSchemeSupported(C.WIDEVINE_UUID)) null else "Widevine"
-    DrmScheme.PLAYREADY -> if (MediaDrm.isCryptoSchemeSupported(C.PLAYREADY_UUID)) null else "PlayReady"
-    DrmScheme.CLEARKEY -> if (MediaDrm.isCryptoSchemeSupported(C.CLEARKEY_UUID)) null else "ClearKey"
 }
 
 /**

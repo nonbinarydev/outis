@@ -21,7 +21,7 @@ import dev.nonbinary.outis.core.VideoPlayer
  */
 @ExperimentalPlayerUiApi
 @Composable
-expect fun PlayerSurface(
+public expect fun PlayerSurface(
     player: VideoPlayer,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,

@@ -18,7 +18,8 @@ DRM key systems are platform-bound — this is the one split you can't engineer 
 |---|---|---|---|---|
 | **Widevine** | ✅ | ❌ | ✅ | ❌ |
 | **PlayReady** | ✅ (device CDM only) | ❌ | ✅ (Edge) | ❌ |
-| **FairPlay** | ❌ | ✅ | ❌ | ✅ |
+| **FairPlay** | ❌ | ✅ (devices, not the simulator) | ❌ | ✅ |
+| **Clear Key** | ✅ (device CDM) | ✅ (HLS only) | ✅ | ❌ |
 
 Practical takeaways:
 
@@ -26,11 +27,12 @@ Practical takeaways:
 - **Everything else → Widevine** (or PlayReady on Microsoft stacks). PlayReady on Android is probed
   against the device with `MediaDrm.isCryptoSchemeSupported` and most phones ship Widevine only, so
   treat the Android PlayReady cell as "if the device has the CDM".
-- A scheme the platform can't satisfy fails the item rather than playing it silently — but **the error
-  category differs per platform**, and it is not always `DRM`. See [§9](#9-troubleshooting).
+- A scheme the device can't satisfy fails the item at once, before anything is fetched, with
+  `Category.DRM` and a message naming the scheme — the same on every platform. Ask in advance with
+  [`drmSupport()`](#checking-what-the-device-supports).
 - **Web: DRM is ignored for progressive sources.** `ShakaEngine` routes `MimeType.MP4`, any
   `MediaSource.LocalFile`, and `.mp4`/`.webm` URLs to the browser's `<video>` element and returns
-  before `configureDrm` is ever reached (`ShakaEngine.kt:448-454`, `:1001-1010`). DRM on Web means
+  before `configureDrm` is ever reached (`ShakaEngine.kt`). DRM on Web means
   HLS or DASH through Shaka.
 - Container note: Widevine/PlayReady are usually carried in **DASH**, FairPlay in **HLS**. Since iOS
   can't play DASH *and* can't do Widevine, your Apple delivery is **HLS + FairPlay**; your Android/Web
@@ -39,47 +41,59 @@ Practical takeaways:
 To pick the right scheme per platform at runtime, branch on the target — see
 [§7](#7-multi-drm-one-codebase).
 
+### Checking what the device supports
+
+The table is the platforms' rule, but the answer for a given device is the device's: PlayReady is on
+some Android phones and not most, and a browser's CDMs depend on its build. `drmSupport()` asks the
+platform itself:
+
+```kotlin
+import dev.nonbinary.outis.core.source.DrmScheme
+import dev.nonbinary.outis.core.source.drmSupport
+
+val support = drmSupport()                 // suspend; asked once per process, then kept
+if (DrmScheme.WIDEVINE in support.schemes) {
+    support.widevineLevel                  // L1 (hardware-backed) or L3 (software)
+}
+```
+
+| Platform | Asked of | Notes |
+|---|---|---|
+| Android | `MediaDrm.isCryptoSchemeSupported`, and Widevine's `securityLevel` property | L2 is reported as L3: it decodes video in software, which HD licences refuse. |
+| Web | `navigator.requestMediaKeySystemAccess`, per key system | EME exists only in a secure context — `https`, or `localhost` — so a plain `http` page reports nothing. L1 means the browser grants hardware robustness. |
+| iOS | Nothing to ask — FairPlay and Clear Key | The simulator has no FairPlay CDM, so it reports Clear Key alone. |
+
+The engines check the same answer before loading a protected item, so you need not call it to get a
+clean error — only to choose a scheme, or to say in advance that one won't work.
+
 ---
 
 ## 2. The `DrmConfig` API
 
-### A build dependency you must add first
-
-`DrmConfig.licenseRequestHeaders` is typed `ImmutableMap<String, String>`
-(`DrmConfig.kt:49`), and `:core` declares kotlinx-collections-immutable as `implementation`, not
-`api` (`core/build.gradle.kts:81`). It is therefore **not** on your compile classpath. Without this
-line you cannot set a single license header:
-
-```kotlin
-// your module's build.gradle.kts, in the same source set that builds MediaItems
-implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.1")
-```
-
-Version `0.5.1` is what `:core` is built against (`gradle/libs.versions.toml:16`). Every example below
-assumes it, plus:
+Every example below assumes:
 
 ```kotlin
 import dev.nonbinary.outis.core.source.*
-import kotlinx.collections.immutable.persistentMapOf
 ```
 
 ### The full declaration
 
-All eight parameters, in order (`DrmConfig.kt:31-84`):
+All nine parameters, in order:
 
 ```kotlin
 data class DrmConfig(
-    val scheme: DrmScheme,                        // WIDEVINE / PLAYREADY / FAIRPLAY
-    val licenseServerUrl: String,                 // where the CDM's challenge is POSTed
+    val scheme: DrmScheme,                        // WIDEVINE / PLAYREADY / FAIRPLAY / CLEARKEY
+    val licenseServerUrl: String? = null,         // where the CDM's challenge is POSTed; null for CLEARKEY
     val certificateUrl: String? = null,           // FairPlay FPS application certificate; ignored otherwise
-    val licenseRequestHeaders: ImmutableMap<String, String> = persistentMapOf(),
+    val clearKeys: Map<String, String> = emptyMap(),             // CLEARKEY only: hex keyId -> hex key
+    val licenseRequestHeaders: Map<String, String> = emptyMap(),
     val multiSession: Boolean = false,            // multiple concurrent key sessions (Android only)
     val widevineLevel: WidevineLevel = WidevineLevel.AUTO,   // Widevine only; see §3
     val licenseRequestInterceptor: ((LicenseRequest) -> LicenseRequest)? = null,   // see §6
     val licenseResponseInterceptor: ((ByteArray) -> ByteArray)? = null,            // see §6
 )
 
-enum class DrmScheme { WIDEVINE, PLAYREADY, FAIRPLAY }
+enum class DrmScheme { WIDEVINE, PLAYREADY, FAIRPLAY, CLEARKEY }
 
 enum class WidevineLevel { AUTO, L1, L3 }
 
@@ -90,7 +104,7 @@ data class LicenseRequest(
 )
 ```
 
-`LicenseRequest` compares `body` by **identity**, not contents (`DrmConfig.kt:109-121`) — it is a
+`LicenseRequest` compares `body` by **identity**, not contents (`DrmConfig.kt`) — it is a
 transient value handed to an interceptor, so build variants with `copy(...)` and don't use it as a map
 key.
 
@@ -104,7 +118,7 @@ player.setMediaItem(
         drmConfig = DrmConfig(
             scheme = DrmScheme.WIDEVINE,
             licenseServerUrl = "https://license.example.com/widevine",
-            licenseRequestHeaders = persistentMapOf("X-Auth-Token" to token),
+            licenseRequestHeaders = mapOf("X-Auth-Token" to token),
         ),
     ),
     autoPlay = true,
@@ -125,22 +139,22 @@ Same shape for both — only the `scheme` changes:
 val drm = DrmConfig(
     scheme = DrmScheme.WIDEVINE,                 // or DrmScheme.PLAYREADY
     licenseServerUrl = "https://license.example.com/wv",
-    licenseRequestHeaders = persistentMapOf("Authorization" to "Bearer $token"),
+    licenseRequestHeaders = mapOf("Authorization" to "Bearer $token"),
 )
 ```
 
 - **Android (Media3):** mapped to `ExoMediaItem.DrmConfiguration` with `C.WIDEVINE_UUID` /
   `C.PLAYREADY_UUID`, the license URI, the request headers and `multiSession`
-  (`ExoPlayerEngine.kt:747-758`). ExoPlayer's default media-source factory builds the
+  (`ExoPlayerEngine.kt`). ExoPlayer's default media-source factory builds the
   `DefaultDrmSessionManager` from it.
 - **Web (Shaka):** mapped to `drm.servers['com.widevine.alpha' | 'com.microsoft.playready']`
-  (`ShakaEngine.kt:746-751`); headers are injected by a networking request filter
-  (`ShakaEngine.kt:306-312`).
+  (`ShakaRequests.kt`, key-system names in `KeySystems.kt`); headers are injected by a networking
+  request filter (`ShakaRequests.kt`).
 - **iOS:** there is no Widevine or PlayReady CDM. No key session is created at all, so the item fails
   as a plain source error — see [§9](#9-troubleshooting). Serve FairPlay to Apple.
 
 `multiSession = true` (some live / key-rotating streams) is honoured on Android, on both the
-declarative path (`ExoPlayerEngine.kt:756`) and the custom-session path (`:807`). It is ignored
+declarative path (`ExoPlayerEngine.kt`) and the custom-session path. It is ignored
 elsewhere.
 
 ### Forcing the Widevine security level
@@ -159,17 +173,17 @@ DrmConfig(
 
 | Value | Android | Web (Shaka) | iOS |
 |---|---|---|---|
-| `AUTO` (default) | platform negotiates | robustness `""` — browser negotiates | n/a |
-| `L3` | `securityLevel=L3` forced on a fresh `MediaDrm` before any session opens (`ExoPlayerEngine.kt:821-841`) | `SW_SECURE_DECODE` / `SW_SECURE_CRYPTO` robustness (`ShakaEngine.kt:80-84`) | n/a |
-| `L1` | **best-effort only** — a device can't be software-forced *up*, so it behaves like `AUTO` (`ExoPlayerEngine.kt:822-824`) | `HW_SECURE_DECODE` / `HW_SECURE_CRYPTO` — playback **fails** where the browser has no hardware CDM | n/a |
+| `AUTO` (default) | platform negotiates | empty robustness lists — Shaka's Widevine default | n/a |
+| `L3` | `securityLevel=L3` forced on a fresh `MediaDrm` before any session opens (`ExoPlayerEngine.kt`) | `SW_SECURE_DECODE` / `SW_SECURE_CRYPTO` robustness (`ShakaRequests.kt`) | n/a |
+| `L1` | **best-effort only** — a device can't be software-forced *up*, so it behaves like `AUTO` (`ExoPlayerEngine.kt`) | `HW_SECURE_DECODE` / `HW_SECURE_CRYPTO` — playback **fails** where the browser has no hardware CDM | n/a |
 
 It is **Widevine only**. PlayReady and FairPlay ignore it: on Android `setPropertyString` on a
-non-Widevine plugin throws, so the SDK never touches it (`ExoPlayerEngine.kt:822-824`); on Web there
+non-Widevine plugin throws, so the SDK never touches it (`ExoPlayerEngine.kt`); on Web there
 is no equivalent robustness token; on iOS FairPlay has no client-settable level and the field is
-deliberately ignored (`AVPlayerEngine.kt:242-243`).
+deliberately ignored (`AVPlayerEngine.kt`).
 
 Setting `L3` on Android takes the same custom `DrmSessionManagerProvider` path as an interceptor
-(`ExoPlayerEngine.kt:781-810`), but keeps Media3's stock HTTP callback, so the license exchange is
+(`ExoPlayerEngine.kt`), but keeps Media3's stock HTTP callback, so the license exchange is
 byte-for-byte what the declarative path would have done.
 
 ---
@@ -184,7 +198,7 @@ val fairPlay = DrmConfig(
     scheme = DrmScheme.FAIRPLAY,
     licenseServerUrl = "https://license.example.com/fairplay",     // takes the SPC, returns the CKC
     certificateUrl = "https://license.example.com/fairplay.cer",   // FPS application certificate
-    licenseRequestHeaders = persistentMapOf("X-Auth-Token" to token),
+    licenseRequestHeaders = mapOf("X-Auth-Token" to token),
 )
 
 player.setMediaItem(
@@ -199,18 +213,18 @@ player.setMediaItem(
 
 - **iOS (AVPlayer):** the SDK runs the full `AVContentKeySession` flow — fetch the certificate, build
   the SPC with `makeStreamingContentKeyRequestDataForApp`, POST it to `licenseServerUrl`, answer the
-  key request with the returned CKC (`FairPlayContentKeyManager.kt:108-163`). The content identifier
+  key request with the returned CKC (`FairPlayContentKeyManager.kt`). The content identifier
   the SPC is built against is the `skd://` key URI with the scheme stripped
-  (`FairPlayContentKeyManager.kt:121-124`); if your provider derives it differently, rewrite the
+  (`FairPlayContentKeyManager.kt`); if your provider derives it differently, rewrite the
   request in [§6](#6-non-standard-license-servers-the-interceptors).
 - **Web (Safari/Shaka):** mapped to `drm.servers['com.apple.fps']` plus
-  `advanced['com.apple.fps'].serverCertificateUri` (`ShakaEngine.kt:753-757`).
+  `advanced['com.apple.fps'].serverCertificateUri` (`ShakaRequests.kt`).
 
 > **`certificateUrl` is not optional on iOS, and omitting it does not give you a DRM error.** The key
 > manager is only created when `scheme == FAIRPLAY && certificateUrl != null`
-> (`AVPlayerEngine.kt:247`). With a null certificate URL the encrypted asset is handed to AVPlayer
+> (`AVPlayerEngine.kt`). With a null certificate URL the encrypted asset is handed to AVPlayer
 > bare and fails as `Category.SOURCE`, with no mention of DRM anywhere. A *present but broken*
-> certificate URL does produce `Category.DRM` (`FairPlayContentKeyManager.kt:133-135`).
+> certificate URL does produce `Category.DRM` (`FairPlayContentKeyManager.kt`).
 
 ---
 
@@ -222,7 +236,7 @@ Most production license servers gate on an auth token. Put it in `licenseRequest
 DrmConfig(
     scheme = DrmScheme.WIDEVINE,
     licenseServerUrl = "https://license.example.com/wv",
-    licenseRequestHeaders = persistentMapOf(
+    licenseRequestHeaders = mapOf(
         "Authorization" to "Bearer $jwt",
         "X-Custom-Header" to "value",
     ),
@@ -231,29 +245,29 @@ DrmConfig(
 
 These are headers on the *license* request, distinct from `MediaItem.headers`, which apply to
 manifest and segment requests. The two scopes really are separate in the engines
-(`ShakaEngine.kt:306-332` splits on Shaka's `RequestType.LICENSE`; iOS puts `MediaItem.headers` on the
-`AVURLAsset` at `AVPlayerEngine.kt:228-236` and the license headers on the SPC POST at
-`FairPlayContentKeyManager.kt:148-150`).
+(`ShakaRequests.kt` splits on Shaka's `RequestType.LICENSE`; iOS puts `MediaItem.headers` on the
+`AVURLAsset` at `AVPlayerEngine.kt` and the license headers on the SPC POST at
+`FairPlayContentKeyManager.kt`).
 
 Where they are applied:
 
 | Platform | Applied to | Notes |
 |---|---|---|
-| Android | Media3 `setLicenseRequestHeaders` (`ExoPlayerEngine.kt:755`) | Bypassed when an interceptor is set — see below. |
-| Web | Shaka request filter, LICENSE requests only (`ShakaEngine.kt:306-312`) | |
-| iOS | The SPC POST (`FairPlayContentKeyManager.kt:148-150`) | **Not** the certificate GET. |
+| Android | Media3 `setLicenseRequestHeaders` (`ExoPlayerEngine.kt`) | Bypassed when an interceptor is set — see below. |
+| Web | Shaka request filter, LICENSE requests only (`ShakaRequests.kt`) | |
+| iOS | The SPC POST (`FairPlayContentKeyManager.kt`) | **Not** the certificate GET. |
 
 Two behaviours that bite in production:
 
 - **iOS never sends headers with the certificate fetch.** `httpGet` is called with `headers = null`
-  (`FairPlayContentKeyManager.kt:180-181`), so a token-gated certificate endpoint fails on iOS while
+  (`FairPlayContentKeyManager.kt`), so a token-gated certificate endpoint fails on iOS while
   working everywhere else. Serve the FPS certificate from an unauthenticated URL, or move the token
   into the URL itself.
 - **On Android, an interceptor takes over the headers.** With `licenseRequestInterceptor` set, the
   request no longer goes through `setLicenseRequestHeaders`; it goes through
   `InterceptingMediaDrmCallback`, whose returned header map is authoritative
-  (`ExoPlayerEngine.kt:865-871`). Headers your interceptor omits are dropped. Same rule on Web and iOS
-  (`DrmConfig.kt:96-101`).
+  (`ExoPlayerEngine.kt`). Headers your interceptor omits are dropped. Same rule on Web and iOS
+  (`DrmConfig.kt`).
 
 ---
 
@@ -271,7 +285,7 @@ import kotlin.io.encoding.Base64
 val drm = DrmConfig(
     scheme = DrmScheme.WIDEVINE,
     licenseServerUrl = "https://mpx.example.com/license",
-    licenseRequestHeaders = persistentMapOf("Authorization" to "Bearer $jwt"),
+    licenseRequestHeaders = mapOf("Authorization" to "Bearer $jwt"),
 
     // Move the challenge into the URL and send an empty body.
     licenseRequestInterceptor = { request ->
@@ -300,60 +314,63 @@ What each platform hands you:
 
 | | Android (Widevine/PlayReady) | iOS (FairPlay) | Web (all schemes) |
 |---|---|---|---|
-| Request interceptor | `ExoPlayerEngine.kt:865-871` | `FairPlayContentKeyManager.kt:147-150` | `ShakaEngine.kt:311-326` |
-| Response interceptor | `ExoPlayerEngine.kt:873` | `FairPlayContentKeyManager.kt:156` | `ShakaEngine.kt:334-339` |
+| Request interceptor | `ExoPlayerEngine.kt` | `FairPlayContentKeyManager.kt` | `ShakaRequests.kt` |
+| Response interceptor | `ExoPlayerEngine.kt` | `FairPlayContentKeyManager.kt` | `ShakaRequests.kt` |
 | `LicenseRequest.body` is | the CDM key-request challenge | the **SPC** | the CDM challenge as Shaka built it |
 | Response bytes are | the raw license HTTP body | the **CKC** | the raw license HTTP body |
-| Default `url` | the CDM-supplied license URL if the `KeyRequest` carries one, else `licenseServerUrl` (`ExoPlayerEngine.kt:867`) | `licenseServerUrl` | `licenseServerUrl` |
-| Default `headers` | `licenseRequestHeaders` only | `licenseRequestHeaders` only | `licenseRequestHeaders` **plus** the headers Shaka itself set, e.g. `Content-Type` (`DrmConfig.kt:97-99`) |
+| Default `url` | the CDM-supplied license URL if the `KeyRequest` carries one, else `licenseServerUrl` (`ExoPlayerEngine.kt`) | `licenseServerUrl` | `licenseServerUrl` |
+| Default `headers` | `licenseRequestHeaders` only | `licenseRequestHeaders` only | `licenseRequestHeaders` **plus** the headers Shaka itself set, e.g. `Content-Type` (`DrmConfig.kt`) |
 
 Rules that apply everywhere:
 
 - The interceptors are **synchronous** — no suspending, no coroutine. Keep them pure and
   non-blocking; on Android `executeKeyRequest` runs on a background license thread
-  (`ExoPlayerEngine.kt:865`, `DrmConfig.kt:73`), so never touch UI state from inside one.
+  (`ExoPlayerEngine.kt`, `DrmConfig.kt`), so never touch UI state from inside one.
 - The returned header map is **authoritative**. Start from `request.headers` and add to it; building
   a fresh map drops everything you didn't list.
 - Setting either interceptor on Android switches the whole exchange to a custom
   `DrmSessionManagerProvider`, which then owns the license URL, headers, `multiSession` and the CDM
-  provider (`ExoPlayerEngine.kt:773-810`, wired at `:251`).
+  provider (`ExoPlayerEngine.buildMediaSource`).
 - FairPlay interceptors run only on the iOS and Web FairPlay paths. There is no Android FPS, so
-  `customDrmSessionManagerProvider` returns null for FairPlay (`ExoPlayerEngine.kt:789`).
+  `customDrmSessionManagerProvider` returns null for FairPlay (`ExoPlayerEngine.kt`).
 
 ---
 
 ## 7. Multi-DRM, one codebase
 
-Because the scheme is per-platform, build the `DrmConfig` for the running target. An `expect`/`actual`
-pair (or any platform branch) does it:
+The scheme depends on where the app runs, and [`drmSupport()`](#checking-what-the-device-supports)
+says which that is — so one function in `commonMain` covers every target, Safari and Chromium included,
+with no platform branch and no browser sniffing:
 
 ```kotlin
 // commonMain
-expect fun drmFor(licenseBase: String, token: String): DrmConfig
-
-// androidMain / jsMain (Chromium)
-actual fun drmFor(licenseBase: String, token: String) = DrmConfig(
-    scheme = DrmScheme.WIDEVINE,
-    licenseServerUrl = "$licenseBase/widevine",
-    licenseRequestHeaders = persistentMapOf("X-Auth-Token" to token),
-)
-
-// iosMain (and Safari, if you detect it on Web)
-actual fun drmFor(licenseBase: String, token: String) = DrmConfig(
-    scheme = DrmScheme.FAIRPLAY,
-    licenseServerUrl = "$licenseBase/fairplay",
-    certificateUrl = "$licenseBase/fairplay.cer",
-    licenseRequestHeaders = persistentMapOf("X-Auth-Token" to token),
-)
+suspend fun drmFor(licenseBase: String, token: String): DrmConfig? {
+    val schemes = drmSupport().schemes
+    val headers = mapOf("X-Auth-Token" to token)
+    return when {
+        DrmScheme.WIDEVINE in schemes -> DrmConfig(
+            scheme = DrmScheme.WIDEVINE,
+            licenseServerUrl = "$licenseBase/widevine",
+            licenseRequestHeaders = headers,
+        )
+        DrmScheme.FAIRPLAY in schemes -> DrmConfig(
+            scheme = DrmScheme.FAIRPLAY,
+            licenseServerUrl = "$licenseBase/fairplay",
+            certificateUrl = "$licenseBase/fairplay.cer",
+            licenseRequestHeaders = headers,
+        )
+        else -> null // nothing here can decrypt this asset
+    }
+}
 ```
 
 …then pick the matching **source** too — DASH for Widevine, HLS for FairPlay. Most multi-DRM packagers
-emit both a DASH+Widevine and an HLS+FairPlay manifest over shared CMAF segments.
+emit both a DASH+Widevine and an HLS+FairPlay manifest over shared CMAF segments. If your backend lists
+them in a SMIL document, hand the player that instead: the default
+[SMIL selection](playback.md#smil) tries the format the item's DRM scheme pairs with first.
 
-Note that the `jsMain` actual has to serve both Chromium and Safari from one binary. Shaka can be
-configured with several key systems at once; Outis maps exactly one `DrmScheme` per item
-(`ShakaEngine.kt:746-751`), so branch on the browser in your `jsMain` actual and hand back FairPlay for
-Safari.
+Outis maps exactly one `DrmScheme` per item, so the choice is yours to make before `setMediaItem` — the
+function above is that choice.
 
 ---
 
@@ -376,36 +393,34 @@ outside this project's control — they move and expire.
 
 ## 9. Troubleshooting
 
-The error category you get for a DRM failure is **not** the same on every platform. This is the single
-most confusing thing about debugging DRM here.
+A scheme the device lacks fails the same way everywhere. Failures after that point carry each engine's
+own detail, so read `code` and `nativeCause` alongside the category.
 
 | Platform | Failure | What you actually observe |
 |---|---|---|
-| Android | Scheme the device has no CDM for (any FairPlay; Widevine/PlayReady on a device without one) | `PlayerError(Category.DRM, message = "<Scheme> DRM isn't supported on this device")`, raised before playback starts (`ExoPlayerEngine.kt:186-192`) |
-| Android | License server rejection, key errors | `Category.DRM` — Media3 error codes 6000-6999 (`ExoPlayerEngine.kt:917`) |
-| iOS | Widevine or PlayReady requested | **`Category.SOURCE`**, not `DRM`. No key session is created (`AVPlayerEngine.kt:247`), so the item just fails to load (`AVPlayerEngine.kt:523`, `:734`) |
-| iOS | FairPlay with `certificateUrl = null` | **`Category.SOURCE`**, same reason |
-| iOS | FairPlay handshake failure (certificate fetch, SPC build, license POST) | `Category.DRM` (`FairPlayContentKeyManager.kt:165-168`). Errors latch first-wins (`AVPlayerEngine.kt:547-549`), so if the `AVPlayerItem` gives up first you get `SOURCE` instead |
-| Web | Any DRM failure during `load()` — including Widevine in Safari | **`Category.SOURCE`, message `"Failed to load media"`** (`ShakaEngine.kt:470-473`). Shaka's error object is discarded, and `emitErrorOnce` latches, so the real DRM error never surfaces |
-| Web | A DRM error after a successful load | `Category.DRM` via Shaka's `error` event, category 6 (`ShakaEngine.kt:958`) |
-| Web | Progressive source (`MimeType.MP4`, `LocalFile`, `.mp4`/`.webm`) with a `DrmConfig` | Nothing. `configureDrm` is never called (`ShakaEngine.kt:448-454`); the item plays clear or fails opaquely |
+| All | A scheme the device has no CDM for — any FairPlay on Android, Widevine or PlayReady on iOS, Widevine in Safari, FairPlay in Chrome, FairPlay on the iOS simulator | `PlayerError(Category.DRM, message = "<Scheme> DRM isn't supported on this device")`, before anything is fetched |
+| Web | A forced `widevineLevel` the browser can't grant | `Category.DRM`, `"Widevine L1 isn't supported on this device"` (or `L3`), before anything is fetched |
+| iOS | FairPlay with `certificateUrl = null` | `Category.DRM`, `"FairPlay needs DrmConfig.certificateUrl"`, before anything is fetched |
+| Android | License server rejection, key errors | `Category.DRM` — Media3 error codes 6000-6999 |
+| iOS | FairPlay handshake failure (certificate fetch, SPC build, license POST) | `Category.DRM`. Errors latch first-wins, so if the `AVPlayerItem` gives up first you get `SOURCE` instead |
+| Web | A failure during or after `load()` | Classified by Shaka's own category — `DRM` for its 6xxx key-system errors — with Shaka's numeric code in `code` and its error object in `nativeCause` |
+| Web | Progressive source (`MimeType.MP4`, `LocalFile`, `.mp4`/`.webm`) with a `DrmConfig` | Nothing. `configureDrm` is never called; the item plays clear or fails opaquely |
 
 Symptom table:
 
 | Symptom | Likely cause |
 |---|---|
 | `Category.DRM` immediately on Android | Wrong scheme for the device, or a bad license/certificate URL. |
-| iOS "won't play", no DRM error anywhere | Wrong scheme, or FairPlay with no `certificateUrl`. See the table above — iOS reports both as `SOURCE`. |
-| Web `"Failed to load media"` and nothing else | Could be DRM. Check the browser console for Shaka's own error, which the SDK discards on the load path. |
+| `Category.DRM` on web with a 6xxx `code` | A key-system or licence problem Shaka hit; the code names it in Shaka's error reference. |
 | FairPlay: certificate loads, then it fails at the **license** step | Provider-specific SPC/CKC shape. Fix it with the interceptors — [§6](#6-non-standard-license-servers-the-interceptors). |
 | FairPlay works on Web, fails on iOS at the **certificate** step | The certificate endpoint requires a token. iOS sends no headers with that GET — [§5](#5-license-request-headers-token-auth). |
 | License rejected only in production | Expired or missing `licenseRequestHeaders` token, or an interceptor that returned a header map without it. |
 | Playback works on most devices, fails on a few old Android handsets | Expired L1 certificate. Try `widevineLevel = WidevineLevel.L3` — [§3](#3-widevine--playready-android--web). |
 | iOS: a clear DASH or `avc3` stream "won't play" but DRM looks configured | Not DRM — iOS can't play DASH at all, and rejects in-band-parameter-set `avc3` HLS. Use HLS `avc1`. |
-| Nothing plays on Web after one DRM failure | A failed Shaka load wedges the Player; the engine flags it (`ShakaEngine.kt:982`) and the next `setMediaItem` recreates it (`:439`). Recovery is automatic. |
+| Nothing plays on Web after one DRM failure | A failed Shaka load wedges the Player; the engine flags it and the next `setMediaItem` recreates it. Recovery is automatic. |
 
-A DRM failure is recoverable: the next `setMediaItem` clears `state.error` on all three engines
-(`ExoPlayerEngine.kt:163`, `AVPlayerEngine.kt:279`, `ShakaEngine.kt:406`) and starts fresh.
+A DRM failure is recoverable: the next `setMediaItem` clears `state.error` on all three engines and
+starts fresh.
 
 ---
 

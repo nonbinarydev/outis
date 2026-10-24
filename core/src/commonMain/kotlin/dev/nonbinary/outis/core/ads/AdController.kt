@@ -6,6 +6,7 @@
 
 package dev.nonbinary.outis.core.ads
 
+import dev.nonbinary.outis.core.ExperimentalPlayerApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -43,7 +44,8 @@ private val QUARTILE_THRESHOLDS = listOf(
  * // chrome: disable the scrubber while ads.state.isInAdBreak; route seeks via ads.resolveSeek(from, to)
  * ```
  */
-class AdController(breaks: List<AdBreak>) {
+@ExperimentalPlayerApi
+public class AdController(breaks: List<AdBreak>) {
     private val breaks = breaks.sortedBy { it.startMs }.toMutableList()
     private val watched = mutableSetOf<String>()
 
@@ -54,7 +56,7 @@ class AdController(breaks: List<AdBreak>) {
      * countdown, the skip button and scrubber-locking. Outside a break this is a **reset** [AdState] that
      * still carries the current [AdState.cuePoints], so a timeline can always mark the ad positions.
      */
-    val state: StateFlow<AdState> = _state.asStateFlow()
+    public val state: StateFlow<AdState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<AdEvent>(extraBufferCapacity = 32)
 
@@ -64,14 +66,14 @@ class AdController(breaks: List<AdBreak>) {
      * you subscribe are lost, and emission is non-suspending (`tryEmit`), so a collector that can't keep
      * up will drop events rather than stall the playhead. Subscribe before the first [onPosition].
      */
-    val events: SharedFlow<AdEvent> = _events.asSharedFlow()
+    public val events: SharedFlow<AdEvent> = _events.asSharedFlow()
 
     private var activeBreak: AdBreak? = null
     private var activeAd: Ad? = null
     private val firedQuartiles = mutableSetOf<AdQuartile>()
 
     /** Drive from the player's position flow (idempotent per position; safe to call on every update). */
-    fun onPosition(positionMs: Long) {
+    public fun onPosition(positionMs: Long) {
         val active = breaks.firstOrNull { it.id !in watched && positionMs >= it.startMs && positionMs < it.endMs }
         if (active == null) {
             finalizePassedBreaks(positionMs)
@@ -94,12 +96,12 @@ class AdController(breaks: List<AdBreak>) {
         val adPos = (offset - acc).coerceAtLeast(0L)
 
         if (active.id != activeBreak?.id) {
+            completeActiveAd() // a jump straight from one break into another
             activeBreak = active
-            activeAd = null
             _events.tryEmit(AdEvent.BreakStarted(active))
         }
         if (current.id != activeAd?.id) {
-            activeAd?.let { _events.tryEmit(AdEvent.AdCompleted(it)) }
+            completeActiveAd()
             activeAd = current
             firedQuartiles.clear()
             _events.tryEmit(AdEvent.AdStarted(current, index, active.ads.size))
@@ -125,7 +127,7 @@ class AdController(breaks: List<AdBreak>) {
      * A forward seek made from *inside* an unwatched break is pinned to [fromMs] (no skipping the current
      * ad). Backward seeks, and seeks that don't cross an unwatched break, pass through unchanged.
      */
-    fun resolveSeek(fromMs: Long, targetMs: Long): Long {
+    public fun resolveSeek(fromMs: Long, targetMs: Long): Long {
         if (targetMs <= fromMs) return targetMs
         // Already inside an unwatched break → can't seek forward out of (i.e. skip) the current ad.
         if (breaks.any { it.id !in watched && fromMs >= it.startMs && fromMs < it.endMs }) return fromMs
@@ -138,12 +140,11 @@ class AdController(breaks: List<AdBreak>) {
      * Skip the current break — meaningful only when [AdState.canSkip]. Marks it watched, clears ad state,
      * and returns the position to seek the player to (the break's end), or `null` if not in a break.
      */
-    fun skipCurrentBreak(): Long? {
+    public fun skipCurrentBreak(): Long? {
         val brk = activeBreak ?: return null
-        activeAd?.let { _events.tryEmit(AdEvent.AdCompleted(it)) }
+        completeActiveAd()
         watched += brk.id
         activeBreak = null
-        activeAd = null
         firedQuartiles.clear()
         _state.value = AdState(cuePoints = cuePoints())
         _events.tryEmit(AdEvent.BreakCompleted(brk))
@@ -156,7 +157,7 @@ class AdController(breaks: List<AdBreak>) {
      * surface avails during playback rather than up front. Ignored if a break with the same id is already
      * known. The position loop picks it up on the next [onPosition].
      */
-    fun addBreak(adBreak: AdBreak) {
+    public fun addBreak(adBreak: AdBreak) {
         if (breaks.any { it.id == adBreak.id }) return
         breaks.add(adBreak)
         breaks.sortBy { it.startMs }
@@ -164,7 +165,7 @@ class AdController(breaks: List<AdBreak>) {
     }
 
     /** Mark every break at or before [positionMs] as already watched (e.g. resuming past them). */
-    fun markWatchedUpTo(positionMs: Long) {
+    public fun markWatchedUpTo(positionMs: Long) {
         breaks.forEach { if (it.endMs <= positionMs) watched += it.id }
     }
 
@@ -172,7 +173,7 @@ class AdController(breaks: List<AdBreak>) {
      * Call when playback reaches the end. Finalizes any still-unwatched break — e.g. a post-roll the last
      * position poll never reported past — so its completion (and `AllAdsCompleted`) events still fire.
      */
-    fun onEnded() {
+    public fun onEnded() {
         finalizePassedBreaks(Long.MAX_VALUE)
         if (_state.value.isInAdBreak) _state.value = AdState(cuePoints = cuePoints())
     }
@@ -187,15 +188,22 @@ class AdController(breaks: List<AdBreak>) {
         // distinctBy keeps a duplicated break id from completing twice, which the previous
         // check-then-mark loop got for free.
         val passed = breaks.filter { it.id !in watched && positionMs >= it.endMs }.distinctBy { it.id }
+        // Seeking back out of a break completes the ad it was on; the break itself stays unwatched.
+        if (passed.none { it.id == activeBreak?.id }) completeActiveAd()
         passed.forEach { brk ->
-            if (brk.id == activeBreak?.id) activeAd?.let { _events.tryEmit(AdEvent.AdCompleted(it)) }
+            if (brk.id == activeBreak?.id) completeActiveAd()
             watched += brk.id
             _events.tryEmit(AdEvent.BreakCompleted(brk))
         }
         if (passed.isNotEmpty() && breaks.all { it.id in watched }) _events.tryEmit(AdEvent.AllAdsCompleted)
         activeBreak = null
-        activeAd = null
         firedQuartiles.clear()
+    }
+
+    /** The playhead moved off [activeAd]: report it complete. */
+    private fun completeActiveAd() {
+        activeAd?.let { _events.tryEmit(AdEvent.AdCompleted(it)) }
+        activeAd = null
     }
 
     private fun emitQuartiles(ad: Ad, adPos: Long) {

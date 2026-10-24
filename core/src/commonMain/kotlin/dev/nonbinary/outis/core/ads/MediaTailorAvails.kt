@@ -6,6 +6,7 @@
 
 package dev.nonbinary.outis.core.ads
 
+import dev.nonbinary.outis.core.ExperimentalPlayerApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -35,7 +36,8 @@ private val mediaTailorJson = Json {
  * times are **seconds** (floating point), so they're scaled to ms here. Unknown fields (adSystem,
  * mediaFiles, companionAds, trackingEvents, …) are ignored.
  */
-fun parseMediaTailorAvails(json: String): List<AdBreak> =
+@ExperimentalPlayerApi
+public fun parseMediaTailorAvails(json: String): List<AdBreak> =
     mediaTailorJson.decodeFromString(AvailsResponseDto.serializer(), json).avails.map { avail ->
         AdBreak(
             id = avail.availId,
@@ -57,7 +59,8 @@ fun parseMediaTailorAvails(json: String): List<AdBreak> =
     }
 
 /** The stitched-manifest + tracking URLs a MediaTailor session-init POST returns (paths — prepend scheme+host). */
-data class MediaTailorSession(
+@ExperimentalPlayerApi
+public data class MediaTailorSession(
     /**
      * Path of the stitched HLS/DASH manifest to hand to the player. **Root-relative, not absolute** —
      * prepend the scheme and host you POSTed the session-init request to before loading it.
@@ -71,7 +74,8 @@ data class MediaTailorSession(
 )
 
 /** Parse the small JSON body returned by a MediaTailor session-init POST. */
-fun parseMediaTailorSession(json: String): MediaTailorSession =
+@ExperimentalPlayerApi
+public fun parseMediaTailorSession(json: String): MediaTailorSession =
     mediaTailorJson.decodeFromString(SessionResponseDto.serializer(), json)
         .let { MediaTailorSession(manifestUrl = it.manifestUrl, trackingUrl = it.trackingUrl) }
 

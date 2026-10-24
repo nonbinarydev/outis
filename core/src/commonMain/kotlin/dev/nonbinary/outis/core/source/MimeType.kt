@@ -11,4 +11,4 @@ package dev.nonbinary.outis.core.source
  * (VP9/AV1 in WebM) — web and Android play it via the media element / ExoPlayer; AVPlayer can't decode
  * it, so a WEBM item surfaces a clean codec error on iOS.
  */
-enum class MimeType { MP4, HLS, DASH, WEBM }
+public enum class MimeType { MP4, HLS, DASH, WEBM }

@@ -6,9 +6,6 @@
 
 package dev.nonbinary.outis.core.source
 
-import kotlinx.collections.immutable.ImmutableMap
-import kotlinx.collections.immutable.persistentMapOf
-
 /**
  * DRM parameters for a [MediaItem].
  *
@@ -31,7 +28,7 @@ import kotlinx.collections.immutable.persistentMapOf
  * unwrap the response, in engine-neutral terms, and the SDK adapts it per platform (Android custom
  * `MediaDrmCallback`, Shaka request/response filters, iOS FairPlay SPC/CKC).
  */
-data class DrmConfig(
+public data class DrmConfig(
     /**
      * Key system to use. Must be one the **content itself** is packaged for *and* the running
      * engine/browser supports — a mismatch (Widevine content in Safari, FairPlay on Android) surfaces a
@@ -55,12 +52,12 @@ data class DrmConfig(
      * (Shaka `clearKeys`) and **iOS** (`AVContentKeySystemClearKey`, **HLS only** — AVPlayer has no DASH,
      * so an iOS Clear Key item must be an HLS source).
      */
-    val clearKeys: ImmutableMap<String, String> = persistentMapOf(),
+    val clearKeys: Map<String, String> = emptyMap(),
     /**
      * Extra headers on the license request (e.g. an auth token). Honoured on Android, Web and
      * iOS (FairPlay SPC POST).
      */
-    val licenseRequestHeaders: ImmutableMap<String, String> = persistentMapOf(),
+    val licenseRequestHeaders: Map<String, String> = emptyMap(),
     /** Allow multiple concurrent key sessions — some live / key-rotating streams require it (Android only). */
     val multiSession: Boolean = false,
     /**
@@ -102,7 +99,7 @@ data class DrmConfig(
  * [DrmConfig.licenseRequestInterceptor], which returns the (possibly rewritten) request to send. Build
  * a variant with [copy].
  */
-data class LicenseRequest(
+public data class LicenseRequest(
     /** Where to POST. Defaults to [DrmConfig.licenseServerUrl]. */
     val url: String,
     /** The request body. Defaults to the CDM challenge (Widevine/PlayReady) or the SPC (FairPlay). */
@@ -136,7 +133,7 @@ data class LicenseRequest(
 }
 
 /** DRM key system. WIDEVINE / PLAYREADY / CLEARKEY — Android + Web; FAIRPLAY — Web (Safari) + iOS. */
-enum class DrmScheme {
+public enum class DrmScheme {
     /** Google Widevine (`com.widevine.alpha`) — Android (Media3) and Web; typically DASH content. */
     WIDEVINE,
 
@@ -168,7 +165,7 @@ enum class DrmScheme {
  * - [L1] — hardware-backed CDM (Web: enforced; Android: best-effort, can't force *up*).
  * - [L3] — software CDM (the expired-L1-certificate workaround). Honoured on Android + Web.
  */
-enum class WidevineLevel {
+public enum class WidevineLevel {
     /**
      * Let the platform negotiate its best available level — the default, and the effective behaviour on
      * iOS, which has no client-settable security level.

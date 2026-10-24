@@ -11,7 +11,6 @@ import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
-import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -143,11 +142,11 @@ class FakeVideoPlayer(
             TrackType.AUDIO -> _state.value = _state.value.copy(
                 audioTracks = _state.value.audioTracks
                     .map { it.copy(isSelected = it.id == track.id) }
-                    .toPersistentList(),
+                    .toList(),
                 selectedAudioTrackId = track.id,
             )
             TrackType.TEXT -> _state.value = _state.value.copy(
-                textTracks = _state.value.textTracks.map { it.copy(isSelected = it.id == track.id) }.toPersistentList(),
+                textTracks = _state.value.textTracks.map { it.copy(isSelected = it.id == track.id) },
                 selectedTextTrackId = track.id,
             )
             TrackType.VIDEO -> return
@@ -158,7 +157,7 @@ class FakeVideoPlayer(
     override fun clearTextTrack() {
         check(!released) { "player released" }
         _state.value = _state.value.copy(
-            textTracks = _state.value.textTracks.map { it.copy(isSelected = false) }.toPersistentList(),
+            textTracks = _state.value.textTracks.map { it.copy(isSelected = false) },
             selectedTextTrackId = null,
         )
         emitTracksChanged()
@@ -169,8 +168,8 @@ class FakeVideoPlayer(
     /** The engine resolved a new set of audio/text tracks. */
     fun simulateTracksChanged(audio: List<MediaTrack> = emptyList(), text: List<MediaTrack> = emptyList()) {
         _state.value = _state.value.copy(
-            audioTracks = audio.toPersistentList(),
-            textTracks = text.toPersistentList(),
+            audioTracks = audio.toList(),
+            textTracks = text.toList(),
             selectedAudioTrackId = audio.firstOrNull { it.isSelected }?.id,
             selectedTextTrackId = text.firstOrNull { it.isSelected }?.id,
         )
@@ -178,7 +177,7 @@ class FakeVideoPlayer(
     }
 
     private fun emitTracksChanged() =
-        emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
+        emit { p, t -> _state.value.tracksChanged(p, t) }
 
     /** The engine reached READY with a (possibly unknown) duration. */
     fun simulateReady(durationMs: Long?, isLive: Boolean = false, seekable: Boolean = true) {

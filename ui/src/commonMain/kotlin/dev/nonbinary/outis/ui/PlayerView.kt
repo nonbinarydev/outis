@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -68,7 +73,7 @@ private const val POINTER_MOVE_THROTTLE_MS = 250L
 // Assembles surface, controls, gestures, keyboard, auto-hide and window hooks, each behind its own
 // flag. The branches are configuration, not logic — this is the one composable that wires the rest.
 @Suppress("CyclomaticComplexMethod")
-fun PlayerView(
+public fun PlayerView(
     player: VideoPlayer,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
@@ -111,6 +116,7 @@ fun PlayerView(
     // system, which is unreliable on the skiko canvas (Safari especially), so on web we listen on the
     // document directly; Android/iOS no-op (TV uses the D-pad wake below).
     PlatformPlayerKeyboard(state, window) { pointerOver.value }
+    val holdFocus = rememberFocusHold(state)
     Box(
         modifier = modifier
             // TV/D-pad: any key wakes hidden controls, or re-arms auto-hide while they're up. Never consumes.
@@ -120,6 +126,7 @@ fun PlayerView(
                 }
                 false
             }
+            .focusHold(holdFocus, state)
             // Tap / click. TOUCH → toggle overlay (mobile). MOUSE → single click = play/pause (immediate);
             // a double click = fullscreen (desktop). awaitFirstDown ignores presses consumed by a control,
             // so clicking a button does only that.
@@ -203,3 +210,26 @@ fun PlayerView(
         if (!window.isInPip) scope.controls()
     }
 }
+
+/**
+ * Takes focus when the overlay hides while the player has it, so the next key still reaches the wake
+ * handler: with nothing focused, no key event reaches a composable at all.
+ */
+@Composable
+private fun rememberFocusHold(state: PlayerControlsState): FocusRequester {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(state.controlsVisible) {
+        if (!state.controlsVisible && state.holdsFocus) runCatching { requester.requestFocus() }
+    }
+    return requester
+}
+
+/**
+ * Reports whether focus is anywhere in the player, overlay included, and is focusable only while it stands
+ * in for the hidden overlay, so it is never an extra stop otherwise.
+ */
+private fun Modifier.focusHold(requester: FocusRequester, state: PlayerControlsState): Modifier =
+    onFocusChanged { state.playerHasFocus = it.hasFocus }
+        .focusRequester(requester)
+        .focusProperties { canFocus = state.holdsFocus && !state.controlsVisible }
+        .focusTarget()

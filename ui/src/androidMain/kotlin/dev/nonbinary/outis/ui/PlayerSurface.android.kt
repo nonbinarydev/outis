@@ -18,6 +18,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.AdOverlayInfo
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -25,7 +26,8 @@ import androidx.media3.ui.PlayerView
 import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.PlayerEvent
 import dev.nonbinary.outis.core.VideoPlayer
-import dev.nonbinary.outis.core.setAdViewProvider
+import dev.nonbinary.outis.core.ads.AdObstruction
+import dev.nonbinary.outis.core.ads.setAdContainer
 import java.util.WeakHashMap
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -46,7 +48,7 @@ import androidx.compose.ui.geometry.Rect as ComposeRect
 @OptIn(UnstableApi::class)
 @ExperimentalPlayerUiApi
 @Composable
-actual fun PlayerSurface(
+public actual fun PlayerSurface(
     player: VideoPlayer,
     modifier: Modifier,
     contentScale: ContentScale,
@@ -95,9 +97,9 @@ actual fun PlayerSurface(
         update = { view ->
             view.player = media3Player
             view.keepScreenOn = keepAwake
-            // This Media3 PlayerView is an AdViewProvider — hand it to the engine so IMA renders its ad
-            // UI (skip/countdown/click-through) into this surface for client-side ads.
-            player.setAdViewProvider(view)
+            // IMA renders client-side ad UI (skip/countdown/click-through) into the PlayerView's ad overlay;
+            // the view's own overlays are friendly obstructions for viewability measurement.
+            player.setAdContainer(view.adViewGroup, view.adOverlayInfos.map { it.toAdObstruction() })
             view.resizeMode = when (contentScale) {
                 ContentScale.Crop -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 ContentScale.FillBounds -> AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -107,10 +109,22 @@ actual fun PlayerSurface(
         },
         onRelease = {
             it.player = null
-            player.setAdViewProvider(null)
+            player.setAdContainer(null)
         },
     )
 }
+
+@OptIn(UnstableApi::class)
+private fun AdOverlayInfo.toAdObstruction(): AdObstruction = AdObstruction(
+    view = view,
+    purpose = when (purpose) {
+        AdOverlayInfo.PURPOSE_CONTROLS -> AdObstruction.Purpose.CONTROLS
+        AdOverlayInfo.PURPOSE_CLOSE_AD -> AdObstruction.Purpose.CLOSE_AD
+        AdOverlayInfo.PURPOSE_NOT_VISIBLE -> AdObstruction.Purpose.NOT_VISIBLE
+        else -> AdObstruction.Purpose.OTHER
+    },
+    reason = reasonDetail,
+)
 
 /**
  * Where each player's video surface currently sits in its window, in window pixels.

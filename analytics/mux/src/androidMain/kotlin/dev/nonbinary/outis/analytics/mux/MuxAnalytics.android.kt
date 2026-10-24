@@ -89,7 +89,7 @@ internal actual val nativePlayerLabel: String = "ExoPlayer"
 // uses for itself; keep MUX_PLUGIN_VERSION in step with the data-media3 dependency (it only feeds the
 // player_mux_plugin_version dimension). player_software_name is the field we actually override.
 private const val MUX_PLUGIN_NAME = "mux-media3"
-private const val MUX_PLUGIN_VERSION = "1.13.0"
+private const val MUX_PLUGIN_VERSION = "1.13.4"
 
 /** Mux's stream-type vocabulary. When the item does not declare it, fall back to the player's live signal. */
 private fun muxStreamType(type: StreamType?, isLive: Boolean): String = when {

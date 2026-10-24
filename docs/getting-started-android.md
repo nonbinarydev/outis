@@ -16,8 +16,8 @@ page still applies to your `androidApp`; only the dependency declaration moves t
 
 | | Value | Why |
 |---|---|---|
-| `minSdk` | **24** or higher | `gradle/libs.versions.toml:4`, applied at `core/build.gradle.kts:38` |
-| `compileSdk` | **36** or higher | Media3 1.10.1 AARs declare `minCompileSdk=36` |
+| `minSdk` | **24** or higher | `gradle/libs.versions.toml:4`, applied at `core/build.gradle.kts` |
+| `compileSdk` | **36** or higher | Media3 1.11.1 AARs declare `minCompileSdk=36` |
 | Java / Kotlin JVM target | **11** or higher | Outis' Android classes are Java 11 bytecode (class-file major version 55) |
 | Android Gradle Plugin | **8.2.0** or higher | required by the Google IMA AAR that Media3's IMA extension pulls in |
 | Kotlin | **2.4.10** recommended | Outis is built with it (`gradle/libs.versions.toml:3`) |
@@ -34,11 +34,11 @@ refuses to inline Java 11 bytecode into a lower target.
 whether you use ads.
 
 `:core` applies the Media3 IMA extension unconditionally to its Android source set
-(`core/build.gradle.kts:105`, `implementation(libs.media3.exoplayer.ima)`), so every Android consumer
+(`core/build.gradle.kts`, `implementation(libs.media3.exoplayer.ima)`), so every Android consumer
 of `outis-core` gets it. Two artifacts in that chain declare the requirement in their AAR metadata,
 and the Android Gradle Plugin enforces it:
 
-- `androidx.media3:media3-exoplayer-ima:1.10.1` — `coreLibraryDesugaringEnabled=true`,
+- `androidx.media3:media3-exoplayer-ima:1.11.1` — `coreLibraryDesugaringEnabled=true`,
   `desugarJdkLib=com.android.tools:desugar_jdk_libs:2.1.5`
 - `com.google.ads.interactivemedia.v3:interactivemedia:3.39.0` (pulled in transitively) —
   `coreLibraryDesugaringEnabled=true`, `desugarJdkLib=com.android.tools:desugar_jdk_libs:2.1.3`
@@ -98,21 +98,14 @@ dependencies {
     implementation("io.github.nonbinarydev:outis-core:0.1.0-alpha01")
     implementation("io.github.nonbinarydev:outis-ui:0.1.0-alpha01")   // optional Compose UI
 
-    // Outis scopes these implementation(), but both appear in its public API signatures,
-    // so you must declare them yourself. See the note below.
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.1")
-
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 ```
 
-**Why the two kotlinx lines.** `core/build.gradle.kts:80-81` declares kotlinx-coroutines and
-kotlinx-collections-immutable with `implementation(...)`, not `api(...)`, so they are not on your
-compile classpath — but `VideoPlayer.state` is a `StateFlow<PlayerState>`, `VideoPlayer.events` is a
-`SharedFlow<PlayerEvent>` (`VideoPlayer.kt:36,42`), and `MediaItem.headers` is an
-`ImmutableMap<String, String>` (`MediaItem.kt:36`). You cannot collect state or set a request header
-without them.
+**No kotlinx lines.** `VideoPlayer.state` and `.events` are coroutine flows, so `:core` declares
+kotlinx-coroutines as `api` and it reaches your compile classpath with `outis-core`. The model's
+collections are plain `List` and `Map` ([ADR-0008](decisions/0008-public-collections-are-plain-list-and-map.md)),
+so request headers are an ordinary `mapOf(...)`.
 
 `outis-ui` is optional. `:core` is a complete player API; `:ui` is one opinionated Compose chrome on
 top of it. If you skip it, see section 8.
@@ -173,9 +166,9 @@ A library cannot inject these; the host Activity must declare them.
 - `android:supportsPictureInPicture="true"` is what permits `enterPictureInPictureMode()` at all.
   **This one is not optional and its absence is not self-correcting**: `rememberPlayerWindow` judges
   availability from the device's `FEATURE_PICTURE_IN_PICTURE` and the app's AppOps grant, neither of
-  which can see your manifest (`PlayerWindow.android.kt:56,97-114`). So without the attribute the
+  which can see your manifest (`PlayerWindow.android.kt`). So without the attribute the
   button still renders, and every tap is rejected by the system with `IllegalStateException`, caught
-  and reported as "did not enter" (`PlayerWindow.android.kt:135-140`). The symptom is a button that
+  and reported as "did not enter" (`PlayerWindow.android.kt`). The symptom is a button that
   looks fine and does nothing.
 - `android:configChanges` stops the Activity being recreated when PiP resizes it — and, as a useful
   side effect, on rotation, which keeps a player held in `remember` alive across an orientation
@@ -183,7 +176,7 @@ A library cannot inject these; the host Activity must declare them.
 
 PiP availability *is* checked against the system feature and the app's AppOps permission at runtime,
 so a user who has revoked PiP for your app gets no button rather than a dead one
-(`PlayerWindow.android.kt:97-114`). That covers revocation, not misconfiguration.
+(`PlayerWindow.android.kt`). That covers revocation, not misconfiguration.
 
 Supply `onPipUnavailable` so a refusal is visible rather than silent — it is the only signal you get
 when entry fails, and during development it is usually the manifest:
@@ -272,27 +265,28 @@ Notes on the code above, each verified against source:
 
 - `AppContext(context.applicationContext)` — the Android `AppContext` holds an application `Context`
   for `ExoPlayer.Builder`. Passing an Activity leaks it, because the player outlives configuration
-  changes (`AppContext.android.kt:17-23`).
+  changes (`AppContext.android.kt`).
 - `VideoPlayer(...)` **must** be called on the main thread. The Android engine checks
   `Looper.myLooper() == Looper.getMainLooper()` in `init` and throws `IllegalStateException` if not
-  (`ExoPlayerEngine.kt:497-500`). Every other method is safe from any thread — each engine
-  marshals internally (`VideoPlayer.kt:28-29`).
-- `release()` is idempotent (`VideoPlayer.kt:82`), so a `DisposableEffect` is the right home for it.
+  (`ExoPlayerEngine.kt`). Every other method is safe from any thread — each engine
+  marshals internally (`VideoPlayer.kt`).
+- `release()` is idempotent (`VideoPlayer.kt`), so a `DisposableEffect` is the right home for it.
 - `setMediaItem(item, autoPlay = true)` is fire-and-forget; the result lands on `state` and `events`
-  (`VideoPlayer.kt:44-45`).
+  (`VideoPlayer.kt`).
 - `mimeType = MimeType.HLS` is optional here because the URL ends in `.m3u8` — set it explicitly for
-  extension-less or signed URLs (`MediaItem.kt:30-31`). The only values are `MP4`, `HLS` and `DASH`
-  (`MimeType.kt:10`).
+  extension-less or signed URLs (`MediaItem.kt`). The only values are `MP4`, `HLS` and `DASH`
+  (`MimeType.kt`).
 - `rememberPlayerWindow(player)` with no `onToggleFullscreen` means the fullscreen button hides
   itself and only the PiP button shows. Pass `onToggleFullscreen = { desired -> ... }` once you have
   somewhere to put a fullscreen presentation.
 - `@OptIn(ExperimentalPlayerUiApi::class)` is only silencing a warning — the marker is declared at
-  `RequiresOptIn.Level.WARNING` (`ExperimentalPlayerUiApi.kt:10`), so the code compiles without it.
+  `RequiresOptIn.Level.WARNING`, so the code compiles without it. See [Opting in](ui.md#opting-in)
+  for the module-wide form.
 - The stream URL is a third-party Apple test asset, used here only so the snippet runs; substitute
   your own.
 
 **Watch the import.** `outis-ui` pulls in `androidx.media3:media3-ui`
-(`ui/build.gradle.kts:71`), which also has a class called `PlayerView`. Make sure the IDE imported
+(`ui/build.gradle.kts`), which also has a class called `PlayerView`. Make sure the IDE imported
 `dev.nonbinary.outis.ui.PlayerView`.
 
 ---
@@ -310,7 +304,7 @@ val media3Player = player.nativePlayerHandle as? Player
 ```
 
 On Android `nativePlayerHandle` is the `ExoPlayer` instance, non-null from construction until
-`release()` (`ExoPlayerEngine.kt:117,505,342`). It is `null` after release. If you need to react to
+`release()` (`ExoPlayerEngine.kt`). It is `null` after release. If you need to react to
 the engine re-creating its player, collect `PlayerEvent.NativePlayerAttached` from `player.events`
 rather than reading the snapshot once.
 
@@ -329,7 +323,7 @@ Three rules, and they cover almost every way a player SDK gets misused:
 `PlayerView` additionally pauses the player on `Lifecycle.ON_STOP` and resumes it on `ON_START` if it
 was playing. `ON_STOP` does not fire while in PiP, so PiP keeps playing. Set
 `pauseWhenStopped = false` if you want background playback — it is the only switch for that
-(`PlayerView.kt:70,74-90`).
+(`PlayerView.kt`).
 
 ---
 

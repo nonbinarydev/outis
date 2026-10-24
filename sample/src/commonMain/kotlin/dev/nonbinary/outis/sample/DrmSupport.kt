@@ -6,22 +6,36 @@
 
 package dev.nonbinary.outis.sample
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import dev.nonbinary.outis.core.source.DrmScheme
+import dev.nonbinary.outis.core.source.DrmSupport
 import dev.nonbinary.outis.core.source.MimeType
+import dev.nonbinary.outis.core.source.drmSupport
+
+/** What this device can decrypt, as the SDK reports it — `null` until it answers, which on web takes a moment. */
+@Composable
+fun rememberDrmSupport(): DrmSupport? = produceState<DrmSupport?>(null) { value = drmSupport() }.value
 
 /**
- * A short warning when [scheme] is not expected to work on the host, or `null` when it should.
+ * A short warning when [scheme] won't decrypt here, or `null` when it will — or while [support] is unknown.
  *
  * A **hint, not a gate**. Schemes stay selectable everywhere on purpose: trying one the platform cannot
  * do is an ordinary integration mistake, and watching the SDK report it is more useful than being
- * prevented from making it. The wording is deliberately "not expected to" rather than "cannot" —
- * detection is imperfect, and a wrong hint is harmless where a wrongly disabled control is not.
- *
- * This lives in the sample because the SDK has no capability API yet; it should be deleted in favour of
- * one (see issue #30). It is also why the strings hedge — the sample is guessing where `:core` could
- * actually know.
+ * prevented from making it.
  */
-expect fun drmSchemeCaveat(scheme: DrmScheme): String?
+fun drmSchemeCaveat(scheme: DrmScheme, support: DrmSupport?): String? = when {
+    support == null || scheme in support.schemes -> null
+    else -> "No ${scheme.displayName} CDM here — the player will refuse it."
+}
+
+private val DrmScheme.displayName: String
+    get() = when (this) {
+        DrmScheme.WIDEVINE -> "Widevine"
+        DrmScheme.PLAYREADY -> "PlayReady"
+        DrmScheme.FAIRPLAY -> "FairPlay"
+        DrmScheme.CLEARKEY -> "Clear Key"
+    }
 
 /**
  * A short warning when [mimeType]'s container isn't expected to play on the host, or `null` when it

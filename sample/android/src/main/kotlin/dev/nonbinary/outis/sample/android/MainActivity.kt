@@ -10,6 +10,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.google.firebase.FirebaseApp
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dev.nonbinary.outis.core.AppContext
 import dev.nonbinary.outis.sample.App
 import dev.nonbinary.outis.sample.ImmersiveHost
@@ -45,8 +47,20 @@ class MainActivity : ComponentActivity(), ImmersiveHost {
             // The application context, not this Activity: the engine outlives any single Activity
             // instance, and holding an Activity reference in a player would leak it across a
             // configuration change.
-            App(AppContext(applicationContext))
+            App(AppContext(applicationContext), onCrashReportingConsent = ::setCrashReporting)
         }
+    }
+
+    /**
+     * Crash reports follow Performance consent. Crashlytics applies the change from the next launch, and
+     * reports held while consent is withheld are deleted rather than sent once it is given.
+     */
+    private fun setCrashReporting(granted: Boolean) {
+        // Without google-services.json there is no FirebaseApp, and getInstance would throw.
+        if (FirebaseApp.getApps(this).isEmpty()) return
+        val crashlytics = FirebaseCrashlytics.getInstance()
+        crashlytics.setCrashlyticsCollectionEnabled(granted)
+        if (!granted) crashlytics.deleteUnsentReports()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

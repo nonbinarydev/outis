@@ -25,8 +25,9 @@
 //     signingKeyFile=/Users/you/.secrets/outis-signing-key.asc
 //     signingInMemoryKeyId=758DFB45CEC69E33
 //     signingInMemoryKeyPassword=...
-//     mavenCentralUsername=...        # only needed for a real Central release
-//     mavenCentralPassword=...
+//
+// The Central upload credentials cannot go here — see above. They are environment variables, set by
+// scripts/publish-env.sh.
 
 val secretsFile = rootProject.file("secrets.properties")
 val alreadyConfigured = providers.gradleProperty("signingInMemoryKey").isPresent

@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
-import kotlinx.collections.immutable.ImmutableList
 
 private fun trackLabel(track: MediaTrack): String = track.label ?: track.language ?: track.id
 
@@ -53,7 +52,7 @@ private fun trackLabel(track: MediaTrack): String = track.label ?: track.languag
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun SubtitleButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun SubtitleButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
     if (state.textTracks.isEmpty()) return // self-hide: nothing to choose
     var open by remember { mutableStateOf(false) }
     val token = remember { Any() }
@@ -97,7 +96,7 @@ fun SubtitleButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun AudioButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun AudioButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
     if (state.audioTracks.size < 2) return // self-hide: no real choice
     var open by remember { mutableStateOf(false) }
     val token = remember { Any() }
@@ -122,8 +121,8 @@ fun AudioButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
 /** A standalone, selectable list of tracks for fully-custom shells (e.g. a TV side panel). */
 @ExperimentalPlayerUiApi
 @Composable
-fun TrackList(
-    tracks: ImmutableList<MediaTrack>,
+public fun TrackList(
+    tracks: List<MediaTrack>,
     selectedId: String?,
     onSelect: (MediaTrack) -> Unit,
     modifier: Modifier = Modifier,
@@ -159,12 +158,12 @@ private fun TrackRow(label: String, selected: Boolean, onClick: () -> Unit) {
 
 /** Scope-member form of [SubtitleButton], taking the [state] from the surrounding controls lambda. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.SubtitleButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.SubtitleButton(modifier: Modifier = Modifier) {
     SubtitleButton(state, modifier)
 }
 
 /** Scope-member form of [AudioButton], taking the [state] from the surrounding controls lambda. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.AudioButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.AudioButton(modifier: Modifier = Modifier) {
     AudioButton(state, modifier)
 }

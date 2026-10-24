@@ -11,11 +11,12 @@ package dev.nonbinary.outis.core.track
  *
  * [id] is an **opaque, engine-stable token** — never a platform handle (Media3 `TrackGroup`,
  * AVPlayer option, …). The UI uses it only to match selection against
- * [dev.nonbinary.outis.core.PlayerState.selectedAudioTrackId] /
- * [dev.nonbinary.outis.core.PlayerState.selectedTextTrackId]; the engine resolves it back to the
+ * [dev.nonbinary.outis.core.PlayerState.selectedAudioTrackId],
+ * [dev.nonbinary.outis.core.PlayerState.selectedTextTrackId] or
+ * [dev.nonbinary.outis.core.PlayerState.selectedVideoTrackId]; the engine resolves it back to the
  * native track internally. Ids are valid only for the currently-loaded item.
  */
-data class MediaTrack(
+public data class MediaTrack(
     /**
      * Opaque, engine-stable token identifying this track — see the class documentation. **Only unique
      * within one [type] for the currently-loaded item**, so match on [id] *and* [type], never [id] alone.
@@ -30,7 +31,7 @@ data class MediaTrack(
     /**
      * `true` when this is the track the engine is currently rendering. Never set it yourself to drive
      * selection — it is a **read-only snapshot** the engine re-emits after
-     * `selectTrack`/`disableTextTrack` actually take effect (selection is not applied optimistically).
+     * `selectTrack`/`clearTextTrack` actually take effect (selection is not applied optimistically).
      * At most one track per [type] carries `true`; text tracks may have none, meaning captions are off.
      */
     val isSelected: Boolean = false,
@@ -38,14 +39,18 @@ data class MediaTrack(
     val isDefault: Boolean = false,
 )
 
-/** `VIDEO` is reserved so the same model can later carry quality/bitrate selection. */
-enum class TrackType {
+/** Which selection group a [MediaTrack] belongs to. */
+public enum class TrackType {
     /** An audio rendition — typically one per language or mix (stereo, 5.1, descriptive audio). */
     AUDIO,
 
     /** A subtitle or closed-caption rendition. Unlike [AUDIO], text can be switched off entirely. */
     TEXT,
 
-    /** Reserved for future quality/bitrate selection. Engines currently **ignore** selection of a video track. */
+    /**
+     * An alternate video rendition — a remaster beside an original transfer — not a rung of the bitrate
+     * ladder, which the engine adapts within on its own. Reported and selectable on Android and web; iOS
+     * reports none yet.
+     */
     VIDEO,
 }

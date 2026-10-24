@@ -32,9 +32,10 @@ Per-subsystem references. Read them in any order; each is self-contained.
 | [DRM](drm.md) | Widevine, PlayReady and FairPlay: what each platform can actually do, the full `DrmConfig` surface, and the license request and response interceptors for providers whose proxy does not take a raw challenge. |
 | [Client-side ads (IMA)](ads-client-side.md) | `AdConfig.ClientSide`, which is implemented on Android and Web only, and what each of those two engines actually writes into `PlayerState.adState` — the field sets differ. |
 | [Server-side ads (SSAI)](ads-server-side.md) | `AdController`: the cue-point tracker your app constructs and feeds for stitched streams, with the MediaTailor and SCTE-35 parsers and the beaconing contract. No engine reads `AdConfig.ServerSide` for you. |
-| [Local files and chapters](local-files.md) | `MediaSource.LocalFile`, embedded chapter parsing for mp4 and Matroska, `PlayerState.chapters` (populated asynchronously, after load, on Android and iOS), and chapter thumbnails with their size budget. |
+| [Local files and chapters](local-files.md) | `MediaSource.LocalFile`; `PlayerState.chapters` from declared chapters, a WebVTT sidecar, or the mp4 and Matroska parsing on Android and iOS; and chapter thumbnails with their size budget. |
 | [Analytics, QoS and the plugin seam](analytics.md) | `PlayerComponent` and `PlayerHost`, the `nativePlayerHandle` escape hatch and what it actually is per platform, and which QoS events each engine emits — three of them are Android-only. |
-| [Mux Data adapter](analytics-mux.md) | The ready-made Mux QoS adapter: add the module (and Mux's non-Central repo), register `MuxAnalytics`, map per-item metadata, and inject the env key safely. Android and web today; iOS stubbed. |
+| [Mux Data adapter](analytics-mux.md) | The ready-made Mux QoS adapter: add the module (and Mux's non-Central repo), register `MuxAnalytics`, map per-item metadata, and inject the env key safely. Android, iOS and web. |
+| [Firebase / GA4 usage adapter](analytics-firebase.md) | What viewers watch, in GA4: the three events it reports and their parameters, logging the app's own events, and the consent switch, with what each platform needs besides. Android, iOS and web. |
 
 ## Reference
 

@@ -11,9 +11,10 @@ package dev.nonbinary.outis.sample.consent
  * per category. This is what keeps the "is Mux essential?" question out of the SDK and in one place.
  *
  * **[PERFORMANCE].requiresConsent is the policy line issue #39 is about.** Flip it to `false` to treat
- * QoS monitoring (Mux) as legitimate-interest rather than consent-gated — a decision for the operator's
- * legal basis, not a fact this sample should assert. It ships `true` because that is the safe default,
- * and because Mux Data stores a viewer id (localStorage on web), which is exactly what ePrivacy governs.
+ * QoS monitoring (Mux) and crash reports as legitimate-interest rather than consent-gated — a decision for
+ * the operator's legal basis, not a fact this sample should assert. It ships `true` because that is the
+ * safe default, and because Mux Data stores a viewer id (localStorage on web), which is exactly what
+ * ePrivacy governs.
  */
 enum class ConsentCategory(
     val label: String,
@@ -28,8 +29,9 @@ enum class ConsentCategory(
     ),
     PERFORMANCE(
         label = "Performance",
-        description = "Quality-of-service monitoring (Mux Data): rebuffering, startup time, stream " +
-            "quality. Used to improve playback, not for advertising.",
+        description = "Quality-of-service monitoring (Mux Data) and, in the apps, crash reports " +
+            "(Crashlytics): rebuffering, startup time, stream quality, crashes. Used to improve " +
+            "playback, not for advertising.",
         requiresConsent = true,
     ),
     MARKETING(

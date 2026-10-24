@@ -13,7 +13,7 @@ package dev.nonbinary.outis.core.chapters
  * [Chapter]: its start/end are the cue timings and its title is the cue payload (falling back to the cue
  * identifier). Any parse failure yields an empty list — chapters must never break playback.
  */
-object VttChapters {
+internal object VttChapters {
     fun parse(vtt: String): List<Chapter> {
         val chapters = mutableListOf<Chapter>()
         // Cues are blank-line-separated blocks; the first block is the "WEBVTT" header (no timing line).

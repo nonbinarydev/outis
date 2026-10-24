@@ -1,6 +1,7 @@
 # 3. Analytics adapters bind to the native player, not to `PlayerEvent`
 
-**Status:** Accepted
+**Status:** Accepted. Narrowed by [ADR-0011](0011-usage-adapters-translate-cross-engine-events.md) to
+quality-of-service adapters; usage-analytics adapters translate the cross-engine events.
 
 ## Context
 
