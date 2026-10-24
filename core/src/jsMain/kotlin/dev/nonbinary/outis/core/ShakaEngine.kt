@@ -287,7 +287,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
         // Ask the browser for the key system before Shaka does, so a scheme it lacks fails as a DRM error
         // that names the scheme, before anything is fetched.
         val drm = item.drmConfig ?: return loadWithShaka(generation, item, url)
-        return KeySystems.supports(drm.scheme, preflightRobustness(drm)).then<dynamic> { supported ->
+        return KeySystems.supports(drm.scheme, preflightRobustness(drm)).then { supported ->
             when {
                 released || generation != loadGeneration -> js("Promise.resolve()")
                 supported -> loadWithShaka(generation, item, url)

@@ -36,7 +36,7 @@ public data class ThumbnailCue(
 
 /**
  * Parses a **WebVTT thumbnails** sidecar (the de-facto trickplay format: each cue's payload is
- * `sprite.jpg#xywh=x,y,w,h`). Sprite URLs are resolved relative to the sidecar's own [baseUrl]. Any parse
+ * `sprite.jpg#xywh=x,y,w,h`). Sprite URLs are resolved against `baseUrl`, the sidecar's own. Any parse
  * failure yields an empty list — thumbnails are optional and must never break playback.
  */
 internal object VttThumbnails {

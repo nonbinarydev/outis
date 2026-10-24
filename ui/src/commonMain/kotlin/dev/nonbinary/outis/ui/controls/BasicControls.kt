@@ -201,10 +201,10 @@ public fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
  *
  * The crop is drawn by hand in a [Canvas]: the whole sheet is painted at a scale that makes the cue's
  * ([ThumbnailCue.width]×[ThumbnailCue.height]) tile fill the box, then [translate]d by the tile's origin so
- * only that tile shows through the box's clip. Everything is explicit — no [ContentScale]/alignment and no
+ * only that tile shows through the box's clip. Everything is explicit — no `ContentScale`/alignment and no
  * reliance on the async painter's `intrinsicSize` (which is unspecified until the bitmap loads and then
  * platform-dependent; letting the paint layer choose the scale/anchor is what made the crop snap to the
- * sheet centre). [sheetSize] is the sheet's true *padded* pixel extent, taken across **all** cues so the
+ * sheet centre). `sheetSize` is the sheet's true *padded* pixel extent, taken across **all** cues so the
  * last sheet — only partially filled — is still drawn at full size. Coil caches the sheet, so scrubbing
  * across tiles of one sheet is a single download.
  */

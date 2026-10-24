@@ -11,6 +11,7 @@ import kotlinx.coroutines.await
 import kotlinx.coroutines.withTimeoutOrNull
 import org.w3c.fetch.RequestInit
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.milliseconds
 
 internal actual suspend fun httpGet(url: String, headers: Map<String, String>, timeoutMs: Int): HttpResult {
     // Kotlin's DOM declarations predate AbortController and RequestInit.signal.
@@ -22,7 +23,7 @@ internal actual suspend fun httpGet(url: String, headers: Map<String, String>, t
     init.signal = controller.signal
     return try {
         runCatching {
-            withTimeoutOrNull(timeoutMs.toLong()) {
+            withTimeoutOrNull(timeoutMs.milliseconds) {
                 val response = window.fetch(url, init.unsafeCast<RequestInit>()).await()
                 if (response.ok) {
                     HttpResult.Ok(response.text().await(), response.url.ifEmpty { url })
