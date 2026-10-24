@@ -31,7 +31,9 @@ jobs:
         with:
           # When pr-mode is set to true, Qodana analyzes only the files that have been changed
           pr-mode: false
-          use-caches: true
+          # Keep off: the linter image lacks Android SDK Platform 37 and only an uncached run installs it,
+          # during the Gradle sync. A cached run analyses the Android code with no SDK and reports noise.
+          use-caches: false
           post-pr-comment: true
           use-annotations: true
           # Upload Qodana results (SARIF, other artifacts, logs) as an artifact to the job
