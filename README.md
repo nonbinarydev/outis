@@ -49,6 +49,7 @@ Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo
 | **PlayReady** DRM | ✅ (device CDM only) | ❌ | ✅ (Edge) |
 | **FairPlay** DRM | ❌ | ✅ | ✅ (Safari) |
 | Audio / subtitle track selection | ✅ | ✅ | ✅ |
+| Sidecar subtitles (WebVTT, SRT) | ✅ | ✅ (drawn by `:ui`; not in PiP or AirPlay) | ✅ (host must allow CORS) |
 | Client-side ads (IMA) | ✅ | ❌ | ✅ (adaptive sources only) |
 | Server-side ads (SSAI) | app-driven | app-driven | app-driven |
 | Chapters, declared or from a WebVTT sidecar | ✅ | ✅ | ✅ |

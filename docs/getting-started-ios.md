@@ -334,8 +334,12 @@ as bugs.
   `DrmScheme.FAIRPLAY` *with* a `certificateUrl` (`AVPlayerEngine.kt`). See [DRM](drm.md).
 - **Client-side ads do nothing.** The iOS engine never reads `MediaItem.adConfig`. See
   [Client-side ads](ads-client-side.md).
-- **`PlayerSurface`'s `showSubtitles` parameter is ignored on iOS.** The surface is an
-  `AVPlayerViewController` (`PlayerSurface.ios.kt`), which renders the selected text track
+- **Sidecar subtitles are drawn by `PlayerSurface`, not by AVKit.** AVPlayer takes no subtitle file,
+  so the engine times the cues of `MediaItem.subtitles` itself and publishes them as
+  `PlayerState.sidecarCues`, which the surface draws over the video. They don't reach
+  picture-in-picture or AirPlay, and a surface of your own must draw `sidecarCues` itself.
+- **`PlayerSurface`'s `showSubtitles` parameter toggles only those sidecar cues.** The surface is an
+  `AVPlayerViewController` (`PlayerSurface.ios.kt`), which renders the media's own text tracks
   natively; use `VideoPlayer.clearTextTrack()` to turn subtitles off.
 - **`rememberPlayerWindow` is Android-only** (`PlayerWindow.android.kt`). On iOS, construct
   `PlayerWindow(...)` yourself and wire `onToggleFullscreen` / `onEnterPip` to your own presentation

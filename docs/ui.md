@@ -271,7 +271,7 @@ public so video can go anywhere in your layout — an overlay, a rail, a mini-pl
 | Platform | Implementation | `contentScale` | `showSubtitles` |
 | -------- | -------------- | -------------- | --------------- |
 | Android | Media3 `PlayerView` with `useController = false`, black background (`PlayerSurface.android.kt`) | `Crop` → `RESIZE_MODE_ZOOM`, `FillBounds` → `RESIZE_MODE_FILL`, else `RESIZE_MODE_FIT` | Honoured: toggles `subtitleView.visibility` |
-| iOS | `AVPlayerViewController` with `showsPlaybackControls = false`, hosted by `UIKitViewController` (`PlayerSurface.ios.kt`) | `Crop` → `ResizeAspectFill`, `FillBounds` → `Resize`, else `ResizeAspect` | **Ignored.** AVKit renders the selected text track and there is no switch. |
+| iOS | `AVPlayerViewController` with `showsPlaybackControls = false`, hosted by `UIKitViewController` (`PlayerSurface.ios.kt`) | `Crop` → `ResizeAspectFill`, `FillBounds` → `Resize`, else `ResizeAspect` | Toggles only the sidecar cues the surface draws itself (`PlayerState.sidecarCues`). AVKit renders the media's own text tracks, with no switch. |
 | Web | The engine's `<video>` element, repositioned under the Compose canvas (`PlayerSurface.js.kt`) | `Crop` → `object-fit: cover`, `FillBounds` → `fill`, else `contain` | **Ignored.** |
 
 `ContentScale.Inside`, `FillHeight`, `FillWidth` and any custom `ContentScale` all fall into the "else"

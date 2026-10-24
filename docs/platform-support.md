@@ -152,6 +152,7 @@ Two behaviours that are easy to misread as bugs:
 | `videoConstraints` resolution cap | Needs both `maxWidth` and `maxHeight` | Needs both (`AVPlayerEngine.kt`) | Each dimension applies independently (`ShakaEngine.kt`) |
 | `adConfig` (`ClientSide`) | Yes | **Ignored** — no iOS code path reads `MediaItem.adConfig` | Shaka (MSE) sources only (`ShakaAds.kt`); ignored for progressive |
 | `chapterThumbnails` | Yes, local files | Yes, local files | No — web parses no container chapters |
+| `subtitles` (WebVTT, SRT) | Yes, over HTTP with `headers`, or from `file://`/`content://` (`SidecarDataSource.kt`) Drawn by `:ui`'s `PlayerSurface` from `PlayerState.sidecarCues`; not in picture-in-picture or AirPlay | Yes, both branches (`SidecarSubtitles.kt`); the host needs CORS, and a progressive file's sidecars are fetched without `headers` |
 | `preferredAudioLanguage`, `preferredTextLanguage`, `startPositionMs`, `startMuted`, `loop` | Yes | Yes | Yes |
 
 The web `headers` gap is structural: the browser's `<video>` element cannot carry custom request
@@ -169,7 +170,7 @@ endpoint fails there.
 | `videoSize` | **Android only.** The iOS and web engines always write `null` (`PlayerState.kt`). Never gate layout on it. |
 | `bufferedPositionMs` | On iOS it is set to `positionMs` — a v1 approximation, not a real buffer level (`AVPlayerEngine.kt`). A buffer-ahead indicator reads permanently zero there. It is also an **absolute timeline position** on every platform, not a duration ahead of `positionMs` (`PlayerState.kt`). |
 | `chapters` | The item's declared `MediaItem.chapters` on all three engines, present as soon as the item is set. Otherwise from the `chaptersUrl` WebVTT sidecar on all three engines, streams included, and then parsed from a local MP4/Matroska container on Android and iOS; those are populated **asynchronously**, as a second state emission after load. |
-| `audioTracks`, `textTracks` | Populated on all three engines for adaptive streams. On web, a **progressive** source leaves both empty: `loadTracks()` runs only on the Shaka branch (`ShakaEngine.kt`) and from Shaka's own track events (`ShakaEngine.kt`), neither of which happens for native `<video>` playback. Any local file on web is progressive, so its audio and subtitle controls are inert. |
+| `audioTracks`, `textTracks` | Populated on all three engines for adaptive streams. On web, a **progressive** source reports none of its own: `loadTracks()` runs only on the Shaka branch (`ShakaEngine.kt`) and from Shaka's own track events (`ShakaEngine.kt`), neither of which happens for native `<video>` playback. So `audioTracks` stays empty there, and `textTracks` holds only the item's sidecar `subtitles`. |
 | `adState` | Written by the Android and web engines for client-side ads only (`ExoPlayerEngine.kt`, `ShakaAds.kt`). Never written on iOS by the SDK; `setAdState` (`AdContainer.ios.kt`) exists solely for a host-supplied IMA adapter to push into. |
 | `videoTracks` | Alternate renditions of the programme (a remaster beside an original), not the bitrate ladder. Reported on Android (one per DASH adaptation set) and web (labelled video streams); **never written on iOS**. Empty unless the manifest offers two or more labelled renditions. |
 
@@ -199,7 +200,7 @@ universal:
 | Parameter | Behaviour |
 |---|---|
 | `surfaceType` | Android only. `SurfaceView` and `TextureView` are Android concepts; the iOS and JS actuals accept the parameter and ignore it (`PlayerSurface.ios.kt`, `PlayerSurface.js.kt`). |
-| `showSubtitles` | Android only — it toggles the Media3 `SubtitleView` (`PlayerSurface.android.kt`). On iOS `AVPlayerViewController` renders cues itself; on web the `<video>` and Shaka do. |
+| `showSubtitles` | Android toggles the Media3 `SubtitleView` (`PlayerSurface.android.kt`). iOS toggles only the sidecar cues the surface draws, as AVKit renders the media's own; on web the `<video>` and Shaka do. |
 | Keyboard shortcuts | Web only. `PlatformPlayerKeyboard` attaches a DOM `keydown` listener on JS; the Android and iOS actuals are no-ops (`PlayerKeyboard.kt`). |
 
 `rememberPlayerWindow` — the helper that wires fullscreen and Picture-in-Picture to the host
