@@ -119,6 +119,16 @@ public data class MediaItem(
      * `null` leaves chapters to [chaptersUrl], then to the chapters embedded in a local file.
      */
     val chapters: List<Chapter>? = null,
+    /**
+     * Subtitle files that ship beside the media, WebVTT or SRT. They join
+     * [dev.nonbinary.outis.core.PlayerState.textTracks] after any the media carries, the first marked
+     * [dev.nonbinary.outis.core.track.MediaTrack.isDefault]: with captions on, it shows unless the media
+     * has a default of its own or a track matches [preferredTextLanguage]. A file that cannot be fetched or
+     * read shows no cues and never stops playback. They are requested the way the media is: with [headers]
+     * on Android and on Web through Shaka, without them for a progressive file on Web, whose `<video>`
+     * sends none. Honoured on Android and Web; iOS ignores them for now.
+     */
+    val subtitles: List<SubtitleFile> = emptyList(),
 )
 
 /** The SSAI ad breaks on this item, or empty if it has none. */

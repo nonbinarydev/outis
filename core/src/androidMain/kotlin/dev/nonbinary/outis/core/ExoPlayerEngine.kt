@@ -26,6 +26,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.ExoPlayer
@@ -57,8 +58,11 @@ import dev.nonbinary.outis.core.source.LicenseRequest
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
+import dev.nonbinary.outis.core.source.SubtitleFile
+import dev.nonbinary.outis.core.source.SubtitleFormat
 import dev.nonbinary.outis.core.source.WidevineLevel
 import dev.nonbinary.outis.core.source.isDrmSchemeSupported
+import dev.nonbinary.outis.core.source.resolvedFormat
 import dev.nonbinary.outis.core.source.unsupportedDrmError
 import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
@@ -259,7 +263,12 @@ internal class ExoPlayerEngine(
                 .setReadTimeoutMs(r.readTimeoutMs)
                 .setAllowCrossProtocolRedirects(r.allowCrossProtocolRedirects)
         }
-        val factory = DefaultMediaSourceFactory(httpFactory)
+        // DefaultDataSource opens file, content and asset URIs itself and hands the rest to the HTTP stack:
+        // an HTTP source alone can open neither a local file nor a file:// subtitle.
+        val dataSource = DefaultDataSource.Factory(appContext, httpFactory)
+        val factory = DefaultMediaSourceFactory(
+            if (item.subtitles.isEmpty()) dataSource else SidecarDataSource.Factory(dataSource, item.subtitles),
+        )
         config.retryConfig?.let { factory.setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(it.maxRetries)) }
         // An interceptor (templated URL, challenge-in-query, wrapped response) or a forced Widevine L3
         // level can't be expressed by the declarative DrmConfiguration — drive those with a custom
@@ -833,6 +842,7 @@ private fun MediaItem.toExoMediaItem(liveConfig: LiveConfig?): ExoMediaItem {
         .setUri(uri)
         .apply { mimeType?.let { setMimeType(it.toExoMimeType()) } }
         .apply { drmConfig?.toExoDrmConfiguration()?.let { setDrmConfiguration(it) } }
+        .setSubtitleConfigurations(subtitles.mapIndexed { index, file -> file.toSubtitleConfiguration(index == 0) })
         .apply {
             (adConfig as? AdConfig.ClientSide)?.let {
                 setAdsConfiguration(ExoMediaItem.AdsConfiguration.Builder(it.adTagUri.toUri()).build())
@@ -851,6 +861,23 @@ private fun MediaItem.toExoMediaItem(liveConfig: LiveConfig?): ExoMediaItem {
         }
         .build()
 }
+
+/**
+ * [this] as a Media3 sidecar. The first is flagged default, so that with captions on and no preferred
+ * language it shows, as it does on Web; Media3 selects no unflagged text track by itself.
+ */
+private fun SubtitleFile.toSubtitleConfiguration(first: Boolean): ExoMediaItem.SubtitleConfiguration =
+    ExoMediaItem.SubtitleConfiguration.Builder(url.toUri())
+        .setMimeType(
+            when (resolvedFormat) {
+                SubtitleFormat.WEBVTT -> MimeTypes.TEXT_VTT
+                SubtitleFormat.SRT -> MimeTypes.APPLICATION_SUBRIP
+            },
+        )
+        .setLanguage(language)
+        .setLabel(label)
+        .setSelectionFlags(if (first) C.SELECTION_FLAG_DEFAULT else 0)
+        .build()
 
 private fun MimeType.toExoMimeType(): String = when (this) {
     MimeType.MP4 -> MimeTypes.VIDEO_MP4
