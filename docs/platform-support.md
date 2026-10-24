@@ -152,7 +152,7 @@ Two behaviours that are easy to misread as bugs:
 | `videoConstraints` resolution cap | Needs both `maxWidth` and `maxHeight` | Needs both (`AVPlayerEngine.kt`) | Each dimension applies independently (`ShakaEngine.kt`) |
 | `adConfig` (`ClientSide`) | Yes | **Ignored** — no iOS code path reads `MediaItem.adConfig` | Shaka (MSE) sources only (`ShakaAds.kt`); ignored for progressive |
 | `chapterThumbnails` | Yes, local files | Yes, local files | No — web parses no container chapters |
-| `subtitles` (WebVTT, SRT) | Yes, over HTTP with `headers`, or from `file://`/`content://` (`SidecarDataSource.kt`) | **Ignored** for now | Yes, both branches (`SidecarSubtitles.kt`); the host needs CORS, and a progressive file's sidecars are fetched without `headers` |
+| `subtitles` (WebVTT, SRT) | Yes, over HTTP with `headers`, or from `file://`/`content://` (`SidecarDataSource.kt`) Drawn by `:ui`'s `PlayerSurface` from `PlayerState.sidecarCues`; not in picture-in-picture or AirPlay | Yes, both branches (`SidecarSubtitles.kt`); the host needs CORS, and a progressive file's sidecars are fetched without `headers` |
 | `preferredAudioLanguage`, `preferredTextLanguage`, `startPositionMs`, `startMuted`, `loop` | Yes | Yes | Yes |
 
 The web `headers` gap is structural: the browser's `<video>` element cannot carry custom request
@@ -200,7 +200,7 @@ universal:
 | Parameter | Behaviour |
 |---|---|
 | `surfaceType` | Android only. `SurfaceView` and `TextureView` are Android concepts; the iOS and JS actuals accept the parameter and ignore it (`PlayerSurface.ios.kt`, `PlayerSurface.js.kt`). |
-| `showSubtitles` | Android only — it toggles the Media3 `SubtitleView` (`PlayerSurface.android.kt`). On iOS `AVPlayerViewController` renders cues itself; on web the `<video>` and Shaka do. |
+| `showSubtitles` | Android toggles the Media3 `SubtitleView` (`PlayerSurface.android.kt`). iOS toggles only the sidecar cues the surface draws, as AVKit renders the media's own; on web the `<video>` and Shaka do. |
 | Keyboard shortcuts | Web only. `PlatformPlayerKeyboard` attaches a DOM `keydown` listener on JS; the Android and iOS actuals are no-ops (`PlayerKeyboard.kt`). |
 
 `rememberPlayerWindow` — the helper that wires fullscreen and Picture-in-Picture to the host

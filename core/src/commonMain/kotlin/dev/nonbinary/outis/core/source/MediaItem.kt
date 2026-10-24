@@ -125,8 +125,10 @@ public data class MediaItem(
      * [dev.nonbinary.outis.core.track.MediaTrack.isDefault]: with captions on, it shows unless the media
      * has a default of its own or a track matches [preferredTextLanguage]. A file that cannot be fetched or
      * read shows no cues and never stops playback. They are requested the way the media is: with [headers]
-     * on Android and on Web through Shaka, without them for a progressive file on Web, whose `<video>`
-     * sends none. Honoured on Android and Web; iOS ignores them for now.
+     * on Android, iOS and on Web through Shaka, without them for a progressive file on Web, whose `<video>`
+     * sends none. iOS's AVPlayer takes no subtitle file, so there the engine times the cues itself and
+     * publishes them as [dev.nonbinary.outis.core.PlayerState.sidecarCues], which `:ui`'s surface draws;
+     * they don't reach picture-in-picture or AirPlay.
      */
     val subtitles: List<SubtitleFile> = emptyList(),
 )

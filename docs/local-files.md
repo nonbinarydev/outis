@@ -63,7 +63,7 @@ Everything else on `MediaItem` applies normally: `startPositionMs` for resume, `
 | mkv (Matroska) | Yes | No — no demuxer | No — WebM subset only |
 | Audio and text tracks in `PlayerState` | Yes | Yes | Sidecar subtitles only — none from the file |
 | Track selection (`selectTrack` / `clearTextTrack`) | Yes | Yes | Sidecar subtitles only |
-| Sidecar subtitles (`MediaItem.subtitles`) | Yes, `file://` included | Not yet — ignored | Yes, over HTTP |
+| Sidecar subtitles (`MediaItem.subtitles`) | Yes, `file://` included | Yes, drawn by `:ui`; `file://` included | Yes, over HTTP |
 | Embedded chapters (`PlayerState.chapters`) | Yes, mp4 and mkv | Yes, mp4 only | No |
 | Chapter thumbnails (`chapterThumbnails`) | Yes | Yes | No |
 | Embedded container metadata (title, artist, artwork) | Not surfaced | Not surfaced | Not surfaced |
@@ -143,7 +143,10 @@ MediaItem(
   fetches a sidecar the first time it is shown, without `headers`, since the `<video>` sends none
   (`SidecarSubtitles.kt`). For HLS and DASH it hands them to Shaka, which requests them with the item's
   `headers`.
-- **iOS** ignores them for now. AVFoundation has no API that adds a subtitle file to a progressive asset.
+- **iOS** has no API that adds a subtitle file to an AVPlayer item, so the engine fetches the file
+  itself, with the item's `headers`, and times its cues into `PlayerState.sidecarCues`. `:ui`'s
+  `PlayerSurface` draws them over the video. They don't reach picture-in-picture or AirPlay, and cue
+  positioning is ignored: every cue sits at the bottom centre.
 
 `MediaTrack` carries no codec or format field (`MediaTrack.kt`), so you cannot tell a text subtitle from
 an image one, or show "SSA" versus "PGS", in your own track picker.
@@ -297,7 +300,8 @@ Listed so you can plan around them rather than search for them.
   `AVMetadataItem` — a grep for either across `core/src/androidMain` and `core/src/iosMain` finds
   nothing — so a file's own title, artist and artwork never surface. `MediaItem.metadata`
   (`MediaItem.kt`) is app-supplied only and is for display, never playback.
-- **Sidecar subtitle files on iOS.** `MediaItem.subtitles` works on Android and Web; iOS ignores it.
+- **Sidecar subtitles in picture-in-picture or AirPlay on iOS.** The surface draws them, so they stay
+  on the device's own screen.
 - **A codec or format field on `MediaTrack`.**
 - **Embedded chapters on Web.** No browser API reads them. Declare the chapters, or ship a WebVTT
   sidecar, which works there.

@@ -16,8 +16,8 @@ import dev.nonbinary.outis.core.source.SubtitleFormat
 import dev.nonbinary.outis.core.source.resolvedFormat
 import dev.nonbinary.outis.core.source.subtitleAsWebVtt
 import dev.nonbinary.outis.core.track.MediaTrack
-import dev.nonbinary.outis.core.track.TrackType
 import dev.nonbinary.outis.core.track.initialTextTrack
+import dev.nonbinary.outis.core.track.sidecarTracks
 import kotlinx.browser.document
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -104,10 +104,7 @@ internal class NativeSubtitles(private val video: HTMLVideoElement, private val 
 
     /** Lists [item]'s sidecars and shows the one it starts with; returns them as text tracks, that one selected. */
     fun attach(item: MediaItem): List<MediaTrack> {
-        val tracks = item.subtitles.mapIndexed { index, file ->
-            // The first is the default, as Android flags it.
-            MediaTrack("SIDECAR:$index", TrackType.TEXT, file.label, file.language, isDefault = index == 0)
-        }
+        val tracks = item.sidecarTracks()
         sidecars = tracks.zip(item.subtitles, ::Sidecar)
         val captionsOn = item.captionsDefault == CaptionsDefaultMode.ON
         val initial = initialTextTrack(tracks, captionsOn, item.preferredTextLanguage)

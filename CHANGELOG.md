@@ -65,9 +65,11 @@ First release. Not yet published to Maven Central.
 **Subtitles**
 
 - Sidecar subtitle files through `MediaItem.subtitles`: WebVTT and SRT beside a progressive file, a
-  local one or an HLS/DASH stream, on Android and Web. They join `textTracks` after the media's own, and
-  are selected, switched off and pre-selected the same way. A file that cannot be fetched or read
+  local one or an HLS/DASH stream, on all three platforms. They join `textTracks` after the media's own,
+  and are selected, switched off and pre-selected the same way. A file that cannot be fetched or read
   shows no cues and never stops playback.
+- `PlayerState.sidecarCues` (experimental): the cues to draw now, on iOS, whose AVPlayer takes no subtitle
+  file. `PlayerSurface` draws them over the video.
 
 **Ads**
 
@@ -123,8 +125,9 @@ First release. Not yet published to Maven Central.
   `faststart`.
 - Embedded chapters are unavailable on web, which has no local-file API. Declared chapters and a
   `chaptersUrl` WebVTT sidecar work on all three platforms.
-- **iOS ignores `MediaItem.subtitles`.** AVFoundation has no API that adds a subtitle file to a
-  progressive asset.
+- **On iOS, sidecar subtitles are drawn by `:ui`, not AVKit.** AVFoundation has no API that adds a
+  subtitle file to an item, so they don't reach picture-in-picture or AirPlay, a surface of your own must
+  draw `PlayerState.sidecarCues`, and cue positioning is ignored.
 
 [Unreleased]: https://github.com/nonbinarydev/outis/compare/v0.1.0-alpha01...HEAD
 [0.1.0-alpha01]: https://github.com/nonbinarydev/outis/releases/tag/v0.1.0-alpha01

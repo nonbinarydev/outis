@@ -56,7 +56,7 @@
         { "url" : "https://nonbinarydev.github.io/outis/subtitles/big-buck-bunny.en.vtt", "language" : "en", "label" : "English (SDH)" },
         { "url" : "https://nonbinarydev.github.io/outis/subtitles/big-buck-bunny.timing.srt", "language" : "en", "label" : "Timing check (SRT)" }
       ],
-      "note" : "Single-file H.264/AAC with faststart and embedded chapters (the sidecar takes precedence on remote playback) — routes to the native <video> element on web and plays on every engine. Its subtitles are sidecar files beside the MP4: English SDH captions in WebVTT, and an SRT track that names its own time every ten seconds, so a drift shows at a glance. iOS does not show them yet."
+      "note" : "Single-file H.264/AAC with faststart and embedded chapters (the sidecar takes precedence on remote playback) — routes to the native <video> element on web and plays on every engine. Its subtitles are sidecar files beside the MP4: English SDH captions in WebVTT, and an SRT track that names its own time every ten seconds, so a drift shows at a glance. On iOS the player UI draws them, so they stay out of picture-in-picture and AirPlay."
     }, {
       "id" : "bbb-av1",
       "title" : "AV1",

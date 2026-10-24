@@ -310,6 +310,7 @@ scope.launch {
 | `audioTracks`, `textTracks`, `videoTracks` and their `selected…TrackId`s | See [§5](#5-track-selection-audio-and-subtitles). |
 | `chapters: List<Chapter>` | Chapter markers, sorted by start: from the `chaptersUrl` WebVTT sidecar on any engine, otherwise embedded in a **local** MP4/Matroska file (Android and iOS). They arrive **asynchronously**, as a second state emission after load — see [local-files.md](local-files.md). |
 | `adState: AdState?` | Client-side ad playback, written by the engine on Android and Web only. `null` outside an ad. Server-side ads do **not** populate this — see [ads-server-side.md](ads-server-side.md). |
+| `sidecarCues: List<String>` | Experimental. The text of the selected sidecar subtitle's cues showing now, **on iOS only**, for the surface to draw: `:ui`'s `PlayerSurface` does. Always empty on Android and Web, whose players draw sidecars themselves. |
 
 ### `events: SharedFlow<PlayerEvent>` — analytics and one-shot reactions
 
@@ -422,7 +423,9 @@ Each joins `textTracks` after the media's own and is selected, switched off and 
 The first is marked `isDefault`. With captions on, the `preferredTextLanguage` match shows first, then
 the media's own default, then the first sidecar. The format comes from the extension unless `format`
 says otherwise. A file that cannot be fetched or read shows no cues and never stops playback. On Web
-the subtitle host needs CORS. **iOS ignores `subtitles` for now.** For local files, see
+the subtitle host needs CORS. **On iOS**, whose AVPlayer takes no subtitle file, the engine times the cues
+itself and publishes them as `PlayerState.sidecarCues`, which `:ui`'s `PlayerSurface` draws over the video;
+they don't reach picture-in-picture or AirPlay. For local files, see
 [local-files.md](local-files.md#4-tracks-and-subtitles-in-a-local-file).
 
 ---

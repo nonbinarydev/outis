@@ -377,8 +377,8 @@ public final class dev/nonbinary/outis/core/PlayerFactoryKt {
 
 public final class dev/nonbinary/outis/core/PlayerState {
 	public fun <init> ()V
-	public fun <init> (Ldev/nonbinary/outis/core/PlaybackState;ZZJJLjava/lang/Long;ZZLjava/lang/Long;FFZLdev/nonbinary/outis/core/VideoSize;Ldev/nonbinary/outis/core/VideoRange;Ldev/nonbinary/outis/core/source/MediaItem;Ldev/nonbinary/outis/core/PlayerError;Ldev/nonbinary/outis/core/ads/AdState;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;)V
-	public synthetic fun <init> (Ldev/nonbinary/outis/core/PlaybackState;ZZJJLjava/lang/Long;ZZLjava/lang/Long;FFZLdev/nonbinary/outis/core/VideoSize;Ldev/nonbinary/outis/core/VideoRange;Ldev/nonbinary/outis/core/source/MediaItem;Ldev/nonbinary/outis/core/PlayerError;Ldev/nonbinary/outis/core/ads/AdState;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ldev/nonbinary/outis/core/PlaybackState;ZZJJLjava/lang/Long;ZZLjava/lang/Long;FFZLdev/nonbinary/outis/core/VideoSize;Ldev/nonbinary/outis/core/VideoRange;Ldev/nonbinary/outis/core/source/MediaItem;Ldev/nonbinary/outis/core/PlayerError;Ldev/nonbinary/outis/core/ads/AdState;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ldev/nonbinary/outis/core/PlaybackState;ZZJJLjava/lang/Long;ZZLjava/lang/Long;FFZLdev/nonbinary/outis/core/VideoSize;Ldev/nonbinary/outis/core/VideoRange;Ldev/nonbinary/outis/core/source/MediaItem;Ldev/nonbinary/outis/core/PlayerError;Ldev/nonbinary/outis/core/ads/AdState;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ldev/nonbinary/outis/core/PlaybackState;
 	public final fun component10 ()F
 	public final fun component11 ()F
@@ -397,6 +397,7 @@ public final class dev/nonbinary/outis/core/PlayerState {
 	public final fun component23 ()Ljava/lang/String;
 	public final fun component24 ()Ljava/util/List;
 	public final fun component25 ()Ljava/util/List;
+	public final fun component26 ()Ljava/util/List;
 	public final fun component3 ()Z
 	public final fun component4 ()J
 	public final fun component5 ()J
@@ -404,8 +405,8 @@ public final class dev/nonbinary/outis/core/PlayerState {
 	public final fun component7 ()Z
 	public final fun component8 ()Z
 	public final fun component9 ()Ljava/lang/Long;
-	public final fun copy (Ldev/nonbinary/outis/core/PlaybackState;ZZJJLjava/lang/Long;ZZLjava/lang/Long;FFZLdev/nonbinary/outis/core/VideoSize;Ldev/nonbinary/outis/core/VideoRange;Ldev/nonbinary/outis/core/source/MediaItem;Ldev/nonbinary/outis/core/PlayerError;Ldev/nonbinary/outis/core/ads/AdState;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;)Ldev/nonbinary/outis/core/PlayerState;
-	public static synthetic fun copy$default (Ldev/nonbinary/outis/core/PlayerState;Ldev/nonbinary/outis/core/PlaybackState;ZZJJLjava/lang/Long;ZZLjava/lang/Long;FFZLdev/nonbinary/outis/core/VideoSize;Ldev/nonbinary/outis/core/VideoRange;Ldev/nonbinary/outis/core/source/MediaItem;Ldev/nonbinary/outis/core/PlayerError;Ldev/nonbinary/outis/core/ads/AdState;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Ldev/nonbinary/outis/core/PlayerState;
+	public final fun copy (Ldev/nonbinary/outis/core/PlaybackState;ZZJJLjava/lang/Long;ZZLjava/lang/Long;FFZLdev/nonbinary/outis/core/VideoSize;Ldev/nonbinary/outis/core/VideoRange;Ldev/nonbinary/outis/core/source/MediaItem;Ldev/nonbinary/outis/core/PlayerError;Ldev/nonbinary/outis/core/ads/AdState;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Ldev/nonbinary/outis/core/PlayerState;
+	public static synthetic fun copy$default (Ldev/nonbinary/outis/core/PlayerState;Ldev/nonbinary/outis/core/PlaybackState;ZZJJLjava/lang/Long;ZZLjava/lang/Long;FFZLdev/nonbinary/outis/core/VideoSize;Ldev/nonbinary/outis/core/VideoRange;Ldev/nonbinary/outis/core/source/MediaItem;Ldev/nonbinary/outis/core/PlayerError;Ldev/nonbinary/outis/core/ads/AdState;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Ldev/nonbinary/outis/core/PlayerState;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAdState ()Ldev/nonbinary/outis/core/ads/AdState;
 	public final fun getAudioTracks ()Ljava/util/List;
@@ -422,6 +423,7 @@ public final class dev/nonbinary/outis/core/PlayerState {
 	public final fun getSelectedAudioTrackId ()Ljava/lang/String;
 	public final fun getSelectedTextTrackId ()Ljava/lang/String;
 	public final fun getSelectedVideoTrackId ()Ljava/lang/String;
+	public final fun getSidecarCues ()Ljava/util/List;
 	public final fun getTextTracks ()Ljava/util/List;
 	public final fun getThumbnails ()Ljava/util/List;
 	public final fun getVideoRange ()Ldev/nonbinary/outis/core/VideoRange;
