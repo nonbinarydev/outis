@@ -62,6 +62,13 @@ First release. Not yet published to Maven Central.
 - Parsing is hardened against malformed input and fails to an empty list rather than disturbing
   playback.
 
+**Subtitles**
+
+- Sidecar subtitle files through `MediaItem.subtitles`: WebVTT and SRT beside a progressive file, a
+  local one or an HLS/DASH stream, on Android and Web. They join `textTracks` after the media's own, and
+  are selected, switched off and pre-selected the same way. A file that cannot be fetched or read
+  shows no cues and never stops playback.
+
 **Ads**
 
 - Server-side ad insertion through `AdController`: an engine-agnostic cue-point tracker the application
@@ -116,6 +123,8 @@ First release. Not yet published to Maven Central.
   `faststart`.
 - Embedded chapters are unavailable on web, which has no local-file API. Declared chapters and a
   `chaptersUrl` WebVTT sidecar work on all three platforms.
+- **iOS ignores `MediaItem.subtitles`.** AVFoundation has no API that adds a subtitle file to a
+  progressive asset.
 
 [Unreleased]: https://github.com/nonbinarydev/outis/compare/v0.1.0-alpha01...HEAD
 [0.1.0-alpha01]: https://github.com/nonbinarydev/outis/releases/tag/v0.1.0-alpha01

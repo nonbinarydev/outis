@@ -101,7 +101,7 @@ you care about deliberately. **iOS (AVPlayer)** maps only
 player.setMediaItem(item, autoPlay = true)   // prepare is folded in; starts when ready if autoPlay
 ```
 
-A `MediaItem` describes **what** to play. All seventeen parameters, in declaration order:
+A `MediaItem` describes **what** to play. All nineteen parameters, in declaration order:
 
 ```kotlin
 data class MediaItem(
@@ -124,6 +124,8 @@ data class MediaItem(
     val chaptersUrl: String? = null,                                    // WebVTT chapters sidecar, any engine
     val thumbnailsUrl: String? = null,                                  // WebVTT trickplay sidecar, any engine
     val analytics: PlaybackMetadata? = null,                            // see analytics.md
+    val chapters: List<Chapter>? = null,                                // declared chapters; win over chaptersUrl
+    val subtitles: List<SubtitleFile> = emptyList(),                    // WebVTT/SRT sidecars, see §5
 )
 ```
 
@@ -163,9 +165,9 @@ before the first frame — no reactive flip after playback starts.
 - **`loop`** — restart the item when it ends (Media3 repeat-one, AVPlayer seek-on-end, Web
   `<video>.loop`). Ignored for live.
 
-> **Web caveat:** the language and caption preferences apply to Shaka-managed HLS/DASH only — a
-> progressive MP4/WebM is a single native `<video>` stream with no selectable audio or text tracks.
-> `startPositionMs`, `startMuted` and `loop` still work there.
+> **Web caveat:** a progressive MP4/WebM is a single native `<video>` stream with no selectable tracks of
+> its own, so the language and caption preferences reach only its sidecar `subtitles` there.
+> `startPositionMs`, `startMuted` and `loop` still work.
 
 ```kotlin
 // HLS with an auth header:
@@ -396,6 +398,32 @@ engine adapts within on its own; Android and web report them, iOS reports none y
 have none. Cue *rendering* is a surface concern: the `:ui`
 `PlayerSurface` renders the selected text track natively, and the overlay's subtitle and audio
 buttons drive the calls above for you — see [ui.md](ui.md).
+
+### Sidecar subtitles
+
+Subtitle files that ship beside the media, rather than inside it, go in `MediaItem.subtitles`. They work
+for a plain MP4 as well as for HLS and DASH, in WebVTT or SRT:
+
+```kotlin
+player.setMediaItem(
+    MediaItem(
+        source = MediaSource.Url("https://cdn.example.com/film.mp4"),
+        captionsDefault = CaptionsDefaultMode.ON,
+        preferredTextLanguage = "es",
+        subtitles = listOf(
+            SubtitleFile("https://cdn.example.com/film.en.vtt", language = "en", label = "English"),
+            SubtitleFile("https://cdn.example.com/film.es.srt", language = "es", label = "Español"),
+        ),
+    ),
+)
+```
+
+Each joins `textTracks` after the media's own and is selected, switched off and pre-selected like them.
+The first is marked `isDefault`. With captions on, the `preferredTextLanguage` match shows first, then
+the media's own default, then the first sidecar. The format comes from the extension unless `format`
+says otherwise. A file that cannot be fetched or read shows no cues and never stops playback. On Web
+the subtitle host needs CORS. **iOS ignores `subtitles` for now.** For local files, see
+[local-files.md](local-files.md#4-tracks-and-subtitles-in-a-local-file).
 
 ---
 

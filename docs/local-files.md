@@ -61,8 +61,9 @@ Everything else on `MediaItem` applies normally: `startPositionMs` for resume, `
 |---|---|---|---|
 | mp4 / m4v | Yes | Yes | Not reachable — see §3 |
 | mkv (Matroska) | Yes | No — no demuxer | No — WebM subset only |
-| Audio and text tracks in `PlayerState` | Yes | Yes | No — always empty |
-| Track selection (`selectTrack` / `clearTextTrack`) | Yes | Yes | No |
+| Audio and text tracks in `PlayerState` | Yes | Yes | Sidecar subtitles only — none from the file |
+| Track selection (`selectTrack` / `clearTextTrack`) | Yes | Yes | Sidecar subtitles only |
+| Sidecar subtitles (`MediaItem.subtitles`) | Yes, `file://` included | Not yet — ignored | Yes, over HTTP |
 | Embedded chapters (`PlayerState.chapters`) | Yes, mp4 and mkv | Yes, mp4 only | No |
 | Chapter thumbnails (`chapterThumbnails`) | Yes | Yes | No |
 | Embedded container metadata (title, artist, artwork) | Not surfaced | Not surfaced | Not surfaced |
@@ -85,9 +86,10 @@ an ordinary `MediaSource.Url` pointing at something the page origin can serve, o
 you created yourself from a `File`/`Blob` — but both of those are URLs, and the field is documented as
 a path. Treat "local files on web" as unsupported until that is designed properly.
 
-Even where a progressive URL does play on Web, it surfaces **no tracks**: `loadTracks()` runs only on
-the Shaka branch and from Shaka's own track events (`ShakaEngine.kt`), so
-`audioTracks` and `textTracks` stay empty and the audio and subtitle controls are inert.
+Even where a progressive URL does play on Web, it surfaces **none of its own tracks**: `loadTracks()`
+runs only on the Shaka branch and from Shaka's own track events (`ShakaEngine.kt`), so `audioTracks`
+stays empty and the audio control is inert. The one exception is sidecar subtitles (§4), which the
+engine adds to `textTracks` itself.
 
 ---
 
@@ -113,10 +115,38 @@ in the resolved `media3-extractor-1.11.1.aar`). Older advice that these are miss
 There is no equivalent on iOS or Web, and since neither can open mkv, the common mkv case does not
 arise there.
 
-**Not available anywhere:** a sideloaded `.srt`/`.vtt` sidecar. `MediaItem` has no field for one
-(`MediaItem.kt`), even though Media3 and AVKit both support side-loading. And `MediaTrack` carries
-no codec or format field (`MediaTrack.kt`), so you cannot tell a text subtitle from an image one,
-or show "SSA" versus "PGS", in your own track picker.
+**Sidecar subtitle files.** `MediaItem.subtitles` takes WebVTT and SRT files that ship beside the media
+(`SubtitleFile.kt`). Each joins `textTracks` after the media's own, with the `language` and `label` you
+give it, and the first is marked `isDefault`:
+
+```kotlin
+val dir = "/data/user/0/com.example.app/files" // Android: context.filesDir
+
+MediaItem(
+    source = MediaSource.LocalFile("$dir/film.mp4"),
+    subtitles = listOf(
+        SubtitleFile("file://$dir/film.en.srt", language = "en", label = "English"),
+        SubtitleFile("https://cdn.example/film.es.vtt", language = "es"),
+    ),
+)
+```
+
+- The format comes from the extension, `.srt` for SRT and anything else WebVTT, unless `format` says
+  otherwise.
+- With `captionsDefault = ON` the track in `preferredTextLanguage` shows, else the media's own default,
+  else the first sidecar.
+- A file that cannot be fetched or read, such as a 404 or an error page served in its place, shows no
+  cues. It never stops playback, on any engine.
+- **Android** opens `file://`, `content://` and `asset://` sidecars as well as HTTP ones, the latter
+  with the item's `headers` (`SidecarDataSource.kt`).
+- **Web** fetches them over HTTP, so the subtitle host needs CORS. For a progressive file the engine
+  fetches a sidecar the first time it is shown, without `headers`, since the `<video>` sends none
+  (`SidecarSubtitles.kt`). For HLS and DASH it hands them to Shaka, which requests them with the item's
+  `headers`.
+- **iOS** ignores them for now. AVFoundation has no API that adds a subtitle file to a progressive asset.
+
+`MediaTrack` carries no codec or format field (`MediaTrack.kt`), so you cannot tell a text subtitle from
+an image one, or show "SSA" versus "PGS", in your own track picker.
 
 ---
 
@@ -267,7 +297,7 @@ Listed so you can plan around them rather than search for them.
   `AVMetadataItem` — a grep for either across `core/src/androidMain` and `core/src/iosMain` finds
   nothing — so a file's own title, artist and artwork never surface. `MediaItem.metadata`
   (`MediaItem.kt`) is app-supplied only and is for display, never playback.
-- **Sideloaded subtitle files.** No `MediaItem` field for an `.srt`/`.vtt` sidecar.
+- **Sidecar subtitle files on iOS.** `MediaItem.subtitles` works on Android and Web; iOS ignores it.
 - **A codec or format field on `MediaTrack`.**
 - **Embedded chapters on Web.** No browser API reads them. Declare the chapters, or ship a WebVTT
   sidecar, which works there.

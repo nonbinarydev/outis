@@ -13,6 +13,7 @@ import sys
 CATALOGUE = pathlib.Path(__file__).with_name("catalogue.json")
 MIME_TYPES = {"HLS", "DASH", "MP4", "WEBM"}
 DRM_SCHEMES = {"WIDEVINE", "PLAYREADY", "FAIRPLAY", "CLEARKEY"}
+SUBTITLE_FORMATS = {"WEBVTT", "SRT"}
 REQUIRED_ITEM_FIELDS = ("id", "title", "label", "url", "mimeType")
 
 
@@ -31,6 +32,31 @@ def chapter_errors(at: str, chapters) -> list[str]:
             errors.append(f"{at}: chapters[{i}].endMs must be an integer no smaller than startMs")
         if "title" in ch and not isinstance(ch["title"], str):
             errors.append(f"{at}: chapters[{i}].title must be a string")
+    return errors
+
+
+def subtitle_errors(at: str, subtitles) -> list[str]:
+    """Sidecar subtitles: a list of {url, language?, label?, format?}."""
+    if subtitles is None:
+        return []
+    if not isinstance(subtitles, list):
+        return [f"{at}: subtitles must be a list"]
+    errors = []
+    for i, sub in enumerate(subtitles):
+        url = sub.get("url") if isinstance(sub, dict) else None
+        if not isinstance(url, str) or not url.startswith("https://"):
+            errors.append(f"{at}: subtitles[{i}].url must be https")
+            continue
+        fmt = sub.get("format")
+        if fmt is not None and fmt not in SUBTITLE_FORMATS:
+            errors.append(f"{at}: subtitles[{i}].format must be one of {sorted(SUBTITLE_FORMATS)}")
+        # The SDK reads the format from the extension when none is given, and anything not .srt as WebVTT.
+        path = url.split("?")[0].split("#")[0].lower()
+        if fmt is None and not path.endswith((".vtt", ".srt")):
+            errors.append(f"{at}: subtitles[{i}] needs a format, its url ending in neither .vtt nor .srt")
+        for key in ("language", "label"):
+            if key in sub and not isinstance(sub[key], str):
+                errors.append(f"{at}: subtitles[{i}].{key} must be a string")
     return errors
 
 
@@ -82,6 +108,7 @@ def main() -> int:
                     errors.append(f"{at}: {key} must be https")
 
             errors.extend(chapter_errors(at, item.get("chapters")))
+            errors.extend(subtitle_errors(at, item.get("subtitles")))
 
             if "poster" in item and item["poster"] not in posters:
                 errors.append(f"{at}: poster {item['poster']!r} is not declared in posters")

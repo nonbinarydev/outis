@@ -334,6 +334,8 @@ as bugs.
   `DrmScheme.FAIRPLAY` *with* a `certificateUrl` (`AVPlayerEngine.kt`). See [DRM](drm.md).
 - **Client-side ads do nothing.** The iOS engine never reads `MediaItem.adConfig`. See
   [Client-side ads](ads-client-side.md).
+- **Sidecar subtitles are ignored.** The iOS engine never reads `MediaItem.subtitles` yet; ship
+  subtitles inside the HLS manifest instead.
 - **`PlayerSurface`'s `showSubtitles` parameter is ignored on iOS.** The surface is an
   `AVPlayerViewController` (`PlayerSurface.ios.kt`), which renders the selected text track
   natively; use `VideoPlayer.clearTextTrack()` to turn subtitles off.
