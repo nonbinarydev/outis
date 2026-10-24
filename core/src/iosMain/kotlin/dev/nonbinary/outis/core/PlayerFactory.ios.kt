@@ -6,5 +6,5 @@
 
 package dev.nonbinary.outis.core
 
-internal actual fun createPlatformPlayer(context: AppContext, config: PlayerConfig): VideoPlayer =
+internal actual fun createPlatformPlayer(context: AppContext, config: PlayerConfig): PlatformEngine =
     AVPlayerEngine(config)

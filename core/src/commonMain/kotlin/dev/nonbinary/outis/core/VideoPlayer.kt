@@ -30,82 +30,82 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * Construct one with the [VideoPlayer] factory function.
  */
-interface VideoPlayer {
+public interface VideoPlayer {
 
     /** Always-readable, conflated snapshot of the player. */
-    val state: StateFlow<PlayerState>
+    public val state: StateFlow<PlayerState>
 
     /**
      * One-shot, time-stamped events (no replay). Analytics/QoS adapters consume this stream;
      * every event carries [PlayerEvent.positionMs] and a monotonic [PlayerEvent.elapsedRealtimeMs].
      */
-    val events: SharedFlow<PlayerEvent>
+    public val events: SharedFlow<PlayerEvent>
 
     /** Set (and implicitly prepare) the item to play. Pass [autoPlay] to start once ready. */
-    fun setMediaItem(item: MediaItem, autoPlay: Boolean = false)
+    public fun setMediaItem(item: MediaItem, autoPlay: Boolean = false)
 
     /**
      * Begin (or resume) playback. Fire-and-forget: this sets play *intent*, so
      * [PlayerState.playWhenReady] flips immediately while [PlayerState.isPlaying] only becomes `true`
      * once frames actually advance — they differ whenever the player is still buffering.
      */
-    fun play()
+    public fun play()
 
     /** Pause playback, leaving the current position intact. Safe to call when already paused. */
-    fun pause()
+    public fun pause()
 
     /**
      * Seek to [positionMs] in **content** time. Emits [PlayerEvent.SeekStarted] then, once the
      * engine resolves it, [PlayerEvent.SeekCompleted].
      */
-    fun seekTo(positionMs: Long)
+    public fun seekTo(positionMs: Long)
 
     /**
      * Set the playback rate, where `1f` is normal speed. Audio pitch correction is the engine's own
      * behaviour and is not normalised across platforms. Rate is **not** reset by [setMediaItem].
      */
-    fun setPlaybackSpeed(speed: Float)
+    public fun setPlaybackSpeed(speed: Float)
 
     /**
      * Set the output volume in the range `0f`..`1f`. Independent of [setMuted] — muting does not zero
      * this value, so unmuting restores the level set here.
      */
-    fun setVolume(volume: Float)
+    public fun setVolume(volume: Float)
 
     /** Mute or unmute without disturbing the [setVolume] level, which is restored on unmute. */
-    fun setMuted(muted: Boolean)
+    public fun setMuted(muted: Boolean)
 
     /** Stop playback and clear the current item, keeping the player reusable. */
-    fun stop()
+    public fun stop()
 
     /** Release all native resources. **Idempotent** — safe to call more than once. */
-    fun release()
+    public fun release()
 
     /**
      * Escape hatch to the underlying native player (`ExoPlayer` / `AVPlayer` / `shaka.Player`),
      * or `null` before it exists / after [release]. Analytics SDKs that bind to the concrete
      * player cast this. Prefer [PlayerHost.nativePlayerHandle] when you must react to re-creation.
      */
-    val nativePlayerHandle: Any?
+    public val nativePlayerHandle: Any?
 
-    /** Register an extension (analytics, ads, …). The seam exists in v1; nothing ships registered. */
-    fun addComponent(component: PlayerComponent)
+    /** Register an extension — an analytics adapter such as `outis-analytics-mux`, or your own. */
+    public fun addComponent(component: PlayerComponent)
 
     /** Detach a previously [added][addComponent] extension. A no-op if it was never registered. */
-    fun removeComponent(component: PlayerComponent)
+    public fun removeComponent(component: PlayerComponent)
 
     // --- Track selection -----------------------------------------------------------------------
     // ADDITIVE RULE: these MUST keep default bodies (never make them abstract). Doing so is a hard
-    // source-break for every implementer (ExoPlayerEngine, FakeVideoPlayer, future iOS/Web actuals)
+    // source-break for every implementer (the three engines, FakeVideoPlayer, an app's own player)
     // and is guarded by VideoPlayerAdditiveContractTest.
 
     /**
-     * Select an audio or text track from [PlayerState.audioTracks] / [PlayerState.textTracks].
-     * Fire-and-forget: the engine applies the change and re-emits the track lists +
-     * [PlayerEvent.TracksChanged]; the selection lands on [state] (don't assume it optimistically).
+     * Select a track from [PlayerState.audioTracks], [PlayerState.textTracks] or
+     * [PlayerState.videoTracks]. Fire-and-forget: the engine applies the change and re-emits the track
+     * lists + [PlayerEvent.TracksChanged]; the selection lands on [state] (don't assume it optimistically).
      */
-    fun selectTrack(track: MediaTrack) {}
+    public fun selectTrack(track: MediaTrack) {}
 
     /** Turn subtitles/captions off (clears the selected text track). */
-    fun clearTextTrack() {}
+    public fun clearTextTrack() {}
 }

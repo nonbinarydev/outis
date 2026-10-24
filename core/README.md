@@ -15,7 +15,7 @@ Targets: `jvm` (API/test-only — no engine), `android`, `iosArm64`, `iosSimulat
 
 | Platform | Engine | Status |
 |---|---|---|
-| Android | Media3 / ExoPlayer (`1.10.1`) — main-thread-pinned, one `Player.Listener` + one `AnalyticsListener`, 250 ms ticker | ✅ |
+| Android | Media3 / ExoPlayer (`1.11.1`) — main-thread-pinned, one `Player.Listener` + one `AnalyticsListener`, 250 ms ticker | ✅ |
 | iOS (arm64 + simulator) | AVFoundation `AVPlayer` — polled state, `AVContentKeySession` for FairPlay | ✅ |
 | Web — `js(IR)` | Shaka Player over a DOM `<video>` | ✅ |
 | Web — `wasmJs` | — | stub (ships headless; `createPlatformPlayer` throws — Kotlin/Wasm↔Shaka interop is a separate effort) |
@@ -108,13 +108,15 @@ Both insertion models ship, and they work differently:
   playlists. See [../docs/ads-server-side.md](../docs/ads-server-side.md).
 - **Client-side (CSAI)** — Google IMA, wired inside the engines on **Android and Web only**. Surfaced
   through `PlayerState.adState`, whose populated fields differ between those two engines. iOS has the
-  bridge (`updateAdState`, `setAdContainer`, `adContainer`) but no adapter ships. See
+  bridge (`setAdState`, `setAdContainer`, `adContainer`) but no adapter ships. See
   [../docs/ads-client-side.md](../docs/ads-client-side.md).
+
+`AdController`, the ad parsers and the platform ad bridges are `@ExperimentalPlayerApi`: warning-level,
+and the part of `:core` expected to change shape before 1.0. The ad data model is not marked, because
+`MediaItem` and `PlayerState` carry it.
 
 ## Reserved for the roadmap (present but unused in v1)
 
-- **Video-quality selection** — `PlayerState.{currentTrack, availableTracks}`, `VideoFormat`
-  (audio/text selection *is* shipped; video-rendition selection is not).
 - **Offline** — `MediaSource.LocalFile` plays today, but there is no download manager to produce those
   files.
 - **QoS events on non-Android engines** — `BitrateChanged` / `BandwidthSample` / `DroppedFrames` are

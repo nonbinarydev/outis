@@ -40,6 +40,10 @@ SDR_MASTER_URL="${SDR_MASTER_URL:-$BASE/sdr/SolLevante_SDR_UHD_24fps.mov}"      
 # 1 = tone-map the SDR fallback from the HDR master (single ~37 GB download — fits a ~60 GB disk).
 # 0 = fetch the real 15 GB SDR grade too (needs ~57 GB; delete the HDR master before the SDR fetch to be safe).
 SDR_FROM_HDR="${SDR_FROM_HDR:-1}"
+FONT="${FONT:-/System/Library/Fonts/Menlo.ttc}"
+# Info-board text colour. SDR uses white; on the PQ/HDR rungs plain white is ~10 000 nits (blinding), so HDR
+# text uses a grey that lands near ~230 nits "paper white" — raise/lower HDR_TEXT if it reads too dim/bright.
+HDR_TEXT="${HDR_TEXT:-0xA0A0A0}"
 SEGDUR="${SEGDUR:-4}"
 PRESET="${PRESET:-medium}"                        # x265/x264 preset (veryfast to iterate, slow for quality)
 STAGES="${STAGES:-fetch audio hdr dv sdr package}"  # 'selftest' is opt-in and needs no master
@@ -71,6 +75,8 @@ KF=(-force_key_frames "expr:gte(t,n_forced*$SEGDUR)")
 
 # ─── preflight ───────────────────────────────────────────────────────────────────────────────────────
 [[ -x "$FFMPEG" ]] || { echo "no ffmpeg at $FFMPEG (set FFMPEG=...)"; exit 1; }
+[[ "$("$FFMPEG" -hide_banner -filters 2>/dev/null)" == *drawtext* ]] || { echo "this ffmpeg lacks drawtext (no libfreetype)"; exit 1; }
+[[ -f "$FONT" ]] || { echo "no font at $FONT (set FONT=...)"; exit 1; }
 if has_stage dv || has_stage selftest; then
   command -v "$DOVI_TOOL" >/dev/null 2>&1 || { echo "dovi_tool not found — 'brew install dovi_tool' (Profile 8.1 RPU)"; exit 1; }
   command -v "$MP4BOX"    >/dev/null 2>&1 || { echo "MP4Box not found — 'brew install gpac' (dvcC muxing)"; exit 1; }
@@ -79,9 +85,25 @@ if has_stage package || has_stage selftest; then
   command -v "$PACKAGER" >/dev/null 2>&1 || { echo "Shaka Packager not found (set PACKAGER=...)"; exit 1; }
 fi
 
-# x265 HDR10 elementary-stream encoder (Annex-B .hevc, ready for dovi_tool). $1 w  $2 h  $3 br  $4 mr  $5 bs  $6 out
-enc_hdr10(){
-  "$FFMPEG" -y -v error -i "$HDR_MASTER" -an -vf "scale=$1:$2:flags=lanczos" \
+# make_fg — writes label_$tag.txt + fg_$tag.txt (a full filtergraph: [pre]scale,drawtext×2[post]) and echoes
+# the fg filename. Mirrors build-demo-media's info board — label top-left, live timecode bottom-left — via
+# -filter_script:v so the %{pts}/%{n} and colons don't get shell-mangled.
+make_fg(){ # w h codec bitrate range(HDR|SDR) pre post
+  local w=$1 h=$2 codec=$3 br=$4 range=$5 pre=$6 post=$7
+  local tag="${range}_${h}" fc=white
+  [[ "$range" == HDR ]] && fc="$HDR_TEXT"
+  printf 'Sol Levante   %s   %sx%s   %s' "$codec" "$w" "$h" "$br" > "$WORK/label_$tag.txt"
+  cat > "$WORK/fg_$tag.txt" <<EOF
+${pre}scale=$w:$h:flags=lanczos,drawtext=fontfile=$FONT:textfile=label_$tag.txt:x=24:y=24:fontsize=$(( h/22 )):fontcolor=$fc:box=1:boxcolor=black@0.5:boxborderw=12,drawtext=fontfile=$FONT:text=t=%{pts} s   f=%{n}:x=24:y=h-$(( h/16 )):fontsize=$(( h/22 )):fontcolor=$fc:box=1:boxcolor=black@0.5:boxborderw=12${post}
+EOF
+  echo "fg_$tag.txt"
+}
+enc(){ ( cd "$WORK" && "$FFMPEG" "$@" ); }  # run from $WORK so the relative textfile= in the fg resolves
+
+# x265 HDR10 elementary-stream encoder (Annex-B .hevc, ready for dovi_tool), with the burned-in info board.
+enc_hdr10(){ # w h br mr bs out
+  local fg; fg=$(make_fg "$1" "$2" "DV" "$3" HDR "" "")
+  enc -y -v error -i "$HDR_MASTER" -an -filter_script:v "$fg" \
     -c:v libx265 -pix_fmt yuv420p10le -preset "$PRESET" -b:v "$3" -maxrate "$4" -bufsize "$5" "${KF[@]}" \
     -x265-params "profile=main10:hdr10=1:hdr10-opt=1:repeat-headers=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc:master-display=$MASTER_DISPLAY:max-cll=$MAX_CLL:keyint=$KEYINT:min-keyint=$KEYINT:scenecut=0" \
     -f hevc "$6"
@@ -171,11 +193,12 @@ encode_sdr(){
     src="$HDR_MASTER"
     tonemap="zscale=t=linear:npl=100,tonemap=hable,zscale=t=bt709:m=bt709:p=bt709:r=tv,"
   fi
-  local row name wh br mr bs w h
+  local row name wh br mr bs w h fg
   for row in "${SDR_LADDER[@]}"; do
     read -r name wh br mr bs <<<"$row"; w=${wh%x*}; h=${wh#*x}
     echo "  SDR $name"
-    "$FFMPEG" -y -v error -i "$src" -an -vf "${tonemap}scale=$w:$h:flags=lanczos,format=yuv420p" \
+    fg=$(make_fg "$w" "$h" "AVC" "$br" SDR "$tonemap" ",format=yuv420p")
+    enc -y -v error -i "$src" -an -filter_script:v "$fg" \
       -c:v libx264 -profile:v high -preset "$PRESET" -b:v "$br" -maxrate "$mr" -bufsize "$bs" \
       "${KF[@]}" -movflags +faststart "$WORK/v.sdr.$h.mp4"
   done

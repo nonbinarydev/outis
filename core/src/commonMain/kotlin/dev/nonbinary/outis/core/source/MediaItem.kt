@@ -6,11 +6,11 @@
 
 package dev.nonbinary.outis.core.source
 
+import dev.nonbinary.outis.core.ExperimentalPlayerApi
 import dev.nonbinary.outis.core.ads.AdBreak
 import dev.nonbinary.outis.core.ads.AdConfig
 import dev.nonbinary.outis.core.analytics.PlaybackMetadata
-import kotlinx.collections.immutable.ImmutableMap
-import kotlinx.collections.immutable.persistentMapOf
+import dev.nonbinary.outis.core.chapters.Chapter
 
 /**
  * What to play. Honours [source], [mimeType], [headers] and [drmConfig] (Widevine/PlayReady on
@@ -20,7 +20,7 @@ import kotlinx.collections.immutable.persistentMapOf
  * [startPositionMs], [startMuted]) are applied as the item is prepared — before first frame — so the
  * right track / position / mute state is in place without a reactive flip after playback starts.
  */
-data class MediaItem(
+public data class MediaItem(
     /**
      * Where the bytes come from — a remote [MediaSource.Url] or an on-device [MediaSource.LocalFile].
      * The only required field; everything else has a sensible default. When [mimeType] is `null` the
@@ -34,7 +34,7 @@ data class MediaItem(
      * Request headers applied when fetching the manifest/segments (auth tokens, etc.). Honoured
      * on Android, iOS and Web.
      */
-    val headers: ImmutableMap<String, String> = persistentMapOf(),
+    val headers: Map<String, String> = emptyMap(),
     /** DRM parameters; `null` for clear content. */
     val drmConfig: DrmConfig? = null,
     /** Optional ceiling on adaptive video selection; `null` => unconstrained. */
@@ -86,7 +86,8 @@ data class MediaItem(
      * Also extract per-chapter preview images (MP4 chapter **image** track, e.g. Subler-written JPEGs) into
      * [dev.nonbinary.outis.core.chapters.Chapter.thumbnail]. Off by default — it reads the image samples,
      * which is extra IO/memory. No effect when the file has no image track (Matroska, title-only MP4); titles
-     * are unaffected either way. Honoured on Android and iOS (local files); ignored on Web (no chapters there).
+     * are unaffected either way. Honoured on Android and iOS for local files whose chapters come from the
+     * container — not when [chapters] or [chaptersUrl] supplies them, and never on Web.
      */
     val chapterThumbnails: Boolean = false,
     /**
@@ -94,7 +95,7 @@ data class MediaItem(
      * [dev.nonbinary.outis.core.PlayerState.chapters] — the only chapter source that works for streamed
      * sources (HLS/DASH) and on Web, since it needs no local container. When null, the engine falls back
      * to chapters embedded in a local MP4/M4V/MKV (Android + iOS local files only). A `.vtt` here takes
-     * precedence over any embedded chapters.
+     * precedence over any embedded chapters, and is not read at all when [chapters] is set.
      */
     val chaptersUrl: String? = null,
     /**
@@ -111,13 +112,21 @@ data class MediaItem(
      * slices sessions by.
      */
     val analytics: PlaybackMetadata? = null,
+    /**
+     * Chapters the app already knows, from its own catalogue for instance. When set, they are
+     * [dev.nonbinary.outis.core.PlayerState.chapters] from the moment the item is set, on every engine and for
+     * any source, and neither [chaptersUrl] nor the container is read; an empty list means no chapters.
+     * `null` leaves chapters to [chaptersUrl], then to the chapters embedded in a local file.
+     */
+    val chapters: List<Chapter>? = null,
 )
 
 /** The SSAI ad breaks on this item, or empty if it has none. */
-fun MediaItem.serverSideBreaks(): List<AdBreak> = (adConfig as? AdConfig.ServerSide)?.breaks ?: emptyList()
+@ExperimentalPlayerApi
+public fun MediaItem.serverSideBreaks(): List<AdBreak> = (adConfig as? AdConfig.ServerSide)?.breaks ?: emptyList()
 
 /** Initial caption/subtitle visibility for a [MediaItem]. */
-enum class CaptionsDefaultMode {
+public enum class CaptionsDefaultMode {
     /** Captions hidden until the user selects a text track (the default). */
     OFF,
 
@@ -140,7 +149,7 @@ enum class CaptionsDefaultMode {
  * / `preferredPeakBitRate`) and Web (Shaka `restrictions`). Resolution caps need **both** [maxWidth] and
  * [maxHeight] (Media3/AVPlayer take a size, not a single dimension).
  */
-data class VideoConstraints(
+public data class VideoConstraints(
     /**
      * Maximum rendition width in **pixels**; `null` => unbounded. Only takes effect together with
      * [maxHeight] — a width on its own is ignored.
@@ -156,7 +165,7 @@ data class VideoConstraints(
 )
 
 /** Optional display metadata for the overlay and OS media sessions. */
-data class MediaMetadata(
+public data class MediaMetadata(
     /** Primary display line (programme / film name). `null` => nothing to show, not an empty title. */
     val title: String? = null,
     /**

@@ -162,8 +162,8 @@ private fun DrmSection(
         }
     }
     // Selectable regardless of the caveat: watching the SDK report an unsupported scheme is more
-    // useful than being stopped from trying, and the hint is a guess on web.
-    drmSchemeCaveat(scheme)?.let {
+    // useful than being stopped from trying.
+    drmSchemeCaveat(scheme, rememberDrmSupport())?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
     OutlinedTextField(

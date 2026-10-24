@@ -10,7 +10,8 @@
 # uploaded as artifacts and a separate job merges them into a single comment — two jobs each posting
 # their own comment would fight over the same thread.
 #
-# :ui has no test source set today. When it gains one, add its tasks to the matrix below.
+# :ui's tests are host tests of its controls state, run on the JVM with Android's stubs, so they ride in
+# the Linux job. So do :analytics:firebase's, on Node: its iOS side needs CocoaPods.
 
 name: PR tests
 
@@ -40,7 +41,7 @@ jobs:
           - name: JVM, JS and Wasm
             os: ubuntu-latest
             key: linux
-            tasks: ":core:jvmTest :core:jsNodeTest :core:jsBrowserTest :core:wasmJsNodeTest :core:wasmJsBrowserTest"
+            tasks: ":core:jvmTest :core:jsNodeTest :core:jsBrowserTest :core:wasmJsNodeTest :core:wasmJsBrowserTest :ui:testAndroidHostTest :analytics:firebase:jsNodeTest"
           - name: iOS simulator
             os: macos-latest
             key: apple
@@ -70,7 +71,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.key }}
-          path: core/build/test-results/
+          path: |
+            core/build/test-results/
+            ui/build/test-results/
+            analytics/firebase/build/test-results/
           if-no-files-found: warn
           retention-days: 7
 
@@ -121,7 +125,8 @@ jobs:
               .replace('jvm', 'JVM').replace('jsNode', 'JS / Node')
               .replace('jsBrowser', 'JS / browser').replace('wasmJsNode', 'Wasm / Node')
               .replace('wasmJsBrowser', 'Wasm / browser')
-              .replace('iosSimulatorArm64', 'iOS simulator');
+              .replace('iosSimulatorArm64', 'iOS simulator')
+              .replace('testAndroidHost', 'UI / Android host');
 
             for (const file of files) {
               const task = path.basename(path.dirname(file));

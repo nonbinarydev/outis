@@ -10,11 +10,9 @@ package dev.nonbinary.outis.core
  * Normalized, engine-agnostic playback error.
  *
  * [nativeCause] retains the original (`ExoPlaybackException`, `NSError`, Shaka error object) for
- * adapters that want engine-specific detail. [Category] is a small, stable taxonomy; `DRM` is
- * emitted by the Android (Media3) and Web (Shaka) engines on key-system/license failures — iOS does
- * not yet surface it.
+ * adapters that want engine-specific detail. [Category] is a small, stable taxonomy.
  */
-data class PlayerError(
+public data class PlayerError(
     /** Coarse, cross-engine classification — the only field safe to branch on in shared code. */
     val category: Category,
     /**
@@ -40,7 +38,7 @@ data class PlayerError(
      * The stable taxonomy playback failures are normalised into. Deliberately small: engines classify
      * on wildly different code spaces, so anything finer would not mean the same thing twice.
      */
-    enum class Category {
+    public enum class Category {
         /**
          * The media itself is unusable or unreachable: bad/unresolvable URL, 404 or other bad HTTP
          * status, malformed container/manifest, or a live stream that fell irrecoverably behind its
@@ -53,8 +51,9 @@ data class PlayerError(
 
         /**
          * Key-system or licence failure: no CDM for the requested scheme, licence server rejection,
-         * or expired/absent keys. **Only Android (Media3) and Web (Shaka) emit this** — iOS currently
-         * reports FairPlay failures as [SOURCE].
+         * or expired/absent keys. On iOS only the key delivery Outis runs itself reports this —
+         * fetching the FairPlay certificate, building the request, the licence call; a key failure
+         * AVFoundation reports on its own arrives as [SOURCE].
          */
         DRM,
 

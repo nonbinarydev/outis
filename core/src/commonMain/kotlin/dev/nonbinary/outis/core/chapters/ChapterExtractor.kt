@@ -19,7 +19,7 @@ package dev.nonbinary.outis.core.chapters
  *
  * Any parse failure yields an empty list — chapters must never break playback.
  */
-object ChapterExtractor {
+internal object ChapterExtractor {
 
     // Backstops against malformed/adversarial files: declared counts are untrusted (32-bit), so every
     // table is clamped by the box's own byte length AND these hard caps before allocating or looping.

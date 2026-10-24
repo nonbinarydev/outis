@@ -1,0 +1,41 @@
+# Fails when the public ABI of a published module no longer matches the dump checked in under its api/
+# directory. The dumps are the reviewable record of the public surface: a diff there is an API change,
+# intended or not. For an intended change, run `./gradlew updateKotlinAbi` and commit the dumps with it.
+#
+# Linux compiles every klib target except the analytics adapters' iOS ones, whose cinterop needs macOS;
+# their part of the dump is inferred from the other targets. Android-only declarations are not dumped at all:
+# Kotlin 2.4.10's ABI validation reads the legacy Android target, not the AGP KMP library one.
+
+name: ABI
+
+on:
+  pull_request:
+  push:
+    branches: [main, development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: abi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Public ABI matches the dumps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Check ABI dumps
+        run: ./gradlew --no-daemon checkKotlinAbi

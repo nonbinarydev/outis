@@ -3,7 +3,8 @@
 Compose Multiplatform surface + a **fully customisable** controls overlay for the KMP video player.
 Runs on **Android, iOS and Web** (JS). Works for touch **and** D-pad/TV.
 
-> The whole API is `@ExperimentalPlayerUiApi` (opt in at the call site).
+> The whole API is `@ExperimentalPlayerUiApi`, a warning-level marker: opt in at the call site or
+> module-wide with `optIn.add("dev.nonbinary.outis.ui.ExperimentalPlayerUiApi")`.
 
 ## Customisation tiers
 

@@ -11,6 +11,14 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
+// Firebase is opt-in: without google-services.json (git-ignored) the app builds and runs Firebase-free.
+// The Google services plugin fails a build that lacks the file, and Crashlytics needs its output, so the
+// two come together or not at all.
+if (file("google-services.json").exists()) {
+    apply(plugin = libs.plugins.googleServices.get().pluginId)
+    apply(plugin = libs.plugins.firebaseCrashlytics.get().pluginId)
+}
+
 // The Android host for the shared sample. All the UI lives in :sample — this module exists only to
 // give it an Activity to run in, because the Kotlin Multiplatform Android plugin builds libraries and
 // cannot produce an installable application.
@@ -134,6 +142,10 @@ dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(project(":sample"))
     implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+    // FirebaseApp, to tell whether a google-services.json configured Firebase before touching Crashlytics.
+    implementation(libs.firebase.common)
     detektPlugins(libs.detekt.formatting)
     detektPlugins(libs.detekt.compose)
     detektPlugins(libs.detekt.compose2)

@@ -6,15 +6,25 @@
 
 package dev.nonbinary.outis.core.thumbnails
 
-import dev.nonbinary.outis.core.chapters.httpGetText
+import dev.nonbinary.outis.core.net.HttpResult
+import dev.nonbinary.outis.core.net.httpGet
+import dev.nonbinary.outis.core.net.resolveUrl
 
 /**
  * One trickplay (seek-preview) thumbnail: the time span it covers and the crop rectangle within a sprite
  * sheet at [url]. Populated on [dev.nonbinary.outis.core.PlayerState.thumbnails] from a WebVTT sidecar
  * ([dev.nonbinary.outis.core.source.MediaItem.thumbnailsUrl]); the UI draws [url] cropped to
  * ([x], [y], [width], [height]) as a preview while scrubbing.
+ *
+ * @property startMs where the span this thumbnail previews starts.
+ * @property endMs where that span ends.
+ * @property url the sprite sheet, resolved against the sidecar's own URL.
+ * @property x left edge of the crop rectangle in the sprite, px.
+ * @property y top edge of the crop rectangle in the sprite, px.
+ * @property width width of the crop rectangle, px.
+ * @property height height of the crop rectangle, px.
  */
-data class ThumbnailCue(
+public data class ThumbnailCue(
     val startMs: Long,
     val endMs: Long,
     val url: String,
@@ -26,38 +36,39 @@ data class ThumbnailCue(
 
 /**
  * Parses a **WebVTT thumbnails** sidecar (the de-facto trickplay format: each cue's payload is
- * `sprite.jpg#xywh=x,y,w,h`). Sprite URLs are resolved relative to the sidecar's own [baseUrl]. Any parse
+ * `sprite.jpg#xywh=x,y,w,h`). Sprite URLs are resolved against `baseUrl`, the sidecar's own. Any parse
  * failure yields an empty list — thumbnails are optional and must never break playback.
  */
-object VttThumbnails {
-    fun parse(vtt: String, baseUrl: String): List<ThumbnailCue> {
-        val cues = mutableListOf<ThumbnailCue>()
-        for (block in vtt.replace("\r\n", "\n").replace("\r", "\n").split(Regex("\n[ \t]*\n"))) {
-            val lines = block.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-            val timingIdx = lines.indexOfFirst { "-->" in it }
-            if (timingIdx < 0) continue // header / NOTE block
-            val ends = lines[timingIdx].split("-->")
-            val start = parseTimestamp(ends.getOrNull(0)) ?: continue
-            val end = parseTimestamp(ends.getOrNull(1)?.trim()?.substringBefore(' ')) ?: continue
-            val payload = lines.getOrNull(timingIdx + 1) ?: continue
-            val spritePath = payload.substringBefore('#')
-            val xywh = payload.substringAfter("#xywh=", "").split(",")
-            if (spritePath.isEmpty() || xywh.size != XYWH_PARTS) continue
-            val x = xywh[0].trim().toIntOrNull() ?: continue
-            val y = xywh[1].trim().toIntOrNull() ?: continue
-            val w = xywh[2].trim().toIntOrNull() ?: continue
-            val h = xywh[3].trim().toIntOrNull() ?: continue
-            cues += ThumbnailCue(start, end, resolveUrl(baseUrl, spritePath), x, y, w, h)
-        }
-        return cues.sortedBy { it.startMs }
-    }
+internal object VttThumbnails {
+    fun parse(vtt: String, baseUrl: String): List<ThumbnailCue> =
+        vtt.replace("\r\n", "\n").replace("\r", "\n").split(Regex("\n[ \t]*\n"))
+            .mapNotNull { parseCue(it, baseUrl) }
+            .sortedBy { it.startMs }
 
-    private fun resolveUrl(base: String, ref: String): String =
-        if (ref.startsWith("http://") || ref.startsWith("https://")) {
-            ref
-        } else {
-            base.substringBeforeLast('/', "") + "/" + ref
-        }
+    /** One cue block, or null for the header, a NOTE, or anything malformed. */
+    private fun parseCue(block: String, baseUrl: String): ThumbnailCue? {
+        val lines = block.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+        val timingIdx = lines.indexOfFirst { "-->" in it }
+        if (timingIdx < 0) return null
+        val ends = lines[timingIdx].split("-->")
+        val start = parseTimestamp(ends.getOrNull(0))
+        val end = parseTimestamp(ends.getOrNull(1)?.trim()?.substringBefore(' '))
+        val payload = lines.getOrNull(timingIdx + 1)
+        if (start == null || end == null || payload == null) return null
+        val spritePath = payload.substringBefore('#')
+        val rect = payload.substringAfter("#xywh=", "").split(",").map { it.trim().toIntOrNull() }
+        if (spritePath.isEmpty() || rect.size != XYWH_PARTS || rect.any { it == null }) return null
+        val r = rect.requireNoNulls()
+        return ThumbnailCue(
+            startMs = start,
+            endMs = end,
+            url = resolveUrl(baseUrl, spritePath),
+            x = r[0],
+            y = r[1],
+            width = r[2],
+            height = r[XYWH_PARTS - 1],
+        )
+    }
 
     private fun parseTimestamp(raw: String?): Long? {
         val s = raw?.trim().orEmpty()
@@ -99,9 +110,11 @@ object VttThumbnails {
 }
 
 /** The cue whose span contains [positionMs] (or the nearest earlier one), or null when there are none. */
-fun List<ThumbnailCue>.thumbnailAt(positionMs: Long): ThumbnailCue? =
+public fun List<ThumbnailCue>.thumbnailAt(positionMs: Long): ThumbnailCue? =
     lastOrNull { positionMs >= it.startMs } ?: firstOrNull()
 
 /** Load + parse a WebVTT thumbnails sidecar; empty on any failure. */
-internal suspend fun loadThumbnails(url: String): List<ThumbnailCue> =
-    httpGetText(url)?.let { runCatching { VttThumbnails.parse(it, url) }.getOrDefault(emptyList()) } ?: emptyList()
+internal suspend fun loadThumbnails(url: String): List<ThumbnailCue> {
+    val sidecar = httpGet(url) as? HttpResult.Ok ?: return emptyList()
+    return runCatching { VttThumbnails.parse(sidecar.body, sidecar.url) }.getOrDefault(emptyList())
+}

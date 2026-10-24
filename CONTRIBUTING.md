@@ -14,9 +14,10 @@ You need:
 - **Android SDK** with `compileSdk` 37, for the Android targets.
 - **macOS with Xcode**, for the Apple targets. `iosArm64` and `iosSimulatorArm64` cannot be built on
   Linux or Windows — there is no `iosX64`, so an Intel Mac cannot build the simulator target either.
-- **CocoaPods** (`brew install cocoapods`), needed only for the Apple targets of `:analytics:mux` — it
-  binds Mux's iOS SDK through the Kotlin CocoaPods plugin. No other module uses pods; this is also why
-  iOS Mux QoS is not exercised in CI (the runner has no CocoaPods).
+- **CocoaPods** (`brew install cocoapods`), needed only for the Apple targets of `:analytics:mux` and
+  `:analytics:firebase` — they bind Mux's and Firebase's iOS SDKs through the Kotlin CocoaPods plugin.
+  No other module uses pods; this is also why neither adapter's iOS side is exercised in CI (the runner
+  has no CocoaPods).
 
 Everything else comes from the Gradle wrapper.
 
@@ -24,6 +25,7 @@ Everything else comes from the Gradle wrapper.
 ./gradlew build          # assemble and test
 ./gradlew :core:allTests # the full multiplatform test suite
 ./gradlew :core:jvmTest   # just the JVM run — much faster while iterating
+./gradlew :ui:testAndroidHostTest # :ui's tests, of its controls state, on the host JVM
 ```
 
 `:core:allTests` runs the shared `commonTest` suite against every target that can host it, so the same
@@ -81,7 +83,17 @@ Prose documentation lives in `docs/`. Two rules that matter more than style:
 - **New `PlayerState` and config fields arrive with defaults.**
 - At alpha, source-additive changes may still be *binary*-incompatible, because adding a field to a
   data class changes `copy` and `componentN` arity. Consumers recompile. This is called out in
-  [CHANGELOG.md](CHANGELOG.md) whenever it happens.
+  [CHANGELOG.md](CHANGELOG.md) whenever it happens. From 1.0 the previous constructor and `copy` stay
+  behind as hidden overloads instead — see [ADR-0009](docs/decisions/0009-public-model-stays-data-classes.md).
+- **Append data-class fields; never reorder them.** `componentN()` makes their order part of the ABI.
+- **Visibility is declared, never defaulted.** The published modules build in explicit API mode. Make a
+  declaration `public` only when consumers need it: demoting it later is a breaking change, and
+  promoting an `internal` one is not.
+- **The ABI dumps are the record of the public API.** Each published module checks its ABI into `api/`,
+  and `./gradlew checkKotlinAbi` (part of `check`, and run on every pull request) fails when the compiled
+  ABI differs. When the change is intended, run `./gradlew updateKotlinAbi` and commit the dump with it,
+  so the diff gets reviewed. Android-only declarations are not in the dumps, so review changes to their
+  `androidMain` API by eye.
 
 ## Branching
 

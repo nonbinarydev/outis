@@ -60,6 +60,7 @@ Small and additive; every field has a default.
 | `audioConfig: AudioConfig?` | `null` | Audio focus + become-noisy (Android), mix-with-others (iOS `AVAudioSession`). **No-op on Web**. |
 | `liveConfig: LiveConfig?` | `null` | Live tuning — target offset + catch-up speed (Android), target offset (iOS), low-latency mode (Web). |
 | `components: List<PlayerComponent>` | `[]` | Extensions registered at construction — see [analytics.md](analytics.md). |
+| `smilSelector: SmilSelector` | `SmilSelector.Platform` | Which rendition of a SMIL source to play — see [SMIL](#smil). |
 
 ### `BufferConfig`
 
@@ -100,13 +101,13 @@ you care about deliberately. **iOS (AVPlayer)** maps only
 player.setMediaItem(item, autoPlay = true)   // prepare is folded in; starts when ready if autoPlay
 ```
 
-A `MediaItem` describes **what** to play. All fourteen parameters, in declaration order:
+A `MediaItem` describes **what** to play. All seventeen parameters, in declaration order:
 
 ```kotlin
 data class MediaItem(
     val source: MediaSource,                                            // required
     val mimeType: MimeType? = null,                                     // null => infer from the URL extension
-    val headers: ImmutableMap<String, String> = persistentMapOf(),
+    val headers: Map<String, String> = emptyMap(),                      // manifest/segment requests
     val drmConfig: DrmConfig? = null,                                   // see drm.md
     val videoConstraints: VideoConstraints? = null,                     // see §7
     // ----- load-time defaults (applied before first frame) -----
@@ -114,30 +115,33 @@ data class MediaItem(
     val preferredTextLanguage: String? = null,                          // BCP-47, e.g. "en"
     val captionsDefault: CaptionsDefaultMode = CaptionsDefaultMode.OFF, // OFF / ON / FOLLOW_SYSTEM
     val startPositionMs: Long? = null,                                  // resume / deep-link
-    val startMuted: Boolean = false,                                    // required for Web autoplay
+    val startMuted: Boolean = false,                                    // a muted start by design; web retries muted itself
     val loop: Boolean = false,                                          // restart at end; ignored for live
     // -----
     val adConfig: AdConfig? = null,                                     // see ads-client-side.md / ads-server-side.md
     val metadata: MediaMetadata? = null,                                // title/subtitle/artwork for overlays
     val chapterThumbnails: Boolean = false,                             // see local-files.md
+    val chaptersUrl: String? = null,                                    // WebVTT chapters sidecar, any engine
+    val thumbnailsUrl: String? = null,                                  // WebVTT trickplay sidecar, any engine
+    val analytics: PlaybackMetadata? = null,                            // see analytics.md
 )
 ```
 
-`headers` is an `ImmutableMap` from `kotlinx.collections.immutable`. `:core` declares that dependency
-as `implementation`, not `api`, so you must add `kotlinx-collections-immutable` to your own build
-before you can call `persistentMapOf` — see [troubleshooting.md](troubleshooting.md).
+`headers` is a plain `Map`, so `mapOf("Authorization" to "Bearer $token")` is all it takes.
 
 ### Source and container
 
-- **`MediaSource`** is sealed: `MediaSource.Url("https://…")` for progressive MP4, HLS or DASH, or
-  `MediaSource.LocalFile("/absolute/path")` for an on-device file. `LocalFile` is **played by all
+- **`MediaSource`** is sealed: `MediaSource.Url("https://…")` for progressive MP4, HLS or DASH,
+  `MediaSource.LocalFile("/absolute/path")` for an on-device file, or `MediaSource.Smil("https://…")`
+  for a SMIL document listing an asset's manifests ([below](#smil)). `LocalFile` is **played by all
   three engines today** (Media3 `setUri`, `NSURL.fileURLWithPath`, and the native `<video>` on web) —
   a `LocalFile` is always treated as progressive, never adaptive. A `file://` URL is accepted by
   `MediaSource.Url` and recognised as local. See [local-files.md](local-files.md) for what each
   platform can actually read.
-- **`MimeType`** is `MP4`, `HLS` or `DASH`. Leave it `null` to infer from the URL extension (`.m3u8` →
-  HLS, `.mpd` → DASH, `.mp4`/`.webm` → progressive); set it explicitly for extension-less or signed
-  URLs. There is no `MimeType.MKV` — Matroska is a progressive local-file case.
+- **`MimeType`** is `MP4`, `HLS`, `DASH` or `WEBM`. Leave it `null` to infer from the URL extension
+  (`.m3u8` → HLS, `.mpd` → DASH, `.mp4`/`.webm` → progressive, `.smil` → a SMIL document); set it
+  explicitly for extension-less or signed URLs. There is no `MimeType.MKV` — Matroska is a progressive
+  local-file case.
 - **`headers`** apply to manifest and segment requests on Android, iOS and Web. Web caveat: a
   *progressive* MP4/WebM plays through the browser's native `<video>`, which cannot take custom
   request headers, so headers apply only to Shaka-managed HLS/DASH there.
@@ -169,7 +173,7 @@ player.setMediaItem(
     MediaItem(
         source = MediaSource.Url("https://cdn.example.com/live/master.m3u8"),
         mimeType = MimeType.HLS,
-        headers = persistentMapOf("Authorization" to "Bearer $token"),
+        headers = mapOf("Authorization" to "Bearer $token"),
         metadata = MediaMetadata(title = "Channel 1", subtitle = "Live"),
     ),
     autoPlay = true,
@@ -181,6 +185,61 @@ player.setMediaItem(
 > must be `avc1`, not in-band-parameter-set `avc3`. See the
 > [capability matrix](../README.md#capability-matrix) and
 > [platform-support.md](platform-support.md).
+
+### SMIL
+
+Some backends publish a SMIL document per asset, listing the manifests it is packaged as — an HLS and
+a DASH over the same content. Hand the player the document and it picks one:
+
+```kotlin
+player.setMediaItem(MediaItem(MediaSource.Smil("https://api.example.com/assets/42")), autoPlay = true)
+
+// A URL whose path ends in .smil is recognised without the wrapper, when mimeType is null:
+player.setMediaItem(MediaItem(MediaSource.Url("https://cdn.example.com/42/index.smil")), autoPlay = true)
+```
+
+No engine reads SMIL, so the player fetches the document, picks a rendition, and loads it as an
+ordinary `MediaSource.Url` with the rendition's format as its `mimeType`. That costs one round trip
+before the first frame; if you already hold the document, resolve it yourself and pass the manifest
+URL instead.
+
+- **Which rendition.** `PlayerConfig.smilSelector` decides. The default, `SmilSelector.Platform`,
+  takes the first DASH or HLS rendition the engine plays — DASH before HLS on Android and the web, HLS
+  alone on iOS — trying the DRM scheme's format first: HLS for FairPlay, DASH for Widevine and
+  PlayReady. It never picks a progressive rendition, and prefers `video` elements to `audio` ones.
+  Vendors signal formats differently, so a selector of your own sees every attribute and `<param>` on
+  each element:
+
+  ```kotlin
+  @OptIn(ExperimentalPlayerApi::class)
+  val config = PlayerConfig(
+      smilSelector = SmilSelector { renditions, _ ->
+          renditions.firstOrNull { it.attributes["system-profile"] == "hls-fmp4" }
+      },
+  )
+  ```
+
+  Returning `null` fails the load.
+- **URLs.** A relative `src` resolves the way a browser resolves a link, against the document's base:
+  the URL it was served from after redirects, or a base the document sets (`<meta name="base">`,
+  `<meta base>`, Wowza's `httpBase`, `xml:base`). Only elements and attributes are read — a DOCTYPE
+  is skipped, so no entity it declares is ever expanded.
+- **Headers.** `MediaItem.headers` go with the document request. They stay on the item only when the
+  chosen rendition shares the document's origin, so a token meant for your API never reaches a
+  third-party CDN.
+- **While it resolves**, the previous item is already stopped and the state reads idle. `play()`,
+  `pause()` and `seekTo()` set the play intent and start position the rendition loads with.
+- **Failures.** An HTTP error status, a document that is not SMIL, or no rendition the selector
+  accepts fails the load as `SOURCE`; no response at all is `NETWORK`. The document request is made
+  once, with `RetryConfig.readTimeoutMs` (30 s by default) as its timeout. The failed state carries
+  the item as you set it, like any failed load.
+- **Once it resolves**, `PlayerState.mediaItem` and `MediaItemTransition` carry the resolved item —
+  the rendition's URL and format, and whichever headers were kept — not the SMIL item you set.
+- **Web:** the document is fetched with `fetch`, so its host must allow CORS, as a manifest host
+  already must.
+
+Wowza's older convention, a `<switch>` of progressive `mp4:` rungs with no manifest, is out of scope:
+playing one rung would lose adaptive bitrate ([ADR-0007](decisions/0007-smil-resolved-before-the-engine.md)).
 
 ---
 
@@ -246,10 +305,9 @@ scope.launch {
 | `videoSize: VideoSize?` | Decoded frame dimensions. **Android only** — the iOS and Web engines always leave this `null`, so never gate layout on it. |
 | `mediaItem: MediaItem?` | What's loaded, so late subscribers read "what's playing" without replaying events. |
 | `error: PlayerError?` | Non-null after a fatal error, and **sticky** until the next load or release. See [§8](#8-error-handling-and-recovery). |
-| `audioTracks`, `textTracks`, `selectedAudioTrackId`, `selectedTextTrackId` | See [§5](#5-track-selection-audio-and-subtitles). |
-| `chapters: ImmutableList<Chapter>` | Embedded chapter markers from a **local** container, sorted by start. Populated on Android and iOS; always empty on Web. They arrive **asynchronously**, as a second state emission after load — see [local-files.md](local-files.md). |
+| `audioTracks`, `textTracks`, `videoTracks` and their `selected…TrackId`s | See [§5](#5-track-selection-audio-and-subtitles). |
+| `chapters: List<Chapter>` | Chapter markers, sorted by start: from the `chaptersUrl` WebVTT sidecar on any engine, otherwise embedded in a **local** MP4/Matroska file (Android and iOS). They arrive **asynchronously**, as a second state emission after load — see [local-files.md](local-files.md). |
 | `adState: AdState?` | Client-side ad playback, written by the engine on Android and Web only. `null` outside an ad. Server-side ads do **not** populate this — see [ads-server-side.md](ads-server-side.md). |
-| `currentTrack`, `availableTracks` | **Reserved.** Video rendition/quality selection is not implemented; nothing ever writes these. |
 
 ### `events: SharedFlow<PlayerEvent>` — analytics and one-shot reactions
 
@@ -273,10 +331,12 @@ scope.launch {
 
 All three engines emit `BufferingStarted` / `BufferingEnded`, `SeekStarted(targetMs)` /
 `SeekCompleted`, `FirstFrameRendered`, `MediaItemTransition(item)`, `PlaybackStateChanged(state)`,
-`IsPlayingChanged(isPlaying)`, `TracksChanged(audioTracks, textTracks)`,
+`IsPlayingChanged(isPlaying)`, `TracksChanged(audioTracks, textTracks, videoTracks)`,
 `NativePlayerAttached(handle)`, `Ended` and `FatalError(error)`. `BufferingStarted` also fires for the
 *initial* buffering of a new item, so don't count every one as a rebuffer — use `FirstFrameRendered`
-to tell startup from rebuffering.
+to tell startup from rebuffering. It marks a frame actually rendered on Android (and fires again when
+the surface is re-attached), but the earlier item-ready moment on iOS and web, so startup measured
+against it reads slightly short there.
 
 Two groups are **not** emitted everywhere:
 
@@ -330,8 +390,10 @@ player.clearTextTrack()           // subtitles OFF (selectedTextTrackId becomes 
 ```
 
 `selectedTextTrackId == null` means subtitles **off**, not "unknown". `selectedAudioTrackId == null`
-means the opposite — the engine has not reported a selection yet. `TrackType.VIDEO` exists in the
-enum but engines ignore selection of a video track. Cue *rendering* is a surface concern: the `:ui`
+means the opposite — the engine has not reported a selection yet. `videoTracks` are alternate
+*versions* of the programme — a remaster beside an original transfer — never the bitrate ladder, which the
+engine adapts within on its own; Android and web report them, iOS reports none yet, and most streams
+have none. Cue *rendering* is a surface concern: the `:ui`
 `PlayerSurface` renders the selected text track natively, and the overlay's subtitle and audio
 buttons drive the calls above for you — see [ui.md](ui.md).
 

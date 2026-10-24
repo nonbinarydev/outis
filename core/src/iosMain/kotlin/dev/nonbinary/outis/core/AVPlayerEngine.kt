@@ -12,25 +12,24 @@ import dev.nonbinary.outis.core.ads.AdState
 import dev.nonbinary.outis.core.chapters.Chapter
 import dev.nonbinary.outis.core.chapters.ChapterExtractor
 import dev.nonbinary.outis.core.chapters.ChapterReader
+import dev.nonbinary.outis.core.chapters.declaredChapters
 import dev.nonbinary.outis.core.chapters.loadSidecarChapters
 import dev.nonbinary.outis.core.plugin.PlayerComponent
 import dev.nonbinary.outis.core.plugin.PlayerHost
 import dev.nonbinary.outis.core.source.CaptionsDefaultMode
+import dev.nonbinary.outis.core.source.DrmConfig
 import dev.nonbinary.outis.core.source.DrmScheme
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
+import dev.nonbinary.outis.core.source.deviceDrmSupport
+import dev.nonbinary.outis.core.source.unsupportedDrmError
 import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
 import kotlinx.cinterop.BetaInteropApi
-import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.reinterpret
-import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,12 +46,10 @@ import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryOptionMixWithOthers
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.setActive
-import platform.AVFoundation.AVAssetTrack
 import platform.AVFoundation.AVMediaCharacteristicAudible
 import platform.AVFoundation.AVMediaCharacteristicLegible
 import platform.AVFoundation.AVMediaSelectionGroup
 import platform.AVFoundation.AVMediaSelectionOption
-import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVPlayerItemDidPlayToEndTimeNotification
@@ -72,7 +69,6 @@ import platform.AVFoundation.currentTime
 import platform.AVFoundation.duration
 import platform.AVFoundation.error
 import platform.AVFoundation.extendedLanguageTag
-import platform.AVFoundation.formatDescriptions
 import platform.AVFoundation.mediaSelectionGroupForMediaCharacteristic
 import platform.AVFoundation.muted
 import platform.AVFoundation.playbackBufferEmpty
@@ -92,21 +88,11 @@ import platform.AVFoundation.setRate
 import platform.AVFoundation.setVolume
 import platform.AVFoundation.status
 import platform.AVFoundation.timeControlStatus
-import platform.AVFoundation.tracksWithMediaType
 import platform.AVFoundation.volume
-import platform.CoreFoundation.CFStringGetCStringPtr
-import platform.CoreFoundation.kCFStringEncodingUTF8
 import platform.CoreGraphics.CGSizeMake
-import platform.CoreMedia.CMFormatDescriptionGetExtension
-import platform.CoreMedia.CMFormatDescriptionGetMediaSubType
-import platform.CoreMedia.CMFormatDescriptionRef
 import platform.CoreMedia.CMTimeGetSeconds
 import platform.CoreMedia.CMTimeMake
 import platform.CoreMedia.CMTimeMakeWithSeconds
-import platform.CoreMedia.kCMFormatDescriptionExtension_TransferFunction
-import platform.CoreVideo.CVBufferGetAttachment
-import platform.CoreVideo.CVBufferRelease
-import platform.CoreVideo.kCVImageBufferTransferFunctionKey
 import platform.Foundation.NSError
 import platform.Foundation.NSNotification
 import platform.Foundation.NSNotificationCenter
@@ -151,9 +137,12 @@ private val liveEngines = mutableSetOf<AVPlayerEngine>()
  * **Memory.** Observer/notification closures capture only a [WeakReference] back to the engine
  * (AVFoundation retains the closures); [liveEngines] keeps the engine alive until [release].
  */
+// Over the LargeClass threshold. Track selection — loadTracks through applyTrackPreferences and the
+// three fields they share — is the next piece to split out, once an iOS test host can catch a mistake.
+@Suppress("LargeClass")
 internal class AVPlayerEngine(
     private val config: PlayerConfig,
-) : VideoPlayer {
+) : PlatformEngine {
 
     private val _state = MutableStateFlow(PlayerState(volume = config.initialVolume))
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
@@ -228,6 +217,11 @@ internal class AVPlayerEngine(
     @Suppress("CyclomaticComplexMethod")
     override fun setMediaItem(item: MediaItem, autoPlay: Boolean) = onMain {
         val avPlayer = player ?: return@onMain
+        // Fail fast on DRM AVFoundation can't serve, rather than as a source error once it tries.
+        item.drmConfig?.let(::drmPreflightError)?.let { error ->
+            failLoad(item, error)
+            return@onMain
+        }
         removeItemObservers()
         endedFlag = false
         errorEmitted = false
@@ -246,6 +240,8 @@ internal class AVPlayerEngine(
         val url = when (val source = item.source) {
             is MediaSource.Url -> NSURL(string = source.url)
             is MediaSource.LocalFile -> NSURL.fileURLWithPath(source.path)
+            // Unreachable: SmilResolvingPlayer swaps a SMIL source for its chosen rendition first.
+            is MediaSource.Smil -> NSURL(string = source.url)
         }
         // Manifest/segment request headers. AVFoundation reads them from the (private but long-stable)
         // "AVURLAssetHTTPHeaderFieldsKey" option; the public constant isn't exposed to Kotlin/Native, so
@@ -322,12 +318,14 @@ internal class AVPlayerEngine(
                 playWhenReady = autoPlay,
                 isMuted = muted,
                 playbackState = PlaybackState.BUFFERING,
-                audioTracks = persistentListOf(),
-                textTracks = persistentListOf(),
+                audioTracks = emptyList(),
+                textTracks = emptyList(),
                 selectedAudioTrackId = null,
                 selectedTextTrackId = null,
-                chapters = persistentListOf(),
-                thumbnails = persistentListOf(),
+                videoTracks = emptyList(),
+                selectedVideoTrackId = null,
+                chapters = item.declaredChapters,
+                thumbnails = emptyList(),
             )
         }
         emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
@@ -398,7 +396,7 @@ internal class AVPlayerEngine(
      * [PlayerState.adState] so the shared chrome blocks seeking during ads. The iOS counterpart of the
      * Media3 engine deriving ad state internally on Android: here the content [player] is paused/resumed by
      * the coordinator (IMA iOS uses content pause/resume, not a stitched timeline), so no position guarding
-     * is needed. `null` clears it (content resumed). Driven via the public [updateAdState] bridge.
+     * is needed. `null` clears it (content resumed). Driven via the public `setAdState` bridge.
      */
     internal fun setAdState(adState: AdState?) = onMain {
         _state.update { it.copy(adState = adState) }
@@ -444,11 +442,26 @@ internal class AVPlayerEngine(
                 videoSize = null,
                 videoRange = VideoRange.SDR,
                 error = null,
-                audioTracks = persistentListOf(),
-                textTracks = persistentListOf(),
+                audioTracks = emptyList(),
+                textTracks = emptyList(),
                 selectedAudioTrackId = null,
                 selectedTextTrackId = null,
+                videoTracks = emptyList(),
+                selectedVideoTrackId = null,
+                chapters = emptyList(),
+                thumbnails = emptyList(),
             )
+        }
+    }
+
+    override fun failLoad(item: MediaItem, error: PlayerError) {
+        stop()
+        onMain {
+            if (player == null) return@onMain
+            errorEmitted = true
+            _state.update { it.copy(mediaItem = item, error = error) }
+            emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
+            emit { p, t -> PlayerEvent.FatalError(error, p, t) }
         }
     }
 
@@ -607,13 +620,13 @@ internal class AVPlayerEngine(
         val text = buildTracks(item, textGroup, TrackType.TEXT)
         _state.update {
             it.copy(
-                audioTracks = audio.toPersistentList(),
-                textTracks = text.toPersistentList(),
+                audioTracks = audio.toList(),
+                textTracks = text.toList(),
                 selectedAudioTrackId = audio.firstOrNull { t -> t.isSelected }?.id,
                 selectedTextTrackId = text.firstOrNull { t -> t.isSelected }?.id,
             )
         }
-        emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
+        emit { p, t -> _state.value.tracksChanged(p, t) }
     }
 
     /**
@@ -628,13 +641,14 @@ internal class AVPlayerEngine(
             if (thumbs.isEmpty()) return@launch
             onMain {
                 if (!released && _state.value.mediaItem === item) {
-                    _state.update { it.copy(thumbnails = thumbs.toPersistentList()) }
+                    _state.update { it.copy(thumbnails = thumbs.toList()) }
                 }
             }
         }
     }
 
     private fun extractChaptersFor(item: MediaItem) {
+        if (item.chapters != null) return // declared chapters are already in state, and win
         // A WebVTT sidecar wins over embedded chapters and is the only source that works for remote/HLS.
         item.chaptersUrl?.let { sidecar ->
             scope.launch(Dispatchers.Default) {
@@ -642,7 +656,7 @@ internal class AVPlayerEngine(
                 if (chapters.isEmpty()) return@launch
                 onMain {
                     if (!released && _state.value.mediaItem === item) {
-                        _state.update { it.copy(chapters = chapters.toPersistentList()) }
+                        _state.update { it.copy(chapters = chapters.toList()) }
                     }
                 }
             }
@@ -651,6 +665,7 @@ internal class AVPlayerEngine(
         val path = when (val s = item.source) {
             is MediaSource.LocalFile -> s.path
             is MediaSource.Url -> if (s.url.startsWith("file://")) s.url.removePrefix("file://") else return
+            is MediaSource.Smil -> return
         }
         // Off the main thread: title parsing reads only small ranges, but thumbnail extraction
         // (MediaItem.chapterThumbnails) can read multi-MB image samples, which must not block the UI.
@@ -670,7 +685,7 @@ internal class AVPlayerEngine(
             onMain {
                 // Only apply if this is still the current item (a newer setMediaItem must not be clobbered).
                 if (!released && _state.value.mediaItem === item) {
-                    _state.update { it.copy(chapters = chapters.toPersistentList()) }
+                    _state.update { it.copy(chapters = chapters.toList()) }
                 }
             }
         }
@@ -702,17 +717,17 @@ internal class AVPlayerEngine(
                     it.copy(
                         isSelected = trackOptions[it.id]?.second == audioSel
                     )
-                }.toPersistentList(),
+                },
                 textTracks = st.textTracks.map {
                     it.copy(
                         isSelected = trackOptions[it.id]?.second == textSel
                     )
-                }.toPersistentList(),
+                },
                 selectedAudioTrackId = st.audioTracks.firstOrNull { trackOptions[it.id]?.second == audioSel }?.id,
                 selectedTextTrackId = st.textTracks.firstOrNull { trackOptions[it.id]?.second == textSel }?.id,
             )
         }
-        emit { p, t -> PlayerEvent.TracksChanged(_state.value.audioTracks, _state.value.textTracks, p, t) }
+        emit { p, t -> _state.value.tracksChanged(p, t) }
     }
 
     /**
@@ -764,6 +779,9 @@ internal class AVPlayerEngine(
 
     // ---- state reconciliation (polled on the main queue) ----
 
+    // A per-item AVPlayerItemVideoOutput used only to sample the decoded frame's colour range for HLS.
+    private var videoOutput: AVPlayerItemVideoOutput? = null
+
     // Maps the whole of AVPlayer/AVPlayerItem state onto one PlayerState in a single pass: status,
     // rate, buffering, seekable/loaded ranges, tracks and errors. The branch count mirrors the number
     // of native properties, and reading them together is what makes the snapshot coherent.
@@ -771,65 +789,12 @@ internal class AVPlayerEngine(
     // This suppression is a stopgap, not a claim that the function is irreducible. Three contiguous
     // blocks — the stall self-heal, the lazy track load, and the derived-event emission — are pure
     // code motion into private methods and would bring this well under the threshold. What is missing
-    // is a way to catch a regression: there is no iosTest source set and no CI, and a mistake here
-    // shows up as state flapping or unpaired BufferingStarted/Ended rather than a compile error.
+    // is a way to catch a regression: CI runs only the common tests on the simulator, nothing exercises
+    // this engine, and a mistake here shows up as state flapping or unpaired BufferingStarted/Ended
+    // rather than a compile error. An iOS test host unblocks it.
     // ShakaEngine.reconcile is deliberately the line-for-line mirror of this one, so refactor both
     // together or not at all.
     @Suppress("CyclomaticComplexMethod")
-    // 'dvh1' / 'dvhe' as FourCharCode — the Dolby Vision HEVC sample-entry codec types.
-    private val fourCcDvh1: UInt = 0x64766831u
-    private val fourCcDvhe: UInt = 0x64766865u
-
-    // A per-item AVPlayerItemVideoOutput used only to sample the decoded frame's colour range for HLS.
-    private var videoOutput: AVPlayerItemVideoOutput? = null
-
-    /**
-     * Colour range of the current video. Two sources, because AVFoundation surfaces this differently by
-     * container:
-     *  1. Progressive / local — the asset's video track has a [CMFormatDescription]: Dolby Vision from the
-     *     codec sub-type, HDR10/HLG from the transfer-function extension. Exact, incl. DV.
-     *  2. HLS — the asset exposes **no** video track (HLS uses internal variants), so we read the decoded
-     *     frame's transfer function off the [videoOutput] tap. This tells HDR10/HLG/SDR but **cannot** tell
-     *     Dolby Vision apart from HDR10 (DV decodes to a PQ buffer). Apple surfaces no per-variant codec.
-     * Pointer identity against the interned transfer constants throughout — CFEqual isn't importable in K/N.
-     */
-    @OptIn(ExperimentalForeignApi::class)
-    private fun currentVideoRange(item: AVPlayerItem?, fallback: VideoRange): VideoRange {
-        val tracks = item?.asset?.tracksWithMediaType(AVMediaTypeVideo)
-        val track = tracks?.firstOrNull() as? AVAssetTrack
-        val desc = track?.formatDescriptions?.firstOrNull() as? CMFormatDescriptionRef
-        if (desc != null) {
-            val sub = CMFormatDescriptionGetMediaSubType(desc)
-            if (sub == fourCcDvh1 || sub == fourCcDvhe) return VideoRange.DOLBY_VISION
-            val ext = CMFormatDescriptionGetExtension(desc, kCMFormatDescriptionExtension_TransferFunction)
-            return transferToRange(ext) ?: VideoRange.SDR
-        }
-        // HLS: no video AVAssetTrack — read the decoded frame's transfer function off the video-output tap.
-        val output = videoOutput
-        val time = item?.currentTime()
-        val hasNew = output != null && time != null && output.hasNewPixelBufferForItemTime(time)
-        val buffer = when {
-            !hasNew || output == null || time == null -> null
-            else -> output.copyPixelBufferForItemTime(time, null)
-        }
-        val tf = buffer?.let { CVBufferGetAttachment(it, kCVImageBufferTransferFunctionKey, null) }
-        val range = if (buffer == null) fallback else (transferToRange(tf) ?: VideoRange.SDR)
-        buffer?.let { CVBufferRelease(it) }
-        return range
-    }
-
-    /** HDR range from a CoreVideo/CoreMedia transfer-function value, matched by string — pointer identity fails. */
-    private fun transferToRange(cf: COpaquePointer?): VideoRange? = when (cfStringValue(cf)) {
-        "SMPTE_ST_2084_PQ" -> VideoRange.HDR10
-        "ITU_R_2100_HLG" -> VideoRange.HLG
-        null -> null
-        else -> VideoRange.SDR
-    }
-
-    /** A CFString's value as a Kotlin string, or null. */
-    private fun cfStringValue(cf: COpaquePointer?): String? =
-        cf?.let { CFStringGetCStringPtr(it.reinterpret(), kCFStringEncodingUTF8)?.toKString() }
-
     private fun reconcile() {
         val avPlayer = player ?: return
         val item = avPlayer.currentItem
@@ -887,7 +852,7 @@ internal class AVPlayerEngine(
                 // which would otherwise flicker isLive=true for a tick.
                 isLive = itemReady && durationMs == null && item?.seekableTimeRanges?.isNotEmpty() == true,
                 isSeekable = itemReady,
-                videoRange = currentVideoRange(item, it.videoRange),
+                videoRange = videoRangeOf(item, videoOutput, it.videoRange),
             )
         }
 
@@ -985,31 +950,6 @@ internal class AVPlayerEngine(
     }
 }
 
-/**
- * Push client-side-ad (CSAI) state into [player]'s [PlayerState.adState], or `null` to clear it once the ad
- * break ends. Called by an iOS IMA adapter that owns the Google IMA SDK: that SDK is UIView/
- * UIViewController-centric and pulled in via CocoaPods/cinterop, so it lives in the integration layer (the
- * app or a dedicated module) rather than the pod-free core — this bridge is how it drives the shared chrome,
- * the iOS parallel of Android's `VideoPlayer.setAdViewProvider`. The coordinator pauses/resumes the content
- * player itself (IMA iOS' content pause/resume model). A no-op for any [VideoPlayer] that isn't the AVPlayer engine.
- */
-fun VideoPlayer.updateAdState(adState: AdState?) {
-    (this as? AVPlayerEngine)?.setAdState(adState)
-}
-
-/**
- * Register the iOS ad-container surface — the `AVPlayerViewController` created by the `:ui` PlayerSurface —
- * with the engine, or `null` to detach it. An iOS IMA adapter reads it back via [adContainer] to anchor
- * IMA's ad UI (`IMAAdDisplayContainer`: its view + presenting view controller) over the video. The iOS
- * parallel of Android's `VideoPlayer.setAdViewProvider`; a no-op for any non-AVPlayer [VideoPlayer].
- */
-fun VideoPlayer.setAdContainer(controller: UIViewController?) {
-    (this as? AVPlayerEngine)?.setAdContainer(controller)
-}
-
-/** The registered ad-container view controller (see [setAdContainer]), or `null`. Used by the iOS IMA adapter. */
-fun VideoPlayer.adContainer(): UIViewController? = (this as? AVPlayerEngine)?.adContainer()
-
 /** A [ChapterReader] over a local file via POSIX read/lseek, so the shared [ChapterExtractor] runs on iOS too. */
 private class PosixChapterReader(
     private val fd: Int,
@@ -1034,3 +974,14 @@ private const val STALL_RECOVERY_COOLDOWN_MS = 15_000L // minimum gap between st
 
 /** Monotonic clock in ms for event timing (no wall-clock meaning). */
 private fun monotonicMillis(): Long = (CACurrentMediaTime() * 1000).toLong()
+
+/**
+ * Why [drm] cannot work here, known before AVFoundation is asked — Widevine and PlayReady have no Apple CDM,
+ * the simulator has no FairPlay, and FairPlay cannot start without its certificate — or `null` when it may.
+ */
+private fun drmPreflightError(drm: DrmConfig): PlayerError? = when {
+    drm.scheme !in deviceDrmSupport.schemes -> unsupportedDrmError(drm)
+    drm.scheme == DrmScheme.FAIRPLAY && drm.certificateUrl == null ->
+        PlayerError(PlayerError.Category.DRM, message = "FairPlay needs DrmConfig.certificateUrl")
+    else -> null
+}

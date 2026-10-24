@@ -7,5 +7,4 @@
 package dev.nonbinary.outis.core
 
 /** iOS [AppContext] — AVPlayer needs no host context. */
-@Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
-actual class AppContext
+public actual class AppContext

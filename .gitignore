@@ -46,6 +46,12 @@ DerivedData/
 *.dSYM.zip
 Pods/
 
+# ─── Firebase ────────────────────────────────────────────────────────────────
+# Each identifies a real Firebase project, so the sample ships only .example copies. Without them the
+# sample builds and runs Firebase-free.
+google-services.json
+GoogleService-Info.plist
+
 # ─── Web / Node ──────────────────────────────────────────────────────────────
 node_modules/
 .yarn/
@@ -111,3 +117,4 @@ Thumbs.db
 
 # Generated demo media (build-demo-media.sh output — regenerate, do not commit)
 demo-media-out/
+sollevante-media-out/

@@ -7,16 +7,18 @@
 package dev.nonbinary.outis.core.chapters
 
 /**
- * A chapter marker embedded in the media container — MP4/M4V (QuickTime `chap` text-track or Nero `chpl`)
- * or Matroska `Chapters`. Surfaced on [dev.nonbinary.outis.core.PlayerState.chapters], sorted by [startMs].
+ * A chapter marker, surfaced on [dev.nonbinary.outis.core.PlayerState.chapters] sorted by [startMs]. It is
+ * declared on the item ([dev.nonbinary.outis.core.source.MediaItem.chapters]), read from a WebVTT sidecar,
+ * or embedded in the media container — MP4/M4V (QuickTime `chap` text track or Nero `chpl`) or Matroska
+ * `Chapters`.
  *
- * [endMs] is the next chapter's [startMs] (or the media duration for the last chapter), filled in when the
- * boundaries are known; `null` when only start points were available.
+ * For container chapters, [endMs] is the next chapter's [startMs] (or the media duration for the last
+ * chapter), filled in when the boundaries are known; `null` when only start points were available.
  */
-data class Chapter(
+public data class Chapter(
     /** Start of the chapter on the content timeline, in milliseconds. */
     val startMs: Long,
-    /** Chapter title, if the container carried one. */
+    /** Chapter title, if the source carried one. */
     val title: String? = null,
     /** Exclusive end on the timeline, in ms — derived (next start / duration), or `null` if unknown. */
     val endMs: Long? = null,

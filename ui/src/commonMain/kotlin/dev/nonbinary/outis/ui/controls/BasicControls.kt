@@ -67,7 +67,6 @@ import dev.nonbinary.outis.core.thumbnails.ThumbnailCue
 import dev.nonbinary.outis.core.thumbnails.thumbnailAt
 import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
 import dev.nonbinary.outis.ui.formatTime
-import kotlinx.collections.immutable.ImmutableList
 import kotlin.math.roundToInt
 
 /** Default rates offered by [PlaybackSpeedButton], as multipliers of normal speed. */
@@ -86,7 +85,7 @@ private val DefaultPlaybackSpeeds = listOf(0.5f, 1f, 1.25f, 1.5f, 2f)
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun PlayPauseButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun PlayPauseButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
     // Always enabled (so it stays D-pad-focusable even in IDLE); the click no-ops when there's nothing to do.
     IconButton(onClick = state::playPause, modifier = modifier.controlFocusRing()) {
         Icon(
@@ -103,7 +102,7 @@ fun PlayPauseButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun BigPlayButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun BigPlayButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
     IconButton(onClick = state::playPause, modifier = modifier.size(72.dp).controlFocusRing()) {
         Icon(
             imageVector = if (state.showPlayIcon) Icons.Filled.PlayArrow else Icons.Filled.Pause,
@@ -123,12 +122,14 @@ fun BigPlayButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
  *
  * Dragging only moves the preview position; the seek is issued on release. If the scrubber leaves
  * composition mid-drag the scrub is abandoned without seeking, so the auto-hide latch is not stuck on.
- * The slider is disabled (but still drawn) while [PlayerControlsState.isSeekable] is `false`.
+ * The slider is disabled (but still drawn) while [PlayerControlsState.isSeekable] is `false` or a
+ * server-side ad plays ([PlayerControlsState.isInAdBreak]). Chapter starts are marked with dots, and
+ * server-side ad breaks with amber ticks.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @ExperimentalPlayerUiApi
 @Composable
-fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
     val duration = state.durationMs
     // No scrubbable timeline yet (live edge or unresolved duration).
     if (state.isLive || duration == null || duration <= 0L) return
@@ -160,12 +161,14 @@ fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
             line(1f, colors.onSurface.copy(alpha = 0.2f)) // base
             if (buffered > 0f) line(buffered, colors.onSurface.copy(alpha = 0.45f)) // buffered-ahead
             if (played > 0f) line(played, colors.primary) // played
-            // Chapter ticks — a dot at each chapter start; skip 0:00 (it sits under the track's left cap).
-            val markerRadius = ScrubberTrackHeight.toPx()
-            state.chapters.forEach { chapter ->
-                if (chapter.startMs <= 0L) return@forEach
-                val fraction = (chapter.startMs.toFloat() / duration).coerceIn(0f, 1f)
-                drawCircle(colors.onSurface, radius = markerRadius, center = Offset(startX + span * fraction, cy))
+            // Markers at 0:00 would sit under the track's left cap, so they are skipped.
+            fun xAt(ms: Long) = startX + span * (ms.toFloat() / duration).coerceIn(0f, 1f)
+            state.chapters.map { it.startMs }.filter { it > 0L }.forEach { ms ->
+                drawCircle(colors.onSurface, radius = stroke, center = Offset(xAt(ms), cy))
+            }
+            state.adCuePoints.filter { it > 0L }.forEach { ms ->
+                val x = xAt(ms)
+                drawLine(AdMarkerColor, Offset(x, cy - stroke * 2f), Offset(x, cy + stroke * 2f), strokeWidth = stroke)
             }
             drawCircle(colors.primary, radius = r, center = Offset(startX + span * played, cy))
         }
@@ -174,7 +177,7 @@ fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
             onValueChange = { state.onScrubMove(it.toLong()) },
             onValueChangeFinished = state::onScrubCommit,
             valueRange = 0f..duration.toFloat(),
-            enabled = state.isSeekable,
+            enabled = state.isSeekable && !state.isInAdBreak,
             // Invisible: the canvas above is the visual. The ScrubberThumbSize thumb keeps the value→x
             // mapping matched to the drawn dot; the full-height track box makes the whole ScrubberTouchHeight
             // band draggable, so the thin visual line isn't a pixel-precise target (was hard to grab).
@@ -198,17 +201,17 @@ fun Scrubber(state: PlayerControlsState, modifier: Modifier = Modifier) {
  *
  * The crop is drawn by hand in a [Canvas]: the whole sheet is painted at a scale that makes the cue's
  * ([ThumbnailCue.width]×[ThumbnailCue.height]) tile fill the box, then [translate]d by the tile's origin so
- * only that tile shows through the box's clip. Everything is explicit — no [ContentScale]/alignment and no
+ * only that tile shows through the box's clip. Everything is explicit — no `ContentScale`/alignment and no
  * reliance on the async painter's `intrinsicSize` (which is unspecified until the bitmap loads and then
  * platform-dependent; letting the paint layer choose the scale/anchor is what made the crop snap to the
- * sheet centre). [sheetSize] is the sheet's true *padded* pixel extent, taken across **all** cues so the
+ * sheet centre). `sheetSize` is the sheet's true *padded* pixel extent, taken across **all** cues so the
  * last sheet — only partially filled — is still drawn at full size. Coil caches the sheet, so scrubbing
  * across tiles of one sheet is a single download.
  */
 @Composable
 private fun ThumbnailPreview(
     cue: ThumbnailCue,
-    all: ImmutableList<ThumbnailCue>,
+    all: List<ThumbnailCue>,
     fraction: Float,
     trackWidth: Dp,
 ) {
@@ -253,6 +256,7 @@ private fun ThumbnailPreview(
 }
 
 private val ScrubberThumbSize = 12.dp
+private val AdMarkerColor = Color(0xFFFFC107)
 private val ScrubberTrackHeight = 4.dp
 
 // The whole scrubber row is this tall so the drag target is a comfortable ~40.dp band; the thin track and
@@ -271,7 +275,7 @@ private val ScrubberTouchHeight = 40.dp
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun TimeLabel(state: PlayerControlsState, modifier: Modifier = Modifier, showDuration: Boolean = true) {
+public fun TimeLabel(state: PlayerControlsState, modifier: Modifier = Modifier, showDuration: Boolean = true) {
     val text = when {
         state.isLive -> "LIVE"
         showDuration -> "${formatTime(state.scrubPositionMs)} / ${formatTime(state.durationMs)}"
@@ -290,7 +294,7 @@ fun TimeLabel(state: PlayerControlsState, modifier: Modifier = Modifier, showDur
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun BufferingIndicator(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun BufferingIndicator(state: PlayerControlsState, modifier: Modifier = Modifier) {
     if (state.isWaitingToPlay) {
         CircularProgressIndicator(
             color = LocalContentColor.current,
@@ -308,7 +312,7 @@ fun BufferingIndicator(state: PlayerControlsState, modifier: Modifier = Modifier
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun MuteButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
+public fun MuteButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
     IconButton(onClick = state::toggleMute, modifier = modifier.controlFocusRing()) {
         Icon(
             imageVector = if (state.isMuted) {
@@ -334,7 +338,7 @@ fun MuteButton(state: PlayerControlsState, modifier: Modifier = Modifier) {
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun PlaybackSpeedButton(
+public fun PlaybackSpeedButton(
     state: PlayerControlsState,
     modifier: Modifier = Modifier,
     speeds: List<Float> = DefaultPlaybackSpeeds,
@@ -375,13 +379,13 @@ fun PlaybackSpeedButton(
 
 /** [PlayPauseButton] against the scope's own [PlayerControlsScope.state]. Behaviour is identical. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.PlayPauseButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.PlayPauseButton(modifier: Modifier = Modifier) {
     PlayPauseButton(state, modifier)
 }
 
 /** [BigPlayButton] against the scope's own [PlayerControlsScope.state]. Behaviour is identical. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.BigPlayButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.BigPlayButton(modifier: Modifier = Modifier) {
     BigPlayButton(state, modifier)
 }
 
@@ -390,13 +394,13 @@ fun PlayerControlsScope.BigPlayButton(modifier: Modifier = Modifier) {
  * emitting nothing for live or unresolved-duration media.
  */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.Scrubber(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.Scrubber(modifier: Modifier = Modifier) {
     Scrubber(state, modifier)
 }
 
 /** [TimeLabel] against the scope's own [PlayerControlsScope.state]. Behaviour is identical. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.TimeLabel(modifier: Modifier = Modifier, showDuration: Boolean = true) {
+public fun PlayerControlsScope.TimeLabel(modifier: Modifier = Modifier, showDuration: Boolean = true) {
     TimeLabel(state, modifier, showDuration)
 }
 
@@ -405,13 +409,13 @@ fun PlayerControlsScope.TimeLabel(modifier: Modifier = Modifier, showDuration: B
  * including drawing nothing while merely paused.
  */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.BufferingIndicator(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.BufferingIndicator(modifier: Modifier = Modifier) {
     BufferingIndicator(state, modifier)
 }
 
 /** [MuteButton] against the scope's own [PlayerControlsScope.state]. Behaviour is identical. */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.MuteButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.MuteButton(modifier: Modifier = Modifier) {
     MuteButton(state, modifier)
 }
 
@@ -420,6 +424,6 @@ fun PlayerControlsScope.MuteButton(modifier: Modifier = Modifier) {
  * list. Pass the free function a `speeds` list to offer different rates.
  */
 @ExperimentalPlayerUiApi @Composable
-fun PlayerControlsScope.PlaybackSpeedButton(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.PlaybackSpeedButton(modifier: Modifier = Modifier) {
     PlaybackSpeedButton(state, modifier)
 }

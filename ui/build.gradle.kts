@@ -8,6 +8,7 @@ import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinMultiplatform
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -23,6 +24,11 @@ group = "io.github.nonbinarydev"
 version = "0.1.0-alpha01"
 
 kotlin {
+    explicitApi()
+
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation()
+
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     androidLibrary {
         namespace = "dev.nonbinary.outis.ui"
@@ -42,6 +48,9 @@ kotlin {
                 }
             }
         }
+
+        // The controls state on the host JVM: its logic needs Compose's snapshot state, not a device.
+        withHostTest { isReturnDefaultValues = true }
     }
     iosArm64()
     iosSimulatorArm64()
@@ -53,6 +62,16 @@ kotlin {
     }
 
     sourceSets {
+        all {
+            languageSettings.optIn("dev.nonbinary.outis.ui.ExperimentalPlayerUiApi")
+            languageSettings.optIn("dev.nonbinary.outis.core.ExperimentalPlayerApi")
+        }
+
+        // withHostTest creates this one later than this block runs, so it is configured when it appears.
+        matching { it.name == "androidHostTest" }.configureEach {
+            dependencies { implementation(libs.kotlin.test) }
+        }
+
         val commonMain by getting {
             dependencies {
                 api(project(":core"))
@@ -65,16 +84,15 @@ kotlin {
                 // Coil's Compose API (AsyncImage) for trickplay scrub-preview tiles. The runtime network
                 // fetcher + engines live in the app (:sample), which owns the process-wide ImageLoader.
                 implementation(libs.coil.compose)
-                // kotlinx-collections-immutable arrives transitively: :core exposes ImmutableList in
-                // PlayerState and declares it `api`, so it is already on this module's compile classpath.
             }
         }
         val androidMain by getting {
             dependencies {
                 // Android surface uses the View-based PlayerView (stable API; renders subtitle cues natively).
                 implementation(libs.media3.ui)
-                // media3-common likewise arrives via :core's `api(libs.media3.common)`, declared there
-                // because VideoPlayer.setAdViewProvider exposes AdViewProvider.
+                // Player, AdOverlayInfo and UnstableApi are imported here directly, so declare their
+                // artifact rather than compile against media3-ui's transitive graph.
+                implementation(libs.media3.common)
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.activity.ktx) // ComponentActivity PIP listener + PictureInPictureModeChangedInfo
                 // ComponentActivity implements androidx.lifecycle.LifecycleOwner, so resolving any call
@@ -97,6 +115,11 @@ dependencies {
     detektPlugins(libs.detekt.formatting)
     detektPlugins(libs.detekt.compose)
     detektPlugins(libs.detekt.compose2)
+}
+
+composeCompiler {
+    // :core is not built by the Compose compiler, so its types carry no stability metadata of their own.
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose-stability.conf"))
 }
 
 detekt {
@@ -146,7 +169,7 @@ mavenPublishing {
     configure(KotlinMultiplatform(javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml")))
 
     // Central Portal (the old OSSRH/Nexus flow is retired). Signing is required by Central; the key
-    // comes from ~/.gradle/gradle.properties locally, or ORG_GRADLE_PROJECT_signingInMemoryKey in CI.
+    // comes from secrets.properties via local-signing.gradle.kts, or ORG_GRADLE_PROJECT_signingInMemoryKey.
     publishToMavenCentral()
     signAllPublications()
 

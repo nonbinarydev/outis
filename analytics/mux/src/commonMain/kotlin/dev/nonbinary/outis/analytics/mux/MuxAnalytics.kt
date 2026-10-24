@@ -36,13 +36,17 @@ import kotlinx.coroutines.flow.onEach
  * per-video. Binding therefore waits for an item to be present and re-binds on each new one — see
  * [attach].
  */
-class MuxAnalytics(
+public class MuxAnalytics(
     private val appContext: AppContext,
     private val config: MuxConfig,
 ) : PlayerComponent {
 
     private var binding: MuxBinding? = null
 
+    /**
+     * Binds Mux once [host] has an item, and binds again whenever the item, the native player or its
+     * presentation changes, so each video is its own Mux view.
+     */
     override fun attach(host: PlayerHost) {
         // Re-bind whenever the native player, the view-level presentation object (iOS's
         // AVPlayerViewController), or the media item changes. bindMux reads whichever object its platform
@@ -64,6 +68,7 @@ class MuxAnalytics(
             .launchIn(host.scope)
     }
 
+    /** Releases the current Mux binding. */
     override fun detach() {
         binding?.dispose()
         binding = null
@@ -74,7 +79,7 @@ class MuxAnalytics(
  * Session-scoped Mux configuration. Everything per-video is [dev.nonbinary.outis.core.analytics.PlaybackMetadata]
  * on the item; this is what stays constant across a viewing session.
  */
-data class MuxConfig(
+public data class MuxConfig(
     /** Mux Data environment key (the client-side monitoring key), from the Mux dashboard. */
     val envKey: String,
     /** Stable id for this viewer across sessions, if the app has one. Never PII. */

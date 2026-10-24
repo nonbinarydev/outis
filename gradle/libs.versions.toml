@@ -16,25 +16,28 @@ android-compileSdk = "37"
 androidx-lifecycle = "2.11.0"
 desugarJdkLibs = "2.1.5"
 androidxActivity = "1.13.0"
-androidxCore = "1.19.0" # needs compileSdk 37, as androidx-lifecycle above
+androidxCore = "1.19.1" # needs compileSdk 37, as androidx-lifecycle above
 composePlugin = "1.11.1"
 detekt = "1.23.8"
 detektCompose = "0.6.3"
-detektCompose2 = "1.4.0"
+detektCompose2 = "2.1.2"
 koin = "4.2.2"
 ktor = "3.5.1"
 coil = "3.5.0"
 dokka = "2.2.0"
 ktlint = "14.2.0"
-guava = "33.6.0-android" # matches the Guava that Media3 resolves; declared so the IDE sees Tracks' ImmutableList
-kotlinx-collections-immutable = "0.5.1"
+guava = "33.7.2-android" # Media3 asks for 33.3.1-android; declared so the IDE sees Tracks' ImmutableList
 kotlinxCoroutines = "1.11.0"
 kotlinxDatetime = "0.8.0"
-kotlinxSerializationJson = "1.11.0"
-media3 = "1.10.1"
+kotlinxSerializationJson = "1.12.0"
+media3 = "1.11.1"
 napier = "2.7.1"
-muxData = "1.13.0"       # Mux Data SDK for AndroidX Media3 (supports Media3 1.10.x)
-muxEmbed = "5.9.0"       # mux-embed, the Mux Data JS SDK for the HTML <video> element
+muxData = "1.13.4"       # Mux Data SDK for AndroidX Media3 (built against Media3 1.11.0)
+muxEmbed = "5.18.2"      # mux-embed, the Mux Data JS SDK for the HTML <video> element
+shakaPlayer = "5.3.1"    # Shaka Player, the web engine (npm)
+firebaseBom = "35.1.0"   # Firebase on Android: Analytics for outis-analytics-firebase, Crashlytics for the sample host
+googleServices = "4.5.0"
+firebaseCrashlyticsPlugin = "3.0.8"
 maven-publish = "0.37.0"
 
 [libraries]
@@ -42,7 +45,6 @@ detekt-formatting = { module = "io.gitlab.arturbosch.detekt:detekt-formatting", 
 detekt-compose = { module = "io.nlopez.compose.rules:detekt", version.ref = "detektCompose" }
 detekt-compose2 = { module = "ru.kode:detekt-rules-compose", version.ref = "detektCompose2" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
-kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
@@ -50,8 +52,13 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 napier = { module = "io.github.aakira:napier", version.ref = "napier" }
 
-# Analytics adapters only (outis-analytics-mux). The SDK core takes no vendor dependency.
+# Analytics adapters only (outis-analytics-mux, outis-analytics-firebase). The SDK core takes no vendor
+# dependency.
 mux-data-media3 = { module = "com.mux.stats.sdk.muxstats:data-media3", version.ref = "muxData" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-common = { module = "com.google.firebase:firebase-common" }
+firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 
 # Sample only — the SDK itself ships no DI container and no HTTP client.
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
@@ -94,3 +101,5 @@ kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", versio
 jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "composePlugin" }
 kotlinComposeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 vanniktech-mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
+googleServices = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebaseCrashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }

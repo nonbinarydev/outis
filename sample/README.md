@@ -27,6 +27,11 @@ rather than the content.
 A status line under the video reports the `PlaybackState`, because "nothing rendered" and "rendered but
 never became ready" look identical on a black surface.
 
+Server-side ad entries get an `AdController` per item (`ads/ServerSideAds.kt`): the catalogue's own
+breaks, or, for `scte35MasterUrl`, avails polled from the live playlist and placed at the playhead where
+they first appear. The sample drives it with the player's position and hands it to the controls state,
+so `DefaultControls` shows the countdown, the skip button and the cue-points.
+
 ### Running it
 
 **Web** — the shared UI in a browser:
@@ -45,6 +50,13 @@ the shared `App()`; install it on a device or emulator:
 ./gradlew :sample:android:installDebug
 ```
 
+**Android TV** — the same APK. Its `TvActivity` is listed only by the TV launcher (`LEANBACK_LAUNCHER`, with
+a banner) and presents `TvApp()`: catalogue rails to move through with the D-pad, the player full screen,
+and Back to return. It is catalogue-only, since typing a URL with a D-pad is no way to try a player, and
+it runs no analytics, so it asks for no consent. One APK rather than a second application module, so the
+Compose-resources staging in `sample/android/build.gradle.kts` is not duplicated. To try the TV screen
+without a television, open the web build with `?tv` and use the arrow keys, Enter and Escape.
+
 **iOS** — `sample/iosApp` is an Xcode host that presents the shared `App()` through
 `mainViewController()`. It links Mux's iOS SDK via CocoaPods, so run `pod install` in `sample/iosApp`
 once, then open **`iosApp.xcworkspace`** (not the `.xcodeproj`) and Run (simulator or device). The Kotlin
@@ -57,8 +69,9 @@ your team ID is never committed.
 ## Analytics and consent
 
 The sample doubles as the reference wiring for the optional [Mux Data](../docs/analytics-mux.md) QoS
-adapter (`:analytics:mux`) and for the consent gate any analytics SDK needs. Neither is part of the SDK —
-`:core` and `:ui` ship no analytics dependency; this is the app's own integration.
+adapter (`:analytics:mux`), the [Firebase / GA4](../docs/analytics-firebase.md) usage adapter
+(`:analytics:firebase`), Crashlytics on the app hosts, and the consent gate all of them need. None of it
+is part of the SDK — `:core` and `:ui` ship no analytics dependency; this is the app's own integration.
 
 ### Enabling Mux
 
@@ -72,6 +85,33 @@ disabled. Supply the key — the client-side *environment* key, not a Mux API to
 
 An empty key bakes an empty constant and the adapter is simply never attached.
 
+### Firebase
+
+Usage analytics (GA4) and, on Android and iOS, crash reports (Crashlytics). A plain checkout is
+Firebase-free: each platform turns it on only when given its own configuration, none of which is
+committed, because each identifies a real Firebase project.
+
+- **Android:** download the app's `google-services.json` from the Firebase console (package
+  `dev.nonbinary.outis.sample`) into `sample/android/`; `google-services.json.example` shows its shape.
+  Only then does the build apply the Google services and Crashlytics plugins.
+- **iOS:** put the app's `GoogleService-Info.plist` in `sample/iosApp/iosApp/` (see the `.example`) and
+  run `pod install`. A build phase bundles the file when it is there, and the app configures Firebase only
+  when it finds it. Crash reports arrive unsymbolicated until the Crashlytics dSYM upload is set up, which
+  this host does not do yet.
+- **Web:** a GA4 measurement id, by the same precedence as the Mux key: a `ga4.id=G-…` line in
+  `local.properties`, or `-Pga4.id=G-…`. [`pages.yml`](../.github/workflows/pages.yml) reads it from the
+  `GA4_MEASUREMENT_ID` repository variable. The build rejects anything that is not shaped like `G-…`,
+  since it becomes part of a script URL.
+
+Then, with **Marketing** consent, the adapter reports `video_start`, `video_complete` and `video_error`,
+and the sample adds `select_content` when the viewer picks a video: the catalogue id only, never a
+custom stream's URL. On the web, gtag.js is not even loaded before that consent; a revoke silences it at
+once. Crash reports follow **Performance** consent from the next launch, because Crashlytics applies a
+change then; reports from a session without consent are deleted, not sent.
+
+The public demo's [privacy notice](../site/privacy.html) describes all of this for visitors, and the
+consent dialog links to it. It is a draft for the operator to complete, not legal advice.
+
 ### Consent
 
 The demo reports to third-party analytics, so it carries the consent gate a public deployment needs —
@@ -79,11 +119,12 @@ and, being a reference, it demonstrates the *mechanism* rather than hardcoding a
 is modelled as **purpose categories**, not per-SDK:
 
 - **Essential** — always on: playback, and the on-device diagnostics log (which never leaves the device).
-- **Performance** — Mux QoS. Gated by default.
-- **Marketing** — usage analytics (e.g. GA4). Always gated.
+- **Performance** — Mux QoS, and Crashlytics in the apps. Gated by default.
+- **Marketing** — usage analytics (GA4). Always gated.
 
 An adapter attaches only while its category is granted (`addComponent` on grant, `removeComponent` on
-revoke), and nothing collects before a first-run choice. The choice persists per platform (localStorage /
+revoke), and nothing collects before a first-run choice: Firebase's own collection is off by default in
+the Android manifest and the iOS `Info.plist`, and consent turns it on. The choice persists per platform (localStorage /
 SharedPreferences / `NSUserDefaults`) so it survives a reload, and is revisitable from **Player settings →
 Privacy & data**.
 
@@ -142,13 +183,16 @@ Each item:
 | `title` | yes | Compact card label. |
 | `label` | yes | Fuller label for the hero and overlay. |
 | `url` | yes | Manifest or file URL. |
-| `mimeType` | yes | `HLS`, `DASH` or `MP4`, mapping to `MimeType`. |
+| `mimeType` | yes | `HLS`, `DASH`, `MP4` or `WEBM`, mapping to `MimeType`. |
 | `tags` | no | Badge strings. |
 | `poster` | no | Key into `posters`. |
 | `tint` | no | Hex colour for a solid tile when there is no poster. Mutually exclusive with `poster`. |
-| `drm` | no | `scheme` (`WIDEVINE`, `PLAYREADY`, `FAIRPLAY`), `licenseServerUrl`, and `certificateUrl` for FairPlay. |
-| `ads` | no | `type: "clientSide"` with `adTagUri`, or `type: "serverSide"` with `breaks`. |
+| `drm` | no | `scheme` (`WIDEVINE`, `PLAYREADY`, `FAIRPLAY`, `CLEARKEY`), `licenseServerUrl`, `certificateUrl` for FairPlay, and `keys` (hex key id to hex key) for Clear Key, which has no server. |
+| `ads` | no | `type: "clientSide"` with `adTagUri`, or `type: "serverSide"` with `breaks`: each an `id`, a `startMs` on the stream's timeline, and `ads`, each an `id`, a `durationMs`, and optionally a `title` and a `skipOffsetMs`. |
 | `scte35MasterUrl` | no | Playlist to poll for live SCTE-35 cue-points. |
+| `chaptersUrl` | no | WebVTT chapters sidecar. |
+| `chapters` | no | Chapters declared inline, each `startMs`, optional `title` and `endMs`. They win over `chaptersUrl`, so keep the sidecar for sample builds that predate the field. |
+| `thumbnailsUrl` | no | WebVTT trickplay-thumbnails sidecar. |
 | `note` | no | Why this entry exists, or what it will not do on which platform. |
 
 **DRM is declarative on purpose.** `DrmConfig` also carries `licenseRequestInterceptor` and

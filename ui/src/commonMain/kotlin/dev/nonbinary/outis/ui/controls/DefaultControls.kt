@@ -35,18 +35,20 @@ private val Scrim = Color(0x66000000)
 /**
  * The default overlay — written entirely against the public scope, so it's an honest copy/fork target.
  * Top row = subtitle/audio/PIP/fullscreen; centre = buffering or big play; bottom = scrubber + transport.
- * Adds a scrim, grabs D-pad focus on appear (TV), and re-arms auto-hide on focus movement.
+ * Adds a scrim, grabs D-pad focus on appear (TV), and re-arms auto-hide on focus movement. During a
+ * server-side ad break it adds the [AdOverlay], which stays up while the rest auto-hides.
  */
 @ExperimentalPlayerUiApi
 @Composable
-fun PlayerControlsScope.DefaultControls(modifier: Modifier = Modifier) {
+public fun PlayerControlsScope.DefaultControls(modifier: Modifier = Modifier) {
     ControlsScaffold(modifier)
+    AdOverlay()
 }
 
 /** [DefaultControls] with each region overridable — retheme while keeping layout/focus/scrim/auto-hide. */
 @ExperimentalPlayerUiApi
 @Composable
-fun PlayerControlsScope.ControlsScaffold(
+public fun PlayerControlsScope.ControlsScaffold(
     modifier: Modifier = Modifier,
     top: @Composable RowScope.() -> Unit = {
         SubtitleButton()

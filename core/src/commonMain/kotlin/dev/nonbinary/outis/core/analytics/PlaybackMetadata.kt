@@ -6,9 +6,6 @@
 
 package dev.nonbinary.outis.core.analytics
 
-import kotlinx.collections.immutable.ImmutableMap
-import kotlinx.collections.immutable.persistentMapOf
-
 /**
  * Vendor-neutral QoS/analytics metadata for a piece of content.
  *
@@ -22,7 +19,7 @@ import kotlinx.collections.immutable.persistentMapOf
  * adapter sends what it has, and viewer identity is the *adapter's* concern (session-scoped), not the
  * item's.
  */
-data class PlaybackMetadata(
+public data class PlaybackMetadata(
     /** Stable id for this title across sessions — the primary key a QoS backend groups views by. */
     val videoId: String? = null,
     /**
@@ -40,8 +37,8 @@ data class PlaybackMetadata(
     /** The CDN or delivery origin serving this stream, for slicing QoS by edge. */
     val cdn: String? = null,
     /** Vendor-specific custom dimensions, passed through untouched. */
-    val custom: ImmutableMap<String, String> = persistentMapOf(),
+    val custom: Map<String, String> = emptyMap(),
 )
 
 /** Whether content is on-demand or live — the one distinction every QoS backend treats specially. */
-enum class StreamType { VOD, LIVE }
+public enum class StreamType { VOD, LIVE }

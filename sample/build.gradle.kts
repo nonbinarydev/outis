@@ -19,19 +19,27 @@ plugins {
 // Deliberately NOT published: no maven-publish plugin, no group or version. This module exists to be
 // run and read, not consumed.
 
-// Build-time config baked into a common constant. The Mux env key is resolved from, in order: a Gradle
-// property (-Pmux.key / gradle.properties / ORG_GRADLE_PROJECT_ — the CI path), then a `mux.key` line in
-// the git-ignored root local.properties (the local-dev home), then empty — a plain checkout builds and
-// runs with analytics switched off, since App.kt skips the adapter when the key is blank.
+// Build-time config baked into a common constant. Each value is resolved from, in order: a Gradle
+// property (-Pmux.key / gradle.properties / ORG_GRADLE_PROJECT_ — the CI path), then a line in the
+// git-ignored root local.properties (the local-dev home), then empty — a plain checkout builds and runs
+// with analytics switched off, since App.kt skips an adapter whose value is blank.
 abstract class GenerateSampleConfig : DefaultTask() {
     @get:Input
     abstract val muxEnvKey: Property<String>
+
+    /** The web demo's GA4 measurement id. It is written into a script URL, so it must look like one. */
+    @get:Input
+    abstract val ga4MeasurementId: Property<String>
 
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
     @TaskAction
     fun generate() {
+        val ga4 = ga4MeasurementId.get()
+        require(ga4.isEmpty() || Regex("G-[A-Z0-9]+").matches(ga4)) {
+            "ga4.id must be a GA4 measurement id such as G-ABC123XYZ, not \"$ga4\""
+        }
         val dir = outputDir.get().asFile.resolve("dev/nonbinary/outis/sample/generated")
         dir.mkdirs()
         dir.resolve("SampleConfig.kt").writeText(
@@ -41,6 +49,7 @@ abstract class GenerateSampleConfig : DefaultTask() {
             |
             |internal object SampleConfig {
             |    const val MUX_ENV_KEY: String = "${muxEnvKey.get()}"
+            |    const val GA4_MEASUREMENT_ID: String = "$ga4"
             |}
             |
             """.trimMargin(),
@@ -48,19 +57,20 @@ abstract class GenerateSampleConfig : DefaultTask() {
     }
 }
 
-// A Gradle property wins (CI passes -Pmux.key); otherwise fall back to a `mux.key` line in the root
+// A Gradle property wins (CI passes -Pmux.key); otherwise fall back to the same key in the root
 // local.properties. Read through providers.fileContents so the configuration cache tracks the file and a
-// changed key re-generates — the file read is lazy, and Properties.load handles the format's escaping.
-val muxKey: Provider<String> = providers.gradleProperty("mux.key")
+// changed value re-generates — the file read is lazy, and Properties.load handles the format's escaping.
+fun sampleProperty(name: String): Provider<String> = providers.gradleProperty(name)
     .orElse(
         providers.fileContents(rootProject.layout.projectDirectory.file("local.properties"))
             .asText
-            .map { text -> Properties().apply { load(text.reader()) }.getProperty("mux.key").orEmpty() },
+            .map { text -> Properties().apply { load(text.reader()) }.getProperty(name).orEmpty() },
     )
     .orElse("")
 
 val generateSampleConfig by tasks.registering(GenerateSampleConfig::class) {
-    muxEnvKey.set(muxKey)
+    muxEnvKey.set(sampleProperty("mux.key"))
+    ga4MeasurementId.set(sampleProperty("ga4.id"))
     outputDir.set(layout.buildDirectory.dir("generated/sampleConfig"))
 }
 
@@ -105,6 +115,11 @@ kotlin {
     }
 
     sourceSets {
+        all {
+            languageSettings.optIn("dev.nonbinary.outis.ui.ExperimentalPlayerUiApi")
+            languageSettings.optIn("dev.nonbinary.outis.core.ExperimentalPlayerApi")
+        }
+
         val commonMain by getting {
             // Provider form so every compileKotlin* task depends on generation; a bare dir would race.
             kotlin.srcDir(generateSampleConfig.flatMap { it.outputDir })
@@ -118,6 +133,9 @@ kotlin {
                 // The optional Mux QoS adapter, wired in as a reference integration. Attached only when a
                 // build supplies an env key and the viewer grants Performance consent — see App.kt.
                 implementation(project(":analytics:mux"))
+                // The optional Firebase/GA4 usage adapter, attached only while the viewer grants Marketing
+                // consent. It reports nothing unless the host has Firebase (or, on web, gtag.js) set up.
+                implementation(project(":analytics:firebase"))
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.ui)

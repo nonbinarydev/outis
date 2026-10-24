@@ -20,6 +20,8 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.dp
+import dev.nonbinary.outis.ui.ExperimentalPlayerUiApi
+import kotlin.math.ceil
 
 /** Thickness of the ring. Drawn wholly inside the control's bounds, so it never affects layout. */
 private val RingWidth = 2.dp
@@ -34,8 +36,11 @@ private val RingColor = Color.White
  * Implemented as a [Modifier.Node] rather than the older `composed { }` form, so a focus change
  * invalidates only the draw pass instead of recomposing every control carrying the ring. That
  * matters on TV, where D-pad movement re-focuses on every key press.
+ *
+ * Every shipped control carries it; put it on a control of your own, before its `clickable`, to match.
  */
-internal fun Modifier.controlFocusRing(): Modifier = this then FocusRingElement
+@ExperimentalPlayerUiApi
+public fun Modifier.controlFocusRing(): Modifier = this then FocusRingElement
 
 private data object FocusRingElement : ModifierNodeElement<FocusRingNode>() {
     override fun create() = FocusRingNode()
@@ -61,7 +66,8 @@ private class FocusRingNode : Modifier.Node(), FocusEventModifierNode, DrawModif
     override fun ContentDrawScope.draw() {
         drawContent()
         if (!focused) return
-        val strokePx = RingWidth.toPx()
+        // A whole number of pixels, as Modifier.border rounds it, so fractional densities stay crisp.
+        val strokePx = ceil(RingWidth.toPx())
         // Inset by half the stroke so the ring lands fully inside the bounds, matching how
         // Modifier.border draws — a centred stroke would be clipped in half at the edges.
         inset(strokePx / 2f) {

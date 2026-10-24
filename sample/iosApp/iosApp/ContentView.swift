@@ -1,10 +1,14 @@
 import UIKit
 import SwiftUI
+import FirebaseCore
+import FirebaseCrashlytics
 import OutisSample
 
 struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
-        MainViewControllerKt.mainViewController()
+        MainViewControllerKt.mainViewController(onCrashReportingConsent: { granted in
+            setCrashReporting(granted.boolValue)
+        })
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
@@ -29,5 +33,12 @@ struct ContentView: View {
     }
 }
 
-
-
+/// Crash reports follow Performance consent. Crashlytics applies the change from the next launch, and
+/// reports held while consent is withheld are deleted rather than sent once it is given.
+private func setCrashReporting(_ granted: Bool) {
+    guard FirebaseApp.app() != nil else { return }
+    Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(granted)
+    if !granted {
+        Crashlytics.crashlytics().deleteUnsentReports()
+    }
+}

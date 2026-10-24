@@ -11,7 +11,7 @@ package dev.nonbinary.outis.core.chapters
  * platform that needs it (Android wraps a `RandomAccessFile`); tests back it with a `ByteArray`. Lets the
  * parser do small ranged reads (seek to box/element offsets) instead of loading whole multi-GB files.
  */
-interface ChapterReader {
+internal interface ChapterReader {
     /** Total file length in bytes. */
     val size: Long
 

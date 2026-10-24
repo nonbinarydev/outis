@@ -110,9 +110,9 @@ break playback. See [Local files and chapters](local-files.md).
 Selection is not optimistic. The engine applies the change and re-emits the track lists with updated
 `isSelected` flags — read the result from `state`, do not assume it from the call.
 
-If you are looking for video quality or rendition selection, it is not implemented.
-`PlayerState.currentTrack` and `availableTracks` are reserved and never populated. To constrain the
-ABR ladder use `MediaItem.videoConstraints`.
+`videoTracks` holds alternate *versions* of a programme, not quality rungs, and is empty for most
+streams; iOS reports none yet. Quality is the engine's adaptive choice — to constrain the ladder use
+`MediaItem.videoConstraints`.
 
 ## Web
 

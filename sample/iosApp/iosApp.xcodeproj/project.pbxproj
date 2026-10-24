@@ -115,6 +115,7 @@
 				7555FF77242A565900829871 /* Sources */,
 				B92378962B6B1156000C7307 /* Frameworks */,
 				7555FF79242A565900829871 /* Resources */,
+				46144AAB03FFFFF9068F6920 /* Copy Firebase config */,
 				1DB0909A51C8BC569347B45F /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
@@ -233,6 +234,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\ncd \"$SRCROOT/../..\" # Navigate to the root of your multi-module project\n./gradlew :sample:embedAndSignAppleFrameworkForXcode\n";
+		};
+		46144AAB03FFFFF9068F6920 /* Copy Firebase config */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy Firebase config";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# GoogleService-Info.plist is git-ignored, so it is bundled only when present: without it the app runs Firebase-free.\nPLIST=\"${SRCROOT}/iosApp/GoogleService-Info.plist\"\nif [ -f \"$PLIST\" ]; then\n  cp \"$PLIST\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

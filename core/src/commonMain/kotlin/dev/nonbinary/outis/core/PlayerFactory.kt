@@ -6,13 +6,17 @@
 
 package dev.nonbinary.outis.core
 
+import dev.nonbinary.outis.core.net.DEFAULT_HTTP_TIMEOUT_MS
 import dev.nonbinary.outis.core.plugin.PlayerComponent
+import dev.nonbinary.outis.core.source.MediaItem
+import dev.nonbinary.outis.core.source.MediaSource
+import dev.nonbinary.outis.core.source.SmilSelector
 
 /**
- * Construction-time configuration. Deliberately small and additive — new knobs arrive with
- * defaults so adding one never breaks callers.
+ * Construction-time configuration. New knobs arrive with defaults, so existing call sites keep
+ * compiling; before 1.0 a release that adds one still needs a recompile, and the CHANGELOG says so.
  */
-data class PlayerConfig(
+public data class PlayerConfig(
     /**
      * Starting output volume in the range `0f`(silent)`..1f`(unattenuated), applied linearly by the
      * engine. This is the **player's own** gain, independent of the device/system volume, and it is
@@ -45,8 +49,14 @@ data class PlayerConfig(
      * defaults. See [LiveConfig].
      */
     val liveConfig: LiveConfig? = null,
-    /** Components registered at construction. Empty in v1. */
+    /** Components registered at construction, such as an analytics adapter. */
     val components: List<PlayerComponent> = emptyList(),
+    /**
+     * Chooses which rendition of a SMIL source to play — a [MediaSource.Smil], or a `.smil` URL with no mime
+     * type. Defaults to the engine's own preference, [SmilSelector.Platform].
+     */
+    @ExperimentalPlayerApi
+    val smilSelector: SmilSelector = SmilSelector.Platform,
 )
 
 /**
@@ -59,7 +69,7 @@ data class PlayerConfig(
  * Low-latency (LL-HLS / LL-DASH) is otherwise manifest-driven on Android + iOS — [lowLatencyMode]
  * is only the explicit toggle Web needs.
  */
-data class LiveConfig(
+public data class LiveConfig(
     /** Target playback offset behind the live edge, ms. (Android + iOS.) */
     val targetOffsetMs: Long? = null,
     /** Minimum playback speed used to catch up to the live edge. (Android only.) */
@@ -76,7 +86,7 @@ data class LiveConfig(
  * timeouts + a `DefaultLoadErrorHandlingPolicy` retry count) and **Web** (Shaka `retryParameters`).
  * **iOS (AVPlayer) is a no-op** — `AVURLAsset` exposes no granular retry/timeout API.
  */
-data class RetryConfig(
+public data class RetryConfig(
     /** Connection timeout, ms. (Android `setConnectTimeoutMs`, Shaka `connectionTimeout`.) */
     val connectTimeoutMs: Int = 30_000,
     /** Read / overall request timeout, ms. (Android `setReadTimeoutMs`, Shaka `timeout`.) */
@@ -101,7 +111,7 @@ data class RetryConfig(
  * (AVPlayer)** honours [mixWithOthers] (the `AVAudioSession` category) — interruptions/focus are handled
  * natively. **Web** has no audio-session concept, so every field is a no-op there.
  */
-data class AudioConfig(
+public data class AudioConfig(
     /** Pause / duck when another app takes audio focus or an interruption occurs. (Android.) */
     val handleAudioFocus: Boolean = true,
     /** Pause when audio becomes "noisy" — e.g. headphones unplugged. (Android.) */
@@ -124,7 +134,7 @@ data class AudioConfig(
  * the other fields are no-ops there. (Enforced at construction: `bufferForPlayback*Ms ≤ minBufferMs ≤
  * maxBufferMs`, all ≥ 0 — a bad config throws `IllegalArgumentException` early, not deep in ExoPlayer.)
  */
-data class BufferConfig(
+public data class BufferConfig(
     /** Minimum buffer to keep, ms. */
     val minBufferMs: Int = 50_000,
     /** Maximum buffer to load ahead, ms. (Shaka `bufferingGoal`, iOS `preferredForwardBufferDuration`.) */
@@ -160,9 +170,26 @@ data class BufferConfig(
  * construction must happen there. Once created, the interface methods may be called from any thread.
  *
  * @param context platform application context ([AppContext]); only Android needs real data.
+ * @throws UnsupportedOperationException on the `jvm` and `wasmJs` targets, which carry this API but no engine.
  */
-fun VideoPlayer(context: AppContext, config: PlayerConfig = PlayerConfig()): VideoPlayer =
-    createPlatformPlayer(context, config)
+public fun VideoPlayer(context: AppContext, config: PlayerConfig = PlayerConfig()): VideoPlayer =
+    SmilResolvingPlayer(
+        engine = createPlatformPlayer(context, config),
+        selector = config.smilSelector,
+        timeoutMs = config.retryConfig?.readTimeoutMs ?: DEFAULT_HTTP_TIMEOUT_MS,
+    )
 
-/** Per-platform construction. Actuals land with each engine (PR2 Android, PR4 iOS, PR5 Web). */
-internal expect fun createPlatformPlayer(context: AppContext, config: PlayerConfig): VideoPlayer
+/** A platform engine: a [VideoPlayer] that can also fail a load it never saw, as if it had rejected it. */
+internal interface PlatformEngine : VideoPlayer {
+    /**
+     * Report [item] as a failed load — idle, [error] on the state, `MediaItemTransition` then `FatalError`
+     * emitted — for a SMIL source that would not resolve.
+     */
+    fun failLoad(item: MediaItem, error: PlayerError)
+}
+
+/** Per-platform construction: the Media3, AVFoundation or Shaka engine. */
+internal expect fun createPlatformPlayer(context: AppContext, config: PlayerConfig): PlatformEngine
+
+/** The platform engine behind this player, for the platform bridges that reach past the common API. */
+internal val VideoPlayer.engine: VideoPlayer get() = (this as? SmilResolvingPlayer)?.engine ?: this

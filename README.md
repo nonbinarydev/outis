@@ -30,9 +30,9 @@ Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo
 
 | Platform | Engine |
 |---|---|
-| Android | Media3 / ExoPlayer 1.10.1 |
+| Android | Media3 / ExoPlayer 1.11.1 |
 | iOS | AVFoundation `AVPlayer` |
-| Web (JS) | Shaka Player 4.11.2, over an HTML `<video>` |
+| Web (JS) | Shaka Player 5.3.1, over an HTML `<video>` |
 
 **Status: `0.1.0-alpha01`.** Not yet published to Maven Central; the coordinates below will not resolve until the first release.
 
@@ -44,21 +44,23 @@ Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo
 | **HLS** | ✅ | ✅ (`avc1` only — not in-band-param `avc3`) | ✅ |
 | **DASH** | ✅ | ❌ (AVPlayer is HLS-only) | ✅ |
 | **Live** (HLS/DASH) | ✅ | ✅ (HLS) | ✅ |
+| **SMIL** listing HLS/DASH manifests | ✅ | ✅ (picks HLS) | ✅ (host must allow CORS) |
 | **Widevine** DRM | ✅ | ❌ | ✅ (Chrome/Edge/Firefox) |
 | **PlayReady** DRM | ✅ (device CDM only) | ❌ | ✅ (Edge) |
 | **FairPlay** DRM | ❌ | ✅ | ✅ (Safari) |
 | Audio / subtitle track selection | ✅ | ✅ | ✅ |
 | Client-side ads (IMA) | ✅ | ❌ | ✅ (adaptive sources only) |
 | Server-side ads (SSAI) | app-driven | app-driven | app-driven |
-| Embedded chapters (MP4 / Matroska) | ✅ | ✅ | ❌ |
+| Chapters, declared or from a WebVTT sidecar | ✅ | ✅ | ✅ |
+| Chapters embedded in a local file | ✅ (MP4, Matroska) | ✅ (MP4) | ❌ |
 | Picture-in-Picture | ✅ (`rememberPlayerWindow`) | host-supplied | host-supplied |
 
 The DRM split is the unavoidable one: Widevine has no CDM on Apple platforms, FairPlay is Apple-only. SSAI is
 *app-driven*: no engine reads `AdConfig.ServerSide` — the stitched stream plays unchanged and you drive the shared
 `AdController`. On web the shared Compose overlay composites over the engine's `<video>` rather than falling back to
-native controls ([how](docs/ui.md#web-surface)). **Not yet:** video-rendition (quality) selection — `currentTrack` and
-`availableTracks` are reserved and never populated, so the track-selection row means audio and subtitles only; cap the
-ladder with `MediaItem.videoConstraints`. Full per-platform behaviour, gaps and target sets → **[docs/platform-support.md](docs/platform-support.md)**.
+native controls ([how](docs/ui.md#web-surface)). Video quality is the engine's to adapt — cap the ladder with
+`MediaItem.videoConstraints` — while alternate *versions* of a programme (a remaster beside an original) are selectable
+`videoTracks` on Android and web. Full per-platform behaviour, gaps and target sets → **[docs/platform-support.md](docs/platform-support.md)**.
 
 ## Requirements
 
@@ -69,14 +71,26 @@ Intel Macs cannot run the simulator build.
 ## Install
 
 ```kotlin
-// outis-core publishes: jvm, android, iosArm64, iosSimulatorArm64, js, wasmJs
+// outis-core publishes: android, iosArm64, iosSimulatorArm64, js — and jvm, wasmJs with the API but no engine
 implementation("io.github.nonbinarydev:outis-core:0.1.0-alpha01")
 // outis-ui publishes: android, iosArm64, iosSimulatorArm64, js — no jvm, no wasmJs
 implementation("io.github.nonbinarydev:outis-ui:0.1.0-alpha01")   // optional Compose UI
 ```
 
+Or import the BOM and declare the version once, for every Outis artifact:
+
+```kotlin
+commonMain.dependencies {
+    implementation(project.dependencies.platform("io.github.nonbinarydev:outis-bom:0.1.0-alpha01"))
+    implementation("io.github.nonbinarydev:outis-core")
+    implementation("io.github.nonbinarydev:outis-ui")
+}
+```
+
 Declare these in a shared `commonMain` only if that module's targets are a subset of the artifact's — a `commonMain`
-dependency on `outis-ui` from a module that also targets jvm or wasmJs will not resolve. Setup: [Android](docs/getting-started-android.md) · [iOS](docs/getting-started-ios.md) · [Web](docs/getting-started-web.md).
+dependency on `outis-ui` from a module that also targets jvm or wasmJs will not resolve. On jvm and wasmJs,
+`VideoPlayer(...)` throws: those targets exist so shared code compiles and tests can run against a fake player
+([why](docs/decisions/0010-engine-less-targets-publish-the-api.md)). Setup: [Android](docs/getting-started-android.md) · [iOS](docs/getting-started-ios.md) · [Web](docs/getting-started-web.md).
 
 ## Quick start
 
@@ -112,9 +126,11 @@ fun start(appContext: AppContext): VideoPlayer {
 | [Ads — server-side](docs/ads-server-side.md) | `AdController`, MediaTailor avails, SCTE-35 cues, beaconing. |
 | [Local files and chapters](docs/local-files.md) | On-device playback, embedded chapters and thumbnails. |
 | [Analytics and QoS](docs/analytics.md) | `PlayerComponent`, the native handle, which events fire where. |
+| Analytics adapters: [Mux](docs/analytics-mux.md) · [Firebase / GA4](docs/analytics-firebase.md) | Ready-made modules: Mux for quality of service, GA4 for what viewers watch. |
 | [Platform support](docs/platform-support.md) | Requirements, published targets, per-platform gaps. |
 | [Troubleshooting](docs/troubleshooting.md) | Symptom, cause, fix. |
 | Module reference | [`outis-core`](core/README.md) · [`outis-ui`](ui/README.md) — the per-module API notes that ship to Maven Central. |
+| [API reference](https://nonbinarydev.github.io/outis/api/) | Every public declaration in every published module, cross-linked. |
 | Full index | [docs/README.md](docs/README.md) |
 
 ## Threading and lifecycle

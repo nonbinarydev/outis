@@ -1,6 +1,7 @@
 # 2. Dependency scope is decided by public-signature leakage
 
-**Status:** Accepted
+**Status:** Accepted. The collections part of its application is revised by
+[ADR-0008](0008-public-collections-are-plain-list-and-map.md); the rule stands.
 
 ## Context
 
