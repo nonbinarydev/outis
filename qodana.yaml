@@ -55,9 +55,9 @@ projectJDK: "21"
 # jvm- prefix, is the Ultimate-tier image and is NOT free — the names are easy to confuse.)
 #
 # The image's IDE caps the AGP it can import (`agp` in gradle/libs.versions.toml): 2026.1 stops at
-# AGP 9.0.0. Past the cap the Gradle build succeeds but the model import refuses ("incompatible version
-# (AGP x)... Latest supported version is AGP y"), and Qodana analyses nothing. Move AGP and this tag
-# together.
+# AGP 9.0.x and 2026.2 at 9.1.x. Past the cap the Gradle build succeeds but the model import refuses
+# ("incompatible version (AGP x)... Latest supported version is AGP y"): 2026.1 then analyses nothing,
+# and 2026.2 fails the scan. Move AGP and this tag together.
 linter: jetbrains/qodana-jvm-android:2026.2
 
 include:

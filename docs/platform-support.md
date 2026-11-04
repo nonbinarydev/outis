@@ -20,7 +20,7 @@ stated otherwise.
 | | Version | Notes |
 |---|---|---|
 | Kotlin | 2.4.21 | Multiplatform plugin, applied by every library module. |
-| Android Gradle Plugin | 9.5.0 | Both modules use the `com.android.kotlin.multiplatform.library` plugin. |
+| Android Gradle Plugin | 9.1.1 | Both modules use the `com.android.kotlin.multiplatform.library` plugin. |
 | Gradle | 9.6.1 | `gradle/wrapper/gradle-wrapper.properties`; only relevant if you build Outis from source. |
 | Android `minSdk` | 24 | `core/build.gradle.kts`, `ui/build.gradle.kts`. |
 | Android `compileSdk` | 37 | `core/build.gradle.kts`, `ui/build.gradle.kts`. |

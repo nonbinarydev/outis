@@ -1,12 +1,11 @@
 [versions]
-# Tied to the linter in qodana.yaml, which must stay on 2026.2 or newer: the 2026.1 image's bundled
-# IDE refuses to import anything past AGP 9.0.0 and analyses nothing at all. Lower AGP only together
-# with that, never alone.
+# Tied to the linter in qodana.yaml. Each image's IDE imports AGP only up to a cap: 2026.1 to 9.0.x,
+# 2026.2 to 9.1.x. Past it Qodana cannot import the project, so AGP moves only together with the image.
 #
 # 9.1.x also matters beyond the linter. AGP 9.0.0 bundles R8 9.0.32, which predates Kotlin 2.4.10 and
 # cannot parse its metadata — every build logged "Unexpected error during rewriting of Kotlin metadata"
 # for PlayerState, AdEvent$AdCompleted and others. AGP 9.1's R8 reads it, and those are gone.
-agp = "9.5.0"
+agp = "9.1.1"
 kotlin = "2.4.21"
 android-minSdk = "24"
 android-compileSdk = "37"
