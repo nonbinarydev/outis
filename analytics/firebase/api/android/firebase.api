@@ -1,0 +1,13 @@
+public final class dev/nonbinary/outis/analytics/firebase/FirebaseUsageAnalytics : dev/nonbinary/outis/core/plugin/PlayerComponent {
+	public static final field Companion Ldev/nonbinary/outis/analytics/firebase/FirebaseUsageAnalytics$Companion;
+	public fun <init> (Ldev/nonbinary/outis/core/AppContext;)V
+	public fun attach (Ldev/nonbinary/outis/core/plugin/PlayerHost;)V
+	public fun detach ()V
+	public final fun logEvent (Ljava/lang/String;Ljava/util/Map;)V
+	public static synthetic fun logEvent$default (Ldev/nonbinary/outis/analytics/firebase/FirebaseUsageAnalytics;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)V
+}
+
+public final class dev/nonbinary/outis/analytics/firebase/FirebaseUsageAnalytics$Companion {
+	public final fun setCollectionEnabled (Ldev/nonbinary/outis/core/AppContext;Z)V
+}
+

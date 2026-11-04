@@ -92,8 +92,7 @@ Prose documentation lives in `docs/`. Two rules that matter more than style:
 - **The ABI dumps are the record of the public API.** Each published module checks its ABI into `api/`,
   and `./gradlew checkKotlinAbi` (part of `check`, and run on every pull request) fails when the compiled
   ABI differs. When the change is intended, run `./gradlew updateKotlinAbi` and commit the dump with it,
-  so the diff gets reviewed. Android-only declarations are not in the dumps, so review changes to their
-  `androidMain` API by eye.
+  so the diff gets reviewed.
 
 ## Branching
 

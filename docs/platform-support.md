@@ -19,15 +19,15 @@ stated otherwise.
 
 | | Version | Notes |
 |---|---|---|
-| Kotlin | 2.4.10 | Multiplatform plugin, applied by every library module. |
+| Kotlin | 2.4.21 | Multiplatform plugin, applied by every library module. |
 | Android Gradle Plugin | 9.1.1 | Both modules use the `com.android.kotlin.multiplatform.library` plugin. |
 | Gradle | 9.6.1 | `gradle/wrapper/gradle-wrapper.properties`; only relevant if you build Outis from source. |
 | Android `minSdk` | 24 | `core/build.gradle.kts`, `ui/build.gradle.kts`. |
 | Android `compileSdk` | 37 | `core/build.gradle.kts`, `ui/build.gradle.kts`. |
 | Android JVM bytecode target | 11 | Set on the Android compilations of every library module (`core/build.gradle.kts`, `ui/build.gradle.kts`, `analytics/mux/build.gradle.kts`). No project-wide Java toolchain is declared, so the plain `jvm()` target of `:core` uses the Kotlin compiler default. |
-| Compose Multiplatform | 1.11.1 | `:ui` only. `:core` has no Compose dependency of any kind (`core/build.gradle.kts`). |
+| Compose Multiplatform | 1.12.2 | `:ui` only. `:core` has no Compose dependency of any kind (`core/build.gradle.kts`). |
 | AndroidX Media3 | 1.11.1 | The Android engine (`exoplayer`, `-hls`, `-dash`, `-ima`), plus `media3-ui` in `:ui`. |
-| Shaka Player | 5.3.1 | Declared as an npm dependency by `:core`'s JS target, pinned as `shakaPlayer` in `gradle/libs.versions.toml`. The Kotlin/JS plugin propagates it to your `package.json` — **you do not add it yourself**. |
+| Shaka Player | 5.3.3 | Declared as an npm dependency by `:core`'s JS target, pinned as `shakaPlayer` in `gradle/libs.versions.toml`. The Kotlin/JS plugin propagates it to your `package.json` — **you do not add it yourself**. |
 
 Building the Apple targets requires macOS. Building the Android and JS targets does not.
 
@@ -97,7 +97,7 @@ needs declaring: the model's collections are plain `List` and `Map`
 
 | | Android | iOS | Web |
 |---|---|---|---|
-| Engine | Media3 / ExoPlayer 1.11.1 | `AVPlayer` (AVFoundation) | Shaka Player 5.3.1, plus the native `<video>` for progressive files |
+| Engine | Media3 / ExoPlayer 1.11.1 | `AVPlayer` (AVFoundation) | Shaka Player 5.3.3, plus the native `<video>` for progressive files |
 | `nativePlayerHandle` is | `ExoPlayer` (`ExoPlayerEngine.kt`) | `AVPlayer` (`AVPlayerEngine.kt`) | `HTMLVideoElement`, **never** `shaka.Player` (`ShakaEngine.kt`) |
 
 The Shaka `Player` instance is not exposed at all. On web, a progressive source (an `MimeType.MP4`, a

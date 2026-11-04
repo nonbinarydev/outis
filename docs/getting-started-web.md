@@ -13,7 +13,7 @@ the Compose canvas, the host page, and — on the `:core`-only route — the fac
 its `<video>` but never puts it in the document. This page covers all three, in that order, plus the
 two page-level side effects the Compose surface has on your DOM.
 
-The web engine is [Shaka Player](https://github.com/shaka-project/shaka-player) 5.3.1 driving an
+The web engine is [Shaka Player](https://github.com/shaka-project/shaka-player) 5.3.3 driving an
 HTML `<video>` element. Adaptive sources (HLS, DASH) go through Shaka; a single progressive file
 (mp4, webm) is played straight off `video.src`, which matters more than it sounds — see
 [Progressive sources take a different path](#8-progressive-sources-take-a-different-path).
@@ -74,7 +74,7 @@ Compose-plugin flag, not an Outis one, and `:core`-only consumers do not need it
 
 `:core` declares `shaka-player` as an npm dependency of its `jsMain` source set, at the version pinned
 in `gradle/libs.versions.toml` (`shakaPlayer`), and the Kotlin/JS plugin records that in the artifact's
-published `package.json` — this repository's own build output shows `"shaka-player": "5.3.1"` under
+published `package.json` — this repository's own build output shows `"shaka-player": "5.3.3"` under
 `dependencies` for both `outis-core` and `outis-ui`. Your project's generated `package.json` picks it
 up transitively. Adding it again yourself only risks a version conflict.
 
@@ -116,7 +116,7 @@ If you use client-side ads, the page also needs the IMA loader — see
 
 ## 3. The Compose entry point
 
-Compose Multiplatform 1.11.1 mounts a JS composition with `ComposeViewport`
+Compose Multiplatform 1.12.2 mounts a JS composition with `ComposeViewport`
 (`androidx.compose.ui.window.ComposeViewport`, `@ExperimentalComposeUiApi`). It takes either a
 container element id or an `Element`; passing `null` (the default) uses `<body>`.
 

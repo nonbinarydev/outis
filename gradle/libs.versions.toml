@@ -1,13 +1,12 @@
 [versions]
-# Tied to the linter in qodana.yaml, which must stay on 2026.2-eap or newer: the 2026.1 image's bundled
-# IDE refuses to import anything past AGP 9.0.0 and analyses nothing at all. Lower AGP only together
-# with that, never alone.
+# Tied to the linter in qodana.yaml. Each image's IDE imports AGP only up to a cap: 2026.1 to 9.0.x,
+# 2026.2 to 9.1.x. Past it Qodana cannot import the project, so AGP moves only together with the image.
 #
 # 9.1.x also matters beyond the linter. AGP 9.0.0 bundles R8 9.0.32, which predates Kotlin 2.4.10 and
 # cannot parse its metadata — every build logged "Unexpected error during rewriting of Kotlin metadata"
 # for PlayerState, AdEvent$AdCompleted and others. AGP 9.1's R8 reads it, and those are gone.
 agp = "9.1.1"
-kotlin = "2.4.10"
+kotlin = "2.4.21"
 android-minSdk = "24"
 android-compileSdk = "37"
 
@@ -17,24 +16,24 @@ androidx-lifecycle = "2.11.0"
 desugarJdkLibs = "2.1.5"
 androidxActivity = "1.13.0"
 androidxCore = "1.19.1" # needs compileSdk 37, as androidx-lifecycle above
-composePlugin = "1.11.1"
+composePlugin = "1.12.2"
 detekt = "1.23.8"
-detektCompose = "0.6.3"
+detektCompose = "0.6.8"
 detektCompose2 = "2.1.2"
 koin = "4.2.2"
-ktor = "3.5.1"
-coil = "3.5.0"
+ktor = "3.6.1"
+coil = "3.6.3"
 dokka = "2.2.0"
 ktlint = "14.2.0"
-guava = "33.7.2-android" # Media3 asks for 33.3.1-android; declared so the IDE sees Tracks' ImmutableList
+guava = "33.8.0-android" # Media3 asks for 33.3.1-android; declared so the IDE sees Tracks' ImmutableList
 kotlinxCoroutines = "1.11.0"
 kotlinxDatetime = "0.8.0"
 kotlinxSerializationJson = "1.12.0"
 media3 = "1.11.1"
 napier = "2.7.1"
 muxData = "1.13.4"       # Mux Data SDK for AndroidX Media3 (built against Media3 1.11.0)
-muxEmbed = "5.18.2"      # mux-embed, the Mux Data JS SDK for the HTML <video> element
-shakaPlayer = "5.3.1"    # Shaka Player, the web engine (npm)
+muxEmbed = "5.19.0"      # mux-embed, the Mux Data JS SDK for the HTML <video> element
+shakaPlayer = "5.3.3"    # Shaka Player, the web engine (npm)
 firebaseBom = "35.1.0"   # Firebase on Android: Analytics for outis-analytics-firebase, Crashlytics for the sample host
 googleServices = "4.5.0"
 firebaseCrashlyticsPlugin = "3.0.8"
