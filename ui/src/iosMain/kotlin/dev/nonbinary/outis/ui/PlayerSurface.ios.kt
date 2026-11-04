@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -41,9 +42,16 @@ import platform.AVFoundation.AVLayerVideoGravityResize
 import platform.AVFoundation.AVLayerVideoGravityResizeAspect
 import platform.AVFoundation.AVLayerVideoGravityResizeAspectFill
 import platform.AVFoundation.AVPlayer
+import platform.AVFoundation.AVPlayerItem
+import platform.AVFoundation.AVTextStyleRule
 import platform.AVFoundation.currentItem
 import platform.AVFoundation.presentationSize
+import platform.AVFoundation.textStyleRules
 import platform.AVKit.AVPlayerViewController
+import platform.CoreFoundation.CFStringRef
+import platform.CoreMedia.kCMTextMarkupAttribute_BaseFontSizePercentageRelativeToVideoHeight
+import platform.CoreMedia.kCMTextMarkupAttribute_OrthogonalLinePositionPercentageRelativeToWritingDirection
+import platform.Foundation.CFBridgingRelease
 
 /**
  * iOS surface backed by [AVPlayerViewController] (`showsPlaybackControls = false`) hosted via Compose's
@@ -70,11 +78,25 @@ public actual fun PlayerSurface(
     contentScale: ContentScale,
     surfaceType: SurfaceType,
     showSubtitles: Boolean,
+    subtitleSize: Float?,
+    subtitleBottom: Float?,
 ) {
     val avPlayer by produceState(player.nativePlayerHandle as? AVPlayer, player) {
         value = player.nativePlayerHandle as? AVPlayer
         player.events.collect { event ->
             if (event is PlayerEvent.NativePlayerAttached) value = event.handle as? AVPlayer
+        }
+    }
+    // Cue size and position are per item (AVPlayerItem.textStyleRules), so each item is styled as it becomes current.
+    LaunchedEffect(avPlayer, subtitleSize, subtitleBottom) {
+        val av = avPlayer ?: return@LaunchedEffect
+        var styled: AVPlayerItem? = null
+        player.state.collect {
+            val item = av.currentItem
+            if (item != null && item !== styled) {
+                item.textStyleRules = cueRules(subtitleSize, subtitleBottom)
+                styled = item
+            }
         }
     }
     val gravity = contentScale.toVideoGravity()
@@ -106,6 +128,8 @@ public actual fun PlayerSurface(
                 player,
                 avPlayer,
                 fitted = gravity == AVLayerVideoGravityResizeAspect,
+                textHeight = subtitleSize ?: CUE_TEXT_HEIGHT,
+                bottomInset = subtitleBottom ?: CUE_BOTTOM_INSET,
                 modifier = Modifier.matchParentSize(),
             )
         }
@@ -119,7 +143,14 @@ public actual fun PlayerSurface(
  */
 @OptIn(ExperimentalForeignApi::class)
 @Composable
-private fun SidecarCues(player: VideoPlayer, avPlayer: AVPlayer?, fitted: Boolean, modifier: Modifier = Modifier) {
+private fun SidecarCues(
+    player: VideoPlayer,
+    avPlayer: AVPlayer?,
+    fitted: Boolean,
+    textHeight: Float,
+    bottomInset: Float,
+    modifier: Modifier = Modifier,
+) {
     val cues by remember(player) { player.state.map { it.sidecarCues }.distinctUntilChanged() }
         .collectAsState(initial = emptyList())
     if (cues.isEmpty()) return
@@ -134,12 +165,12 @@ private fun SidecarCues(player: VideoPlayer, avPlayer: AVPlayer?, fitted: Boolea
                 text = cues.joinToString("\n"),
                 style = TextStyle(
                     color = Color.White,
-                    fontSize = (picture.height.value * CUE_TEXT_HEIGHT).coerceAtLeast(MIN_CUE_TEXT_SP).sp,
+                    fontSize = (picture.height.value * textHeight).coerceAtLeast(MIN_CUE_TEXT_SP).sp,
                     textAlign = TextAlign.Center,
                 ),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(start = 16.dp, end = 16.dp, bottom = picture.height * CUE_BOTTOM_INSET)
+                    .padding(start = 16.dp, end = 16.dp, bottom = picture.height * bottomInset)
                     .background(CueBackground, RoundedCornerShape(4.dp))
                     .padding(horizontal = 8.dp, vertical = 2.dp),
             )
@@ -157,10 +188,11 @@ private fun fit(aspect: Double, bounds: DpSize): DpSize {
     }
 }
 
-/** Caption text height and bottom inset, as fractions of the picture's height. */
+/** Default caption text height and bottom inset, as fractions of the picture's height. */
 private const val CUE_TEXT_HEIGHT = 0.045f
 private const val CUE_BOTTOM_INSET = 0.06f
 private const val MIN_CUE_TEXT_SP = 12f
+private const val PERCENT = 100f
 private val CueBackground = Color(0xBF000000)
 
 @OptIn(ExperimentalForeignApi::class)
@@ -169,3 +201,28 @@ private fun ContentScale.toVideoGravity(): String = when (this) {
     ContentScale.FillBounds -> AVLayerVideoGravityResize
     else -> AVLayerVideoGravityResizeAspect
 }!! // framework string constants are non-null at runtime
+
+/** The CoreMedia key as the NSString AVFoundation's dictionaries take; CFSTR constants are immortal. */
+@OptIn(ExperimentalForeignApi::class)
+private fun CFStringRef?.key(): String = CFBridgingRelease(this) as String
+
+/**
+ * The text style rules for [PlayerSurface]'s subtitle size and gap, or null for AVKit's own. Size maps straight onto
+ * the font size as a percentage of the video height; the gap onto the line position, a percentage down from the top.
+ */
+@OptIn(ExperimentalForeignApi::class)
+private fun cueRules(size: Float?, bottom: Float?): List<AVTextStyleRule>? {
+    val attributes = buildMap<Any?, Any?> {
+        size?.let {
+            put(kCMTextMarkupAttribute_BaseFontSizePercentageRelativeToVideoHeight.key(), (it * PERCENT).toDouble())
+        }
+        bottom?.let {
+            put(
+                kCMTextMarkupAttribute_OrthogonalLinePositionPercentageRelativeToWritingDirection.key(),
+                ((1 - it) * PERCENT).toDouble(),
+            )
+        }
+    }
+    if (attributes.isEmpty()) return null
+    return listOfNotNull(AVTextStyleRule(textMarkupAttributes = attributes))
+}
