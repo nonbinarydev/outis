@@ -25,7 +25,9 @@ import dev.nonbinary.outis.core.source.deviceDrmSupport
 import dev.nonbinary.outis.core.source.unsupportedDrmError
 import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
+import dev.nonbinary.outis.core.track.SidecarCaptions
 import dev.nonbinary.outis.core.track.TrackType
+import dev.nonbinary.outis.core.track.languageTagMatches
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
@@ -100,6 +102,9 @@ import platform.Foundation.NSOperationQueue
 import platform.Foundation.NSThread
 import platform.Foundation.NSURL
 import platform.Foundation.NSUnderlyingErrorKey
+import platform.MediaAccessibility.MACaptionAppearanceGetDisplayType
+import platform.MediaAccessibility.kMACaptionAppearanceDisplayTypeAlwaysOn
+import platform.MediaAccessibility.kMACaptionAppearanceDomainUser
 import platform.QuartzCore.CACurrentMediaTime
 import platform.UIKit.UIViewController
 import platform.darwin.NSObjectProtocol
@@ -178,6 +183,8 @@ internal class AVPlayerEngine(
     private var audioGroup: AVMediaSelectionGroup? = null
     private var textGroup: AVMediaSelectionGroup? = null
     private val trackOptions = mutableMapOf<String, Pair<AVMediaSelectionGroup, AVMediaSelectionOption>>()
+    private val sidecars = SidecarCaptions(scope) { publishCues() } // AVPlayer takes no subtitle file
+    private var cueObserver: Any? = null // ticks sidecar cues into state while one shows
     private var fairPlay: FairPlayContentKeyManager? = null // lazily created for the first FairPlay item
     private var clearKey: ClearKeyContentKeyManager? = null // lazily created for the first Clear Key item
 
@@ -233,6 +240,7 @@ internal class AVPlayerEngine(
         trackOptions.clear()
         audioGroup = null
         textGroup = null
+        resetSidecars(item)
         lastPlaybackState = PlaybackState.BUFFERING
         startSeekTargetMs = item.startPositionMs?.takeIf { it > 0 }
         stallStartedElapsedMs = 0L
@@ -326,6 +334,7 @@ internal class AVPlayerEngine(
                 selectedVideoTrackId = null,
                 chapters = item.declaredChapters,
                 thumbnails = emptyList(),
+                sidecarCues = emptyList(),
             )
         }
         emit { p, t -> PlayerEvent.MediaItemTransition(item, p, t) }
@@ -421,6 +430,7 @@ internal class AVPlayerEngine(
         trackOptions.clear()
         audioGroup = null
         textGroup = null
+        resetSidecars(null)
         videoOutput = null
         startSeekTargetMs = null
         stallStartedElapsedMs = 0L
@@ -450,6 +460,7 @@ internal class AVPlayerEngine(
                 selectedVideoTrackId = null,
                 chapters = emptyList(),
                 thumbnails = emptyList(),
+                sidecarCues = emptyList(),
             )
         }
     }
@@ -484,6 +495,7 @@ internal class AVPlayerEngine(
         if (avPlayer != null) {
             timeObserver?.let { avPlayer.removeTimeObserver(it) }
             timeObserver = null
+            resetSidecars(null)
             removeItemObservers()
             avPlayer.setRate(0f)
             avPlayer.replaceCurrentItemWithPlayerItem(null)
@@ -505,15 +517,22 @@ internal class AVPlayerEngine(
 
     override fun selectTrack(track: MediaTrack) = onMain {
         val item = player?.currentItem ?: return@onMain
-        val entry = trackOptions[track.id] ?: return@onMain
-        item.selectMediaOption(entry.second, inMediaSelectionGroup = entry.first)
+        if (track.type == TrackType.TEXT && sidecars.has(track.id)) {
+            // A sidecar replaces the media's own text track rather than joining it.
+            textGroup?.let { item.selectMediaOption(null, inMediaSelectionGroup = it) }
+            showSidecar(track.id)
+        } else {
+            val entry = trackOptions[track.id] ?: return@onMain
+            item.selectMediaOption(entry.second, inMediaSelectionGroup = entry.first)
+            if (entry.first == textGroup) showSidecar(null)
+        }
         refreshTrackSelection(item)
     }
 
     override fun clearTextTrack() = onMain {
         val item = player?.currentItem ?: return@onMain
-        val group = textGroup ?: return@onMain
-        item.selectMediaOption(null, inMediaSelectionGroup = group)
+        showSidecar(null)
+        textGroup?.let { item.selectMediaOption(null, inMediaSelectionGroup = it) }
         refreshTrackSelection(item)
     }
 
@@ -617,7 +636,7 @@ internal class AVPlayerEngine(
         textGroup = item.asset.mediaSelectionGroupForMediaCharacteristic(AVMediaCharacteristicLegible)
         applyTrackPreferences(item)
         val audio = buildTracks(item, audioGroup, TrackType.AUDIO)
-        val text = buildTracks(item, textGroup, TrackType.TEXT)
+        val text = buildTracks(item, textGroup, TrackType.TEXT) + sidecars.tracks
         _state.update {
             it.copy(
                 audioTracks = audio.toList(),
@@ -718,17 +737,17 @@ internal class AVPlayerEngine(
                         isSelected = trackOptions[it.id]?.second == audioSel
                     )
                 },
-                textTracks = st.textTracks.map {
-                    it.copy(
-                        isSelected = trackOptions[it.id]?.second == textSel
-                    )
-                },
+                textTracks = st.textTracks.map { it.copy(isSelected = isTextSelected(it.id, textSel)) },
                 selectedAudioTrackId = st.audioTracks.firstOrNull { trackOptions[it.id]?.second == audioSel }?.id,
-                selectedTextTrackId = st.textTracks.firstOrNull { trackOptions[it.id]?.second == textSel }?.id,
+                selectedTextTrackId = st.textTracks.firstOrNull { isTextSelected(it.id, textSel) }?.id,
             )
         }
         emit { p, t -> _state.value.tracksChanged(p, t) }
     }
+
+    /** Whether text track [id] is the one showing: the sidecar showing, or the media's own [selected]. */
+    private fun isTextSelected(id: String, selected: AVMediaSelectionOption?): Boolean =
+        if (sidecars.has(id)) id == sidecars.shownId else selected != null && trackOptions[id]?.second == selected
 
     /**
      * Apply the [MediaItem]'s load-time language + caption preferences to the selection groups, once,
@@ -740,6 +759,10 @@ internal class AVPlayerEngine(
             audioGroup?.let { g ->
                 optionForLanguage(g, lang)?.let { playerItem.selectMediaOption(it, inMediaSelectionGroup = g) }
             }
+        }
+        if (sidecars.tracks.isNotEmpty()) {
+            applySidecarCaptionsDefault(playerItem, mi)
+            return
         }
         val tg = textGroup ?: return
         when (mi.captionsDefault) {
@@ -760,12 +783,81 @@ internal class AVPlayerEngine(
     }
 
     /**
-     * Whether two lower-cased BCP-47 tags name the same language, tolerating a region or variant on
-     * either side — `en` matches `en-GB`, and `en-GB` matches `en`. Both are compared as prefixes so
-     * neither the track nor the request has to be the more specific one.
+     * [applyTrackPreferences]' captions default for an item with sidecars, which compete with the media's
+     * own text tracks. OFF hides both. FOLLOW_SYSTEM biases to the preferred language among the media's
+     * own as before, and shows captions only when the user turned on Closed Captions + SDH and AVPlayer
+     * chose none itself.
      */
-    private fun languageTagMatches(tag: String, want: String): Boolean =
-        tag == want || tag.startsWith("$want-") || want.startsWith("$tag-")
+    private fun applySidecarCaptionsDefault(playerItem: AVPlayerItem, item: MediaItem) {
+        val group = textGroup
+        when (item.captionsDefault) {
+            CaptionsDefaultMode.OFF -> group?.let { playerItem.selectMediaOption(null, inMediaSelectionGroup = it) }
+            CaptionsDefaultMode.ON -> showCaptions(playerItem, group, item.preferredTextLanguage)
+            CaptionsDefaultMode.FOLLOW_SYSTEM -> {
+                val own = item.preferredTextLanguage?.let { want -> group?.let { optionForLanguage(it, want) } }
+                val chosen = group?.let { playerItem.selectedMediaOptionInMediaSelectionGroup(it) }
+                if (group != null && own != null) {
+                    playerItem.selectMediaOption(own, inMediaSelectionGroup = group)
+                } else if (chosen == null && systemCaptionsOn()) {
+                    showCaptions(playerItem, group, item.preferredTextLanguage)
+                }
+            }
+        }
+    }
+
+    /**
+     * Captions on, for an item with sidecars: the media's own text track in [wanted], else a sidecar in
+     * it, else the media's own default track, else the first sidecar.
+     */
+    private fun showCaptions(playerItem: AVPlayerItem, group: AVMediaSelectionGroup?, wanted: String?) {
+        val sidecar = wanted?.let { want ->
+            sidecars.tracks.firstOrNull { track -> track.language?.let { languageTagMatches(it, want) } == true }
+        }
+        val own = wanted?.let { want -> group?.let { optionForLanguage(it, want) } }
+            ?: group?.defaultOption?.takeIf { sidecar == null }
+        if (group != null && own != null) {
+            playerItem.selectMediaOption(own, inMediaSelectionGroup = group)
+        } else {
+            group?.let { playerItem.selectMediaOption(null, inMediaSelectionGroup = it) }
+            showSidecar((sidecar ?: sidecars.tracks.first()).id)
+        }
+    }
+
+    /** Whether the user turned on Closed Captions + SDH in iOS's accessibility settings. */
+    private fun systemCaptionsOn(): Boolean =
+        MACaptionAppearanceGetDisplayType(kMACaptionAppearanceDomainUser) == kMACaptionAppearanceDisplayTypeAlwaysOn
+
+    /** Takes [item]'s sidecars in place of the last item's, `null` for none, with none showing. */
+    private fun resetSidecars(item: MediaItem?) {
+        sidecars.attach(item)
+        showSidecar(null)
+    }
+
+    /** Shows the sidecar named [id], or none for `null`, ticking its cues into state while one shows. */
+    private fun showSidecar(id: String?) {
+        sidecars.show(id)
+        val avPlayer = player
+        if (sidecars.shownId == null) {
+            cueObserver?.let { avPlayer?.removeTimeObserver(it) }
+            cueObserver = null
+        } else if (cueObserver == null && avPlayer != null) {
+            // Ten times a second: AVPlayer has no cue events for a file it never saw, and the position
+            // poll is too coarse for a caption's timing.
+            val weakSelf = WeakReference(this)
+            val tenth = CMTimeMake(1, 10)
+            cueObserver = avPlayer.addPeriodicTimeObserverForInterval(tenth, dispatch_get_main_queue()) { _ ->
+                weakSelf.get()?.let { if (!it.released) it.publishCues() }
+            }
+        }
+        publishCues()
+    }
+
+    /** Publishes the showing sidecar's cues at the playhead, when they differ from the last. */
+    private fun publishCues() {
+        val seconds = player?.let { CMTimeGetSeconds(it.currentTime()) } ?: Double.NaN
+        val cues = if (seconds.isNaN() || seconds < 0) emptyList() else sidecars.cuesAt((seconds * 1000).toLong())
+        if (cues != _state.value.sidecarCues) _state.update { it.copy(sidecarCues = cues) }
+    }
 
     /** First selection option in [group] whose BCP-47 language tag matches [bcp47] (prefix-tolerant). */
     private fun optionForLanguage(group: AVMediaSelectionGroup, bcp47: String): AVMediaSelectionOption? {

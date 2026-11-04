@@ -31,8 +31,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.nonbinary.outis.core.source.DrmScheme
 import dev.nonbinary.outis.core.source.MimeType
+import dev.nonbinary.outis.core.source.SubtitleFormat
 import dev.nonbinary.outis.sample.catalogue.CatalogueDrm
 import dev.nonbinary.outis.sample.catalogue.CatalogueItem
+import dev.nonbinary.outis.sample.catalogue.CatalogueSubtitle
 
 /** Marks the entry this form produces, so the catalogue can highlight it like any other selection. */
 const val CUSTOM_STREAM_ID = "custom-stream"
@@ -56,6 +58,8 @@ fun CustomStreamForm(onPlay: (CatalogueItem) -> Unit, modifier: Modifier = Modif
     var scheme by remember { mutableStateOf(DrmScheme.WIDEVINE) }
     var licenceUrl by remember { mutableStateOf("") }
     var certificateUrl by remember { mutableStateOf("") }
+    var subtitleUrl by remember { mutableStateOf("") }
+    var subtitleFormat by remember { mutableStateOf<SubtitleFormat?>(null) }
 
     // FairPlay cannot start a key session without the FPS application certificate, so a licence URL
     // alone is not enough to enable Play — the catalogue's own FairPlay entry documents this.
@@ -95,6 +99,13 @@ fun CustomStreamForm(onPlay: (CatalogueItem) -> Unit, modifier: Modifier = Modif
             }
         }
 
+        SubtitleSection(
+            url = subtitleUrl,
+            onUrl = { subtitleUrl = it },
+            format = subtitleFormat,
+            onFormat = { subtitleFormat = it },
+        )
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(checked = drmOn, onCheckedChange = { drmOn = it })
             Text("DRM", modifier = Modifier.padding(start = 12.dp))
@@ -131,11 +142,42 @@ fun CustomStreamForm(onPlay: (CatalogueItem) -> Unit, modifier: Modifier = Modif
                         } else {
                             null
                         },
+                        subtitles = subtitleUrl.trim().takeIf { it.isNotEmpty() }
+                            ?.let { listOf(CatalogueSubtitle(url = it, format = subtitleFormat)) }
+                            .orEmpty(),
                     ),
                 )
             },
         ) {
             Text("Play")
+        }
+    }
+}
+
+/** The optional subtitle file beside the stream, and its format when the URL's extension does not say. */
+@Composable
+private fun SubtitleSection(
+    url: String,
+    onUrl: (String) -> Unit,
+    format: SubtitleFormat?,
+    onFormat: (SubtitleFormat?) -> Unit,
+) {
+    OutlinedTextField(
+        value = url,
+        onValueChange = onUrl,
+        label = { Text("Subtitle file URL (optional)") },
+        supportingText = { Text("WebVTT or SRT, beside the stream.") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (url.isNotBlank()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Auto reads the format from the extension: `.srt` is SRT, anything else WebVTT.
+            FilterChip(selected = format == null, onClick = { onFormat(null) }, label = { Text("Auto") })
+            SubtitleFormat.entries.forEach { entry ->
+                FilterChip(selected = format == entry, onClick = { onFormat(entry) }, label = { Text(entry.name) })
+            }
         }
     }
 }

@@ -18,6 +18,12 @@ import dev.nonbinary.outis.core.VideoPlayer
  * anywhere in your own layout: an overlay shell, a side-by-side rail, a mini-player, etc. It draws
  * **only** the video (and, on platforms that support it, subtitle cues); controls are entirely
  * separate. Bind it to a [VideoPlayer]; it reacts to the player being (re)created internally.
+ *
+ * [subtitleSize] is the cue text height and [subtitleBottom] the gap below the cues, each a fraction of the surface
+ * height; null keeps the platform's own default. Android sizes and insets Media3's SubtitleView; iOS sets the item's
+ * text style rules (font size and line position against the video height) and draws sidecar cues to the same values;
+ * the web styles and places the native cues on the `<video>`. A gap of a third or so lifts cues clear of a control
+ * bar while it is up.
  */
 @ExperimentalPlayerUiApi
 @Composable
@@ -27,4 +33,6 @@ public expect fun PlayerSurface(
     contentScale: ContentScale = ContentScale.Fit,
     surfaceType: SurfaceType = SurfaceType.SurfaceView,
     showSubtitles: Boolean = true,
+    subtitleSize: Float? = null,
+    subtitleBottom: Float? = null,
 )

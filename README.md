@@ -3,7 +3,7 @@
 <img src="docs/img/lockup-light-1273w.png" width="480" alt="Outis — a Kotlin Multiplatform video player">
 </picture></p>
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.nonbinarydev/outis-core?label=maven%20central)](https://central.sonatype.com/artifact/io.github.nonbinarydev/outis-core) [![Licence](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE) [![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-blue)](https://kotlinlang.org) ![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS%20%7C%20Web-blue)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.nonbinarydev/outis-core?label=maven%20central)](https://central.sonatype.com/artifact/io.github.nonbinarydev/outis-core) [![Licence](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE) [![Kotlin](https://img.shields.io/badge/kotlin-2.4.21-blue)](https://kotlinlang.org) ![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS%20%7C%20Web-blue)
 
 [![Quality gate](https://sonarcloud.io/api/project_badges/measure?project=nonbinarydev_outis&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nonbinarydev_outis) [![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=nonbinarydev_outis&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=nonbinarydev_outis) [![detekt](https://github.com/nonbinarydev/outis/actions/workflows/detekt.yml/badge.svg)](https://github.com/nonbinarydev/outis/actions/workflows/detekt.yml) [![Qodana](https://github.com/nonbinarydev/outis/actions/workflows/qodana_code_quality.yml/badge.svg)](https://github.com/nonbinarydev/outis/actions/workflows/qodana_code_quality.yml)
 
@@ -32,7 +32,7 @@ Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo
 |---|---|
 | Android | Media3 / ExoPlayer 1.11.1 |
 | iOS | AVFoundation `AVPlayer` |
-| Web (JS) | Shaka Player 5.3.1, over an HTML `<video>` |
+| Web (JS) | Shaka Player 5.3.3, over an HTML `<video>` |
 
 **Status: `0.1.0-alpha01`.** Not yet published to Maven Central; the coordinates below will not resolve until the first release.
 
@@ -49,6 +49,7 @@ Try it in the <a href="https://nonbinarydev.github.io/outis/demo/">live web demo
 | **PlayReady** DRM | ✅ (device CDM only) | ❌ | ✅ (Edge) |
 | **FairPlay** DRM | ❌ | ✅ | ✅ (Safari) |
 | Audio / subtitle track selection | ✅ | ✅ | ✅ |
+| Sidecar subtitles (WebVTT, SRT) | ✅ | ✅ (drawn by `:ui`; not in PiP or AirPlay) | ✅ (host must allow CORS) |
 | Client-side ads (IMA) | ✅ | ❌ | ✅ (adaptive sources only) |
 | Server-side ads (SSAI) | app-driven | app-driven | app-driven |
 | Chapters, declared or from a WebVTT sidecar | ✅ | ✅ | ✅ |
@@ -64,7 +65,7 @@ native controls ([how](docs/ui.md#web-surface)). Video quality is the engine's t
 
 ## Requirements
 
-Android `minSdk` 24 and `compileSdk` 37; JVM target 11; Kotlin 2.4.10; Compose Multiplatform 1.11.1 for `:ui`. Apple
+Android `minSdk` 24 and `compileSdk` 37; JVM target 11; Kotlin 2.4.21; Compose Multiplatform 1.12.2 for `:ui`. Apple
 targets build on macOS only, and `iosArm64` / `iosSimulatorArm64` are the only ones published — there is no `iosX64`, so
 Intel Macs cannot run the simulator build.
 

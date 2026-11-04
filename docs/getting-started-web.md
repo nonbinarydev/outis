@@ -13,7 +13,7 @@ the Compose canvas, the host page, and — on the `:core`-only route — the fac
 its `<video>` but never puts it in the document. This page covers all three, in that order, plus the
 two page-level side effects the Compose surface has on your DOM.
 
-The web engine is [Shaka Player](https://github.com/shaka-project/shaka-player) 5.3.1 driving an
+The web engine is [Shaka Player](https://github.com/shaka-project/shaka-player) 5.3.3 driving an
 HTML `<video>` element. Adaptive sources (HLS, DASH) go through Shaka; a single progressive file
 (mp4, webm) is played straight off `video.src`, which matters more than it sounds — see
 [Progressive sources take a different path](#8-progressive-sources-take-a-different-path).
@@ -74,7 +74,7 @@ Compose-plugin flag, not an Outis one, and `:core`-only consumers do not need it
 
 `:core` declares `shaka-player` as an npm dependency of its `jsMain` source set, at the version pinned
 in `gradle/libs.versions.toml` (`shakaPlayer`), and the Kotlin/JS plugin records that in the artifact's
-published `package.json` — this repository's own build output shows `"shaka-player": "5.3.1"` under
+published `package.json` — this repository's own build output shows `"shaka-player": "5.3.3"` under
 `dependencies` for both `outis-core` and `outis-ui`. Your project's generated `package.json` picks it
 up transitively. Adding it again yourself only risks a version conflict.
 
@@ -116,7 +116,7 @@ If you use client-side ads, the page also needs the IMA loader — see
 
 ## 3. The Compose entry point
 
-Compose Multiplatform 1.11.1 mounts a JS composition with `ComposeViewport`
+Compose Multiplatform 1.12.2 mounts a JS composition with `ComposeViewport`
 (`androidx.compose.ui.window.ComposeViewport`, `@ExperimentalComposeUiApi`). It takes either a
 container element id or an `Element`; passing `null` (the default) uses `<body>`.
 
@@ -166,7 +166,7 @@ Compose's own and is required.
 `PlayerView` takes `surfaceType` and `showSubtitles` parameters that the web `PlayerSurface` accepts
 and never reads (`ui/src/jsMain/kotlin/dev/nonbinary/outis/ui/PlayerSurface.js.kt`) — they are
 Android and iOS concerns. Text-track *selection* still works: `selectTrack` / `clearTextTrack` drive
-Shaka's text tracks on the adaptive path.
+Shaka's text tracks on the adaptive path, and a progressive file's sidecar `subtitles`.
 
 There is no `rememberPlayerWindow` on web — it is an Android actual
 (`ui/src/androidMain/kotlin/dev/nonbinary/outis/ui/window/PlayerWindow.android.kt`). If you want the
@@ -322,7 +322,8 @@ extension-matched `.mp4` / `.webm` URLs to `video.src` directly, bypassing Shaka
 - **`AdConfig.ClientSide` is silently ignored** — ads are requested inside the Shaka load handler
   (`ShakaEngine.kt`), which the progressive branch returns before reaching
   (`ShakaEngine.kt`).
-- **Audio and text tracks stay empty** — `loadTracks()` runs on the Shaka path only.
+- **The file reports no tracks of its own** — `loadTracks()` runs on the Shaka path only. `textTracks`
+  holds just the item's sidecar `subtitles`, which the engine fetches without `headers`.
 
 `MediaSource.LocalFile.path` is assigned to `video.src` verbatim, and a browser cannot open a
 filesystem path, so local-file playback on web needs a URL the page origin can actually serve. See
@@ -336,6 +337,7 @@ filesystem path, so local-file playback on web needs a URL the page origin can a
 | `CaptionsDefaultMode.FOLLOW_SYSTEM` | Treated as `OFF` on web; there is no universal caption-accessibility signal (`MediaItem.kt`). |
 | DRM | Widevine in Chrome, Edge and Firefox; PlayReady in Edge; FairPlay in Safari. A scheme the browser lacks fails before loading, as `PlayerError.Category.DRM`; a failure during the load takes Shaka's own category, so a key-system error is `DRM` too — see [DRM](drm.md). |
 | Chapters | Declared `MediaItem.chapters` and a `chaptersUrl` WebVTT sidecar both work; chapters embedded in a file are never read on web. |
+| Sidecar subtitles | `MediaItem.subtitles` works on both paths, WebVTT and SRT. The engine fetches each file itself, so its host needs CORS. |
 
 Everything else — sources, transport, state and events, tracks, live, quality caps — behaves as
 described in [Playback](playback.md).
