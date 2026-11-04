@@ -24,7 +24,7 @@ something you take prebuilt from this repository.
   Mac; you need Apple silicon, or a real device.
 - **Nothing has been published yet.** At `0.1.0-alpha01` the coordinates below will not resolve from
   Maven Central. See [Platform support](platform-support.md) for the full requirements table.
-- Kotlin 2.4.10, plus Compose Multiplatform 1.11.1 if you take `outis-ui`.
+- Kotlin 2.4.21, plus Compose Multiplatform 1.12.2 if you take `outis-ui`.
 
 ---
 
@@ -101,7 +101,7 @@ against the Kotlin Gradle plugin 2.4.10 sources). Two related traps:
 ### 3. Host the Compose surface
 
 `outis-ui` renders through Compose, so on iOS you wrap it in a `UIViewController` with
-`ComposeUIViewController` (`androidx.compose.ui.window`, Compose Multiplatform 1.11.1) and present
+`ComposeUIViewController` (`androidx.compose.ui.window`, Compose Multiplatform 1.12.2) and present
 that from SwiftUI or UIKit. Put this in your shared module's `iosMain`, in a file named
 `PlayerViewController.kt` — the file name decides the Swift name:
 

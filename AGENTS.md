@@ -5,7 +5,7 @@ and the ADRs in `docs/decisions/`.
 
 Outis is a Kotlin Multiplatform video player SDK — one engine-agnostic playback API across Android
 (Media3), iOS (AVFoundation) and Web (Shaka), plus an optional Compose Multiplatform UI. Kotlin
-2.4.10, AGP 9.1.1, `minSdk` 24, `compileSdk` 37.
+2.4.21, AGP 9.1.1, `minSdk` 24, `compileSdk` 37.
 
 ## Modules
 
