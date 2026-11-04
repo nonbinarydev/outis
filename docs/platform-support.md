@@ -194,13 +194,13 @@ See [Client-side ads](ads-client-side.md) and [Server-side ads](ads-server-side.
 
 ### The Compose UI (`outis-ui`)
 
-`PlayerSurface` has an actual for Android, iOS and JS. Within that, three parameters are not
-universal:
+`PlayerSurface` has an actual for Android, iOS and JS. Within that, these are not universal:
 
 | Parameter | Behaviour |
 |---|---|
 | `surfaceType` | Android only. `SurfaceView` and `TextureView` are Android concepts; the iOS and JS actuals accept the parameter and ignore it (`PlayerSurface.ios.kt`, `PlayerSurface.js.kt`). |
 | `showSubtitles` | Android toggles the Media3 `SubtitleView` (`PlayerSurface.android.kt`). iOS toggles only the sidecar cues the surface draws, as AVKit renders the media's own; on web the `<video>` and Shaka do. |
+| `subtitleSize`, `subtitleBottom` | Honoured on all three, and null keeps the platform's default. Android sizes and pads the Media3 `SubtitleView`, as fractions of its height (`PlayerSurface.android.kt`). iOS measures against the picture, not the surface, so letterboxing makes them smaller: `AVPlayerItem.textStyleRules` for the media's own text tracks, and the sidecar cues the surface draws (`PlayerSurface.ios.kt`). Web covers native cues on the `<video>`, against its height: a `::cue` font size, and each active cue's line position (`PlayerSurface.js.kt`). So far, only Android has been run on a device. |
 | Keyboard shortcuts | Web only. `PlatformPlayerKeyboard` attaches a DOM `keydown` listener on JS; the Android and iOS actuals are no-ops (`PlayerKeyboard.kt`). |
 
 `rememberPlayerWindow` — the helper that wires fullscreen and Picture-in-Picture to the host

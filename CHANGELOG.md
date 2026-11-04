@@ -70,6 +70,8 @@ First release. Not yet published to Maven Central.
   shows no cues and never stops playback.
 - `PlayerState.sidecarCues` (experimental): the cues to draw now, on iOS, whose AVPlayer takes no subtitle
   file. `PlayerSurface` draws them over the video.
+- `subtitleSize` and `subtitleBottom` on `PlayerSurface`: the cue text height and the gap below the cues,
+  each a fraction of the surface's height, on all three platforms.
 
 **Ads**
 
