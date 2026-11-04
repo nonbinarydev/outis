@@ -1,5 +1,5 @@
 [versions]
-# Tied to the linter in qodana.yaml, which must stay on 2026.2-eap or newer: the 2026.1 image's bundled
+# Tied to the linter in qodana.yaml, which must stay on 2026.2 or newer: the 2026.1 image's bundled
 # IDE refuses to import anything past AGP 9.0.0 and analyses nothing at all. Lower AGP only together
 # with that, never alone.
 #

@@ -53,15 +53,15 @@ detekt runs with `autoCorrect` on locally (off in CI, guarded by `System.getenv(
 ## Comments and docs
 
 Write **fewer, shorter** comments than feels natural. A comment states a *live constraint* that will
-break something if violated ("the linter must stay on 2026.2-eap or newer"), not the history behind a
+break something if violated ("the linter must stay on 2026.2 or newer"), not the history behind a
 decision. The story of what was tried belongs in the commit message or the issue, not the source.
 
 ## Version-catalog pins that are load-bearing
 
 Some versions are held deliberately; read the comment before changing them.
 
-- **AGP 9.1.1 is tied to the Qodana linter** (`qodana.yaml`, `2026.2-eap`). The older linter's IDE
-  refused to import past AGP 9.0.0 and analysed nothing. Lower AGP only together with the linter.
+- **AGP 9.1.1 is tied to the Qodana linter** (`qodana.yaml`, `2026.2`). Each linter image's IDE caps
+  the AGP it can import, and past it Qodana analyses nothing. Move AGP only together with the linter.
 - **`androidx.core` 1.19.0 and `lifecycle` 2.11.0 require `compileSdk` 37** (`checkAarMetadata` fails
   hard on 36). These move together with `android-compileSdk`.
 - The **Maven Central search index lags** — it did not list Koin 4.2.2 while the artifact existed.
