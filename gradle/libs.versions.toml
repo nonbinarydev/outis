@@ -6,7 +6,7 @@
 # 9.1.x also matters beyond the linter. AGP 9.0.0 bundles R8 9.0.32, which predates Kotlin 2.4.10 and
 # cannot parse its metadata — every build logged "Unexpected error during rewriting of Kotlin metadata"
 # for PlayerState, AdEvent$AdCompleted and others. AGP 9.1's R8 reads it, and those are gone.
-agp = "9.1.1"
+agp = "9.5.0"
 kotlin = "2.4.21"
 android-minSdk = "24"
 android-compileSdk = "37"

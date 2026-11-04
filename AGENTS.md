@@ -5,7 +5,7 @@ and the ADRs in `docs/decisions/`.
 
 Outis is a Kotlin Multiplatform video player SDK — one engine-agnostic playback API across Android
 (Media3), iOS (AVFoundation) and Web (Shaka), plus an optional Compose Multiplatform UI. Kotlin
-2.4.21, AGP 9.1.1, `minSdk` 24, `compileSdk` 37.
+2.4.21, AGP 9.5.0, `minSdk` 24, `compileSdk` 37.
 
 ## Modules
 
@@ -60,7 +60,7 @@ decision. The story of what was tried belongs in the commit message or the issue
 
 Some versions are held deliberately; read the comment before changing them.
 
-- **AGP 9.1.1 is tied to the Qodana linter** (`qodana.yaml`, `2026.2`). Each linter image's IDE caps
+- **AGP 9.5.0 is tied to the Qodana linter** (`qodana.yaml`, `2026.2`). Each linter image's IDE caps
   the AGP it can import, and past it Qodana analyses nothing. Move AGP only together with the linter.
 - **`androidx.core` 1.19.0 and `lifecycle` 2.11.0 require `compileSdk` 37** (`checkAarMetadata` fails
   hard on 36). These move together with `android-compileSdk`.
