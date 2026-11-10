@@ -28,6 +28,8 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLVideoElement
+import org.w3c.dom.events.Event
+import kotlin.math.roundToInt
 
 /**
  * Web surface — the Compose control overlay **on top of** the video, the same shared overlay used on
@@ -60,6 +62,8 @@ public actual fun PlayerSurface(
     contentScale: ContentScale,
     surfaceType: SurfaceType,
     showSubtitles: Boolean,
+    subtitleSize: Float?,
+    subtitleBottom: Float?,
 ) {
     val video by produceState(player.nativePlayerHandle as? HTMLVideoElement, player) {
         value = player.nativePlayerHandle as? HTMLVideoElement
@@ -98,6 +102,16 @@ public actual fun PlayerSurface(
         }
     }
 
+    // Subtitle size and gap: native cues (Shaka's default displayer) on the <video>, styled and placed by CueStyler.
+    val styler = remember(video, subtitleSize, subtitleBottom) {
+        video?.takeIf { subtitleSize != null || subtitleBottom != null }
+            ?.let { CueStyler(it, subtitleSize, subtitleBottom) }
+    }
+    DisposableEffect(styler) {
+        styler?.start()
+        onDispose { styler?.stop() }
+    }
+
     // On a fatal error the (behind-the-overlay) video would show a frozen/garbage frame through the
     // canvas hole. Hide it so the Compose error overlay paints over a clean background; restored on the
     // next good load.
@@ -119,6 +133,7 @@ public actual fun PlayerSurface(
                 placement.widthPx = size.width / density
                 placement.heightPx = size.height / density
                 video?.let(placement::applyTo)
+                styler?.restyle()
             },
     )
 }
@@ -159,5 +174,78 @@ private class ElementPlacement {
             width = "${widthPx}px"
             height = "${heightPx}px"
         }
+    }
+}
+
+private var cueStylers = 0
+
+/**
+ * The web side of [PlayerSurface]'s subtitle size and gap, for the native cues Shaka's default text displayer puts on
+ * the `<video>`. Size is a `::cue` font size scoped to this element; the gap is each active cue's line position, set
+ * as cues change. Placing cues is safe -- it is changing a track's mode that makes Shaka restart its text stream.
+ */
+private class CueStyler(private val video: HTMLVideoElement, private val size: Float?, private val bottom: Float?) {
+    private val cls = "outis-cues-" + (++cueStylers)
+    private val sheet = document.createElement("style") as HTMLElement
+    private val wired = mutableListOf<dynamic>()
+    private val onCue: (Event) -> Unit = { place() }
+    private val onAdd: (Event) -> Unit = { wire() }
+
+    fun start() {
+        video.classList.add(cls)
+        document.head?.appendChild(sheet)
+        video.textTracks.asDynamic().addEventListener("addtrack", onAdd)
+        wire()
+        restyle()
+    }
+
+    fun stop() {
+        video.classList.remove(cls)
+        sheet.parentNode?.removeChild(sheet)
+        video.textTracks.asDynamic().removeEventListener("addtrack", onAdd)
+        wired.forEach { it.removeEventListener("cuechange", onCue) }
+        wired.clear()
+    }
+
+    private fun height(): Double = video.clientHeight.takeIf { it > 0 }?.toDouble() ?: window.innerHeight.toDouble()
+
+    private fun wire() {
+        val tracks = video.textTracks.asDynamic()
+        for (i in 0 until (tracks.length as Int)) {
+            val t = tracks[i]
+            if (wired.none { it === t }) {
+                t.addEventListener("cuechange", onCue)
+                wired.add(t)
+            }
+        }
+    }
+
+    fun restyle() {
+        size?.let { sheet.textContent = "video.$cls::cue { font-size: ${(it * height()).roundToInt()}px; }" }
+        place()
+    }
+
+    private fun place() {
+        val b = bottom ?: return
+        val h = height()
+        // A native cue line is its font size plus leading, ~1.36x; Chromium's default font is ~5% of the height.
+        val perLine = (size ?: DEFAULT_CUE_SIZE) * h * CUE_LEADING
+        for (t in wired) {
+            val active = t.activeCues ?: continue
+            for (c in 0 until (active.length as Int)) {
+                val cue = active[c]
+                val lines = ((cue.text as? String).orEmpty().count { it == '\n' } + 1).coerceIn(1, MAX_CUE_LINES)
+                cue.snapToLines = false
+                cue.lineAlign = "start"
+                cue.line = ((h * (1 - b) - lines * perLine) / h * PERCENT).coerceIn(0.0, PERCENT)
+            }
+        }
+    }
+
+    private companion object {
+        const val DEFAULT_CUE_SIZE = 0.05f
+        const val CUE_LEADING = 1.36
+        const val MAX_CUE_LINES = 4
+        const val PERCENT = 100.0
     }
 }

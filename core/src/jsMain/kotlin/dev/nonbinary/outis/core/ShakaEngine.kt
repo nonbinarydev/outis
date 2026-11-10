@@ -21,6 +21,7 @@ import dev.nonbinary.outis.core.source.unsupportedDrmError
 import dev.nonbinary.outis.core.thumbnails.loadThumbnails
 import dev.nonbinary.outis.core.track.MediaTrack
 import dev.nonbinary.outis.core.track.TrackType
+import dev.nonbinary.outis.core.track.languageTagMatches
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.CoroutineScope
@@ -88,6 +89,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
     override val nativePlayerHandle: Any? get() = _native.value
 
     private val scope: CoroutineScope = MainScope()
+    private val nativeSubtitles = NativeSubtitles(video, scope)
 
     private var released = false
     private var playWhenReady = false
@@ -112,6 +114,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
 
     /** id -> Shaka video stream id, the join key onto a variant's `videoId`. */
     private val videoSelectionById = mutableMapOf<String, Int>()
+    private var firstSidecarId: Any? = null // Shaka's id for the item's first sidecar, its default text track
     private val components = mutableListOf<PlayerComponent>()
     private val host = object : PlayerHost {
         override val state: StateFlow<PlayerState> get() = this@ShakaEngine.state
@@ -183,6 +186,8 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
         textTrackById.clear()
         audioTrackById.clear()
         videoSelectionById.clear()
+        nativeSubtitles.clear()
+        firstSidecarId = null
         playWhenReady = autoPlay
         requests.mediaHeaders = item.headers
         clearPendingStartListener() // drop any un-fired native start-position listener from a prior item
@@ -282,6 +287,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
         if (progressive) {
             usingShaka = false
             startNativePlayback(url, item.startPositionMs)
+            nativeSubtitles.attach(item).takeIf { it.isNotEmpty() }?.let(::publishTextTracks)
             return js("Promise.resolve()")
         }
         // Ask the browser for the key system before Shaka does, so a scheme it lacks fails as a DRM error
@@ -314,11 +320,16 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
             { _ ->
                 if (!released && generation == loadGeneration) {
                     if (playWhenReady) playWithAutoplayFallback()
-                    loadTracks()
-                    applyCaptionsDefault(item) // after loadTracks so its textchanged re-read sees the visibility
-                    reconcile()
-                    // Client-side ads (CSAI) stitch over the Shaka (MSE) stream via the ad manager.
-                    (item.adConfig as? AdConfig.ClientSide)?.let { ads.request(shakaPlayer, it.adTagUri) }
+                    if (item.subtitles.isEmpty()) {
+                        onShakaLoaded(item)
+                    } else {
+                        shakaPlayer.addSidecarSubtitles(item.subtitles).then { first ->
+                            if (!released && generation == loadGeneration) {
+                                firstSidecarId = first
+                                onShakaLoaded(item)
+                            }
+                        }
+                    }
                 }
                 Unit
             },
@@ -327,6 +338,14 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
                 Unit
             },
         )
+    }
+
+    private fun onShakaLoaded(item: MediaItem) {
+        loadTracks()
+        shakaPlayer.applyCaptionsDefault(item, firstSidecarId) // after loadTracks: its textchanged re-read sees it
+        reconcile()
+        // Client-side ads (CSAI) stitch over the Shaka (MSE) stream via the ad manager.
+        (item.adConfig as? AdConfig.ClientSide)?.let { ads.request(shakaPlayer, it.adTagUri) }
     }
 
     /** Native (non-Shaka) playback for progressive files; called once Shaka's unload has settled. */
@@ -428,6 +447,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
         if (released) return
         ++loadGeneration // a load still in the chain must not start after this
         clearPendingStartListener()
+        nativeSubtitles.clear()
         video.pause()
         if (usingShaka) shakaPlayer.unload().catch { it } else video.removeAttribute("src")
         usingShaka = false
@@ -470,6 +490,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
         scope.cancel()
         video.pause()
         ads.release()
+        nativeSubtitles.clear()
         shakaPlayer.destroy().catch { it }
         _native.value = null
     }
@@ -485,7 +506,14 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
     }
 
     override fun selectTrack(track: MediaTrack) {
-        if (released || !usingShaka) return
+        if (released) return
+        if (!usingShaka) {
+            if (track.type == TrackType.TEXT && nativeSubtitles.has(track.id)) {
+                nativeSubtitles.show(track.id)
+                publishTextTracks(_state.value.textTracks.map { it.copy(isSelected = it.id == track.id) })
+            }
+            return
+        }
         when (track.type) {
             TrackType.AUDIO -> audioTrackById[track.id]?.let { shakaTrack ->
                 shakaPlayer.selectAudioTrack(shakaTrack)
@@ -517,31 +545,15 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
 
     override fun clearTextTrack() {
         if (released) return
-        if (usingShaka) shakaPlayer.selectTextTrack(null)
-        _state.update { st ->
-            st.copy(
-                textTracks = st.textTracks.map { it.copy(isSelected = false) },
-                selectedTextTrackId = null,
-            )
-        }
-        emit { p, t -> _state.value.tracksChanged(p, t) }
+        if (usingShaka) shakaPlayer.selectTextTrack(null) else nativeSubtitles.show(null)
+        publishTextTracks(_state.value.textTracks.map { it.copy(isSelected = false) })
     }
 
-    /**
-     * Initial caption visibility after load. FOLLOW_SYSTEM has no universal web signal, so it maps to OFF.
-     * ON with no preferred language shows the manifest's primary text track, else its first.
-     */
-    private fun applyCaptionsDefault(item: MediaItem) {
-        val tracks = shakaPlayer.getTextTracks()
-        if (item.captionsDefault != CaptionsDefaultMode.ON) {
-            // Off also hides forced subtitles Shaka may have picked for the audio language.
-            if (tracks.any { it.active == true }) shakaPlayer.selectTextTrack(null)
-            return
-        }
-        if (tracks.none { it.active == true }) {
-            val pick: Any? = tracks.firstOrNull { it.primary == true } ?: tracks.firstOrNull()
-            if (pick != null) shakaPlayer.selectTextTrack(pick)
-        }
+    /** Publishes [tracks] as the text tracks, with the one marked selected as the selection. */
+    private fun publishTextTracks(tracks: List<MediaTrack>) {
+        val selected = tracks.firstOrNull { it.isSelected }?.id
+        _state.update { it.copy(textTracks = tracks, selectedTextTrackId = selected) }
+        emit { p, t -> _state.value.tracksChanged(p, t) }
     }
 
     // ---- events + state ----
@@ -744,6 +756,7 @@ internal class ShakaEngine(private val config: PlayerConfig) : PlatformEngine {
                 label = tt.label as? String,
                 language = tt.language as? String,
                 isSelected = tt.active == true,
+                isDefault = tt.primary == true || tt.id == firstSidecarId,
             )
         }
 
@@ -938,6 +951,30 @@ private fun shaka.Player.configureLanguagePreferences(item: MediaItem) {
     config.preferredAudio = audio.toTypedArray()
     config.preferredText = text.toTypedArray()
     configure(config)
+}
+
+/**
+ * Initial caption visibility after load. FOLLOW_SYSTEM has no universal web signal, so it maps to OFF. ON,
+ * when Shaka showed nothing itself, shows the preferred language's track, else the manifest's primary
+ * text track, else the first sidecar, [firstSidecarId], else the first track.
+ */
+private fun shaka.Player.applyCaptionsDefault(item: MediaItem, firstSidecarId: Any?) {
+    val tracks = getTextTracks()
+    if (item.captionsDefault != CaptionsDefaultMode.ON) {
+        // Off also hides forced subtitles Shaka may have picked for the audio language.
+        if (tracks.any { it.active == true }) selectTextTrack(null)
+        return
+    }
+    if (tracks.none { it.active == true }) {
+        val preferred: Any? = item.preferredTextLanguage?.let { want ->
+            tracks.firstOrNull { (it.language as? String)?.let { tag -> languageTagMatches(tag, want) } == true }
+        }
+        val pick: Any? = preferred
+            ?: tracks.firstOrNull { it.primary == true }
+            ?: tracks.firstOrNull { it.id == firstSidecarId }
+            ?: tracks.firstOrNull()
+        if (pick != null) selectTextTrack(pick)
+    }
 }
 
 private fun shaka.Player.disableAbr() {

@@ -147,6 +147,14 @@ public data class PlayerState(
      * every engine, streams included.
      */
     val thumbnails: List<ThumbnailCue> = emptyList(),
+    /**
+     * The text of the cues to draw over the video now, one entry per cue, from the item's selected sidecar
+     * subtitle file ([dev.nonbinary.outis.core.source.MediaItem.subtitles]) on an engine whose player takes
+     * no such file: iOS, where AVPlayer has no way to add one. `:ui`'s `PlayerSurface` draws them, and a
+     * custom surface on iOS must. Always empty on Android and Web, whose players draw sidecars themselves.
+     */
+    @ExperimentalPlayerApi
+    val sidecarCues: List<String> = emptyList(),
 )
 
 /**

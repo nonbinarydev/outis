@@ -19,15 +19,15 @@ stated otherwise.
 
 | | Version | Notes |
 |---|---|---|
-| Kotlin | 2.4.10 | Multiplatform plugin, applied by every library module. |
+| Kotlin | 2.4.21 | Multiplatform plugin, applied by every library module. |
 | Android Gradle Plugin | 9.1.1 | Both modules use the `com.android.kotlin.multiplatform.library` plugin. |
 | Gradle | 9.6.1 | `gradle/wrapper/gradle-wrapper.properties`; only relevant if you build Outis from source. |
 | Android `minSdk` | 24 | `core/build.gradle.kts`, `ui/build.gradle.kts`. |
 | Android `compileSdk` | 37 | `core/build.gradle.kts`, `ui/build.gradle.kts`. |
 | Android JVM bytecode target | 11 | Set on the Android compilations of every library module (`core/build.gradle.kts`, `ui/build.gradle.kts`, `analytics/mux/build.gradle.kts`). No project-wide Java toolchain is declared, so the plain `jvm()` target of `:core` uses the Kotlin compiler default. |
-| Compose Multiplatform | 1.11.1 | `:ui` only. `:core` has no Compose dependency of any kind (`core/build.gradle.kts`). |
+| Compose Multiplatform | 1.12.2 | `:ui` only. `:core` has no Compose dependency of any kind (`core/build.gradle.kts`). |
 | AndroidX Media3 | 1.11.1 | The Android engine (`exoplayer`, `-hls`, `-dash`, `-ima`), plus `media3-ui` in `:ui`. |
-| Shaka Player | 5.3.1 | Declared as an npm dependency by `:core`'s JS target, pinned as `shakaPlayer` in `gradle/libs.versions.toml`. The Kotlin/JS plugin propagates it to your `package.json` — **you do not add it yourself**. |
+| Shaka Player | 5.3.3 | Declared as an npm dependency by `:core`'s JS target, pinned as `shakaPlayer` in `gradle/libs.versions.toml`. The Kotlin/JS plugin propagates it to your `package.json` — **you do not add it yourself**. |
 
 Building the Apple targets requires macOS. Building the Android and JS targets does not.
 
@@ -97,7 +97,7 @@ needs declaring: the model's collections are plain `List` and `Map`
 
 | | Android | iOS | Web |
 |---|---|---|---|
-| Engine | Media3 / ExoPlayer 1.11.1 | `AVPlayer` (AVFoundation) | Shaka Player 5.3.1, plus the native `<video>` for progressive files |
+| Engine | Media3 / ExoPlayer 1.11.1 | `AVPlayer` (AVFoundation) | Shaka Player 5.3.3, plus the native `<video>` for progressive files |
 | `nativePlayerHandle` is | `ExoPlayer` (`ExoPlayerEngine.kt`) | `AVPlayer` (`AVPlayerEngine.kt`) | `HTMLVideoElement`, **never** `shaka.Player` (`ShakaEngine.kt`) |
 
 The Shaka `Player` instance is not exposed at all. On web, a progressive source (an `MimeType.MP4`, a
@@ -152,6 +152,7 @@ Two behaviours that are easy to misread as bugs:
 | `videoConstraints` resolution cap | Needs both `maxWidth` and `maxHeight` | Needs both (`AVPlayerEngine.kt`) | Each dimension applies independently (`ShakaEngine.kt`) |
 | `adConfig` (`ClientSide`) | Yes | **Ignored** — no iOS code path reads `MediaItem.adConfig` | Shaka (MSE) sources only (`ShakaAds.kt`); ignored for progressive |
 | `chapterThumbnails` | Yes, local files | Yes, local files | No — web parses no container chapters |
+| `subtitles` (WebVTT, SRT) | Yes, over HTTP with `headers`, or from `file://`/`content://` (`SidecarDataSource.kt`) Drawn by `:ui`'s `PlayerSurface` from `PlayerState.sidecarCues`; not in picture-in-picture or AirPlay | Yes, both branches (`SidecarSubtitles.kt`); the host needs CORS, and a progressive file's sidecars are fetched without `headers` |
 | `preferredAudioLanguage`, `preferredTextLanguage`, `startPositionMs`, `startMuted`, `loop` | Yes | Yes | Yes |
 
 The web `headers` gap is structural: the browser's `<video>` element cannot carry custom request
@@ -169,7 +170,7 @@ endpoint fails there.
 | `videoSize` | **Android only.** The iOS and web engines always write `null` (`PlayerState.kt`). Never gate layout on it. |
 | `bufferedPositionMs` | On iOS it is set to `positionMs` — a v1 approximation, not a real buffer level (`AVPlayerEngine.kt`). A buffer-ahead indicator reads permanently zero there. It is also an **absolute timeline position** on every platform, not a duration ahead of `positionMs` (`PlayerState.kt`). |
 | `chapters` | The item's declared `MediaItem.chapters` on all three engines, present as soon as the item is set. Otherwise from the `chaptersUrl` WebVTT sidecar on all three engines, streams included, and then parsed from a local MP4/Matroska container on Android and iOS; those are populated **asynchronously**, as a second state emission after load. |
-| `audioTracks`, `textTracks` | Populated on all three engines for adaptive streams. On web, a **progressive** source leaves both empty: `loadTracks()` runs only on the Shaka branch (`ShakaEngine.kt`) and from Shaka's own track events (`ShakaEngine.kt`), neither of which happens for native `<video>` playback. Any local file on web is progressive, so its audio and subtitle controls are inert. |
+| `audioTracks`, `textTracks` | Populated on all three engines for adaptive streams. On web, a **progressive** source reports none of its own: `loadTracks()` runs only on the Shaka branch (`ShakaEngine.kt`) and from Shaka's own track events (`ShakaEngine.kt`), neither of which happens for native `<video>` playback. So `audioTracks` stays empty there, and `textTracks` holds only the item's sidecar `subtitles`. |
 | `adState` | Written by the Android and web engines for client-side ads only (`ExoPlayerEngine.kt`, `ShakaAds.kt`). Never written on iOS by the SDK; `setAdState` (`AdContainer.ios.kt`) exists solely for a host-supplied IMA adapter to push into. |
 | `videoTracks` | Alternate renditions of the programme (a remaster beside an original), not the bitrate ladder. Reported on Android (one per DASH adaptation set) and web (labelled video streams); **never written on iOS**. Empty unless the manifest offers two or more labelled renditions. |
 
@@ -193,13 +194,13 @@ See [Client-side ads](ads-client-side.md) and [Server-side ads](ads-server-side.
 
 ### The Compose UI (`outis-ui`)
 
-`PlayerSurface` has an actual for Android, iOS and JS. Within that, three parameters are not
-universal:
+`PlayerSurface` has an actual for Android, iOS and JS. Within that, these are not universal:
 
 | Parameter | Behaviour |
 |---|---|
 | `surfaceType` | Android only. `SurfaceView` and `TextureView` are Android concepts; the iOS and JS actuals accept the parameter and ignore it (`PlayerSurface.ios.kt`, `PlayerSurface.js.kt`). |
-| `showSubtitles` | Android only — it toggles the Media3 `SubtitleView` (`PlayerSurface.android.kt`). On iOS `AVPlayerViewController` renders cues itself; on web the `<video>` and Shaka do. |
+| `showSubtitles` | Android toggles the Media3 `SubtitleView` (`PlayerSurface.android.kt`). iOS toggles only the sidecar cues the surface draws, as AVKit renders the media's own; on web the `<video>` and Shaka do. |
+| `subtitleSize`, `subtitleBottom` | Honoured on all three, and null keeps the platform's default. Android sizes and pads the Media3 `SubtitleView`, as fractions of its height (`PlayerSurface.android.kt`). iOS measures against the picture, not the surface, so letterboxing makes them smaller: `AVPlayerItem.textStyleRules` for the media's own text tracks, and the sidecar cues the surface draws (`PlayerSurface.ios.kt`). Web covers native cues on the `<video>`, against its height: a `::cue` font size, and each active cue's line position (`PlayerSurface.js.kt`). So far, only Android has been run on a device. |
 | Keyboard shortcuts | Web only. `PlatformPlayerKeyboard` attaches a DOM `keydown` listener on JS; the Android and iOS actuals are no-ops (`PlayerKeyboard.kt`). |
 
 `rememberPlayerWindow` — the helper that wires fullscreen and Picture-in-Picture to the host

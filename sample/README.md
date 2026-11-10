@@ -193,6 +193,7 @@ Each item:
 | `chaptersUrl` | no | WebVTT chapters sidecar. |
 | `chapters` | no | Chapters declared inline, each `startMs`, optional `title` and `endMs`. They win over `chaptersUrl`, so keep the sidecar for sample builds that predate the field. |
 | `thumbnailsUrl` | no | WebVTT trickplay-thumbnails sidecar. |
+| `subtitles` | no | Subtitle files beside the stream, each a `url` and optionally a `language`, a `label` and a `format` (`WEBVTT` or `SRT`; without one the URL's extension decides). The first is the default. Shown on all three platforms; on iOS the player UI draws them. |
 | `note` | no | Why this entry exists, or what it will not do on which platform. |
 
 **DRM is declarative on purpose.** `DrmConfig` also carries `licenseRequestInterceptor` and

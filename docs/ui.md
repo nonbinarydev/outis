@@ -244,7 +244,8 @@ fun PlayerView(
 There is no `showSubtitles` parameter on `PlayerView`. It calls
 `PlayerSurface(player, Modifier.matchParentSize(), contentScale, surfaceType)`
 (`PlayerView.kt`), leaving `showSubtitles` at its default of `true`. To turn native subtitle
-rendering off you must drop to tier 4 and call `PlayerSurface` yourself.
+rendering off you must drop to tier 4 and call `PlayerSurface` yourself. The same goes for setting
+`subtitleSize` and `subtitleBottom`, which `PlayerView` leaves null.
 
 On Android, note the name collision: `dev.nonbinary.outis.ui.PlayerView` and
 `androidx.media3.ui.PlayerView` cannot both be imported unqualified in the same file.
@@ -262,16 +263,23 @@ expect fun PlayerSurface(
     contentScale: ContentScale = ContentScale.Fit,
     surfaceType: SurfaceType = SurfaceType.SurfaceView,
     showSubtitles: Boolean = true,
+    subtitleSize: Float? = null,
+    subtitleBottom: Float? = null,
 )
 ```
 
 It draws only the video, plus subtitle cues on platforms that render them natively. It is deliberately
 public so video can go anywhere in your layout — an overlay, a rail, a mini-player.
 
+`subtitleSize` is the cue text height and `subtitleBottom` the gap below the cues, each a fraction of
+the surface's height; null keeps the platform's own default. A gap of a third or so lifts cues clear of
+a control bar while it is up. What each platform measures them against is in
+[Platform support](platform-support.md#the-compose-ui-outis-ui).
+
 | Platform | Implementation | `contentScale` | `showSubtitles` |
 | -------- | -------------- | -------------- | --------------- |
 | Android | Media3 `PlayerView` with `useController = false`, black background (`PlayerSurface.android.kt`) | `Crop` → `RESIZE_MODE_ZOOM`, `FillBounds` → `RESIZE_MODE_FILL`, else `RESIZE_MODE_FIT` | Honoured: toggles `subtitleView.visibility` |
-| iOS | `AVPlayerViewController` with `showsPlaybackControls = false`, hosted by `UIKitViewController` (`PlayerSurface.ios.kt`) | `Crop` → `ResizeAspectFill`, `FillBounds` → `Resize`, else `ResizeAspect` | **Ignored.** AVKit renders the selected text track and there is no switch. |
+| iOS | `AVPlayerViewController` with `showsPlaybackControls = false`, hosted by `UIKitViewController` (`PlayerSurface.ios.kt`) | `Crop` → `ResizeAspectFill`, `FillBounds` → `Resize`, else `ResizeAspect` | Toggles only the sidecar cues the surface draws itself (`PlayerState.sidecarCues`). AVKit renders the media's own text tracks, with no switch. |
 | Web | The engine's `<video>` element, repositioned under the Compose canvas (`PlayerSurface.js.kt`) | `Crop` → `object-fit: cover`, `FillBounds` → `fill`, else `contain` | **Ignored.** |
 
 `ContentScale.Inside`, `FillHeight`, `FillWidth` and any custom `ContentScale` all fall into the "else"

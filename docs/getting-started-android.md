@@ -20,7 +20,7 @@ page still applies to your `androidApp`; only the dependency declaration moves t
 | `compileSdk` | **36** or higher | Media3 1.11.1 AARs declare `minCompileSdk=36` |
 | Java / Kotlin JVM target | **11** or higher | Outis' Android classes are Java 11 bytecode (class-file major version 55) |
 | Android Gradle Plugin | **8.2.0** or higher | required by the Google IMA AAR that Media3's IMA extension pulls in |
-| Kotlin | **2.4.10** recommended | Outis is built with it (`gradle/libs.versions.toml:3`) |
+| Kotlin | **2.4.21** recommended | Outis is built with it (`gradle/libs.versions.toml:10`) |
 
 `compileSdk` and the JVM target are the two that bite first. A `compileSdk` below 36 fails AAR
 metadata validation on sync; a Kotlin `jvmTarget` below 11 fails at compile time, because Kotlin
