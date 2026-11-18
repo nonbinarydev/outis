@@ -15,3 +15,8 @@ DEVELOPMENT_TEAM = YOUR_TEAM_ID
 // Optional — only if dev.nonbinary.outis.sample is already registered to another
 // team. Appended to the bundle id to make it unique to you.
 // TEAM_ID = .yourname
+
+// Optional, for any build (simulator too) — only if Xcode fails with "Unable to locate
+// a Java Runtime". Xcode does not load your shell profile, so a JDK from mise, SDKMAN or
+// asdf is invisible to the "Compile Kotlin Framework" phase. Point it at a JDK 21 home.
+// JAVA_HOME = $(HOME)/.local/share/mise/installs/java/temurin-21
