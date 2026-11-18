@@ -827,7 +827,20 @@ private fun shakaPlayerError(error: dynamic): PlayerError {
         else -> PlayerError.Category.UNKNOWN
     }
     val code = (error?.code as? Int)?.toString()
-    return PlayerError(category, code = code, message = "Shaka error ${code.orEmpty()}".trim(), nativeCause = error)
+    val uri = if (category == PlayerError.Category.NETWORK) failedRequestUri(error) else null
+    val message = listOfNotNull("Shaka error ${code.orEmpty()}".trim(), uri).joinToString(" · ")
+    return PlayerError(category, code = code, message = message, nativeCause = error)
+}
+
+/**
+ * The URL a Shaka network error (1000–1004) failed on, from `data[0]`, without its query or
+ * fragment: signed-URL tokens live there, and the message is written to logs and bug reports.
+ */
+private fun failedRequestUri(error: dynamic): String? {
+    val data = error?.data ?: return null
+    val uri = data[0] as? String ?: return null
+    if (!uri.startsWith("http://") && !uri.startsWith("https://")) return null
+    return uri.substringBefore('#').substringBefore('?')
 }
 
 /** Why `load()` rejected: Shaka's own error when it gave one, else a source failure. */
