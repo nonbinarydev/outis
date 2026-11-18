@@ -6,6 +6,7 @@
 
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.report.ReportMergeTask
+import org.jetbrains.kotlin.gradle.targets.native.tasks.PodGenTask
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform) apply false
@@ -29,8 +30,8 @@ plugins {
 dependencies {
     dokka(project(":core"))
     dokka(project(":ui"))
-    dokka(project(":analytics:mux"))
-    dokka(project(":analytics:firebase"))
+    // Absent when Outis is an included build (settings.gradle.kts), where no API reference is built.
+    listOfNotNull(findProject(":analytics:mux"), findProject(":analytics:firebase")).forEach { dokka(it) }
 }
 
 dokka {
@@ -54,5 +55,40 @@ subprojects {
     }
     detektMergeSarif.configure {
         input.from(tasks.withType<Detekt>().map { it.sarifReportFile })
+    }
+}
+
+/**
+ * Raises every CocoaPods dependency to the module's own iOS deployment target in the synthetic Podfile.
+ *
+ * Xcode 27 builds nothing below iOS 15.0, but the Podfile the Kotlin CocoaPods plugin generates only lifts
+ * pods to 12.0 (its Xcode 14.3 workaround, KT-57741, which no setting changes). Pods that still declare 12.0
+ * (GoogleUtilities, PromisesObjC, nanopb, Mux-Stats-Core) then fail every `podBuild*` task with
+ * "IPHONEOS_DEPLOYMENT_TARGET is set to 12.0". An app linking these modules builds the pods for its own
+ * target anyway, so building them for the module's `ios.deploymentTarget` changes nothing downstream.
+ */
+subprojects {
+    tasks.withType<PodGenTask>().configureEach {
+        val podfileFile = podfile
+        doLast {
+            val file = podfileFile.get()
+            val text = file.readText()
+            val marker = "# Outis: deployment-target lift"
+            // Only the iOS Podfile names an iOS platform; other families have nothing to raise.
+            val target = Regex("""platform :ios, '([0-9.]+)'""").find(text)?.groupValues?.get(1)
+            if (target == null || marker in text) return@doLast
+            val anchor = "target.build_configurations.each do |config|"
+            check(anchor in text) {
+                "The synthetic Podfile changed shape; update the deployment-target lift in build.gradle.kts: $file"
+            }
+            val lift = listOf(
+                "      $marker (Xcode 27 builds nothing below iOS 15.0)",
+                "      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']",
+                "      if current && Gem::Version.new(current) < Gem::Version.new('$target') then",
+                "        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '$target'",
+                "      end",
+            ).joinToString("\n", prefix = "\n")
+            file.writeText(text.replaceFirst(anchor, anchor + lift))
+        }
     }
 }

@@ -27,7 +27,10 @@ kotlin {
     explicitApi()
 
     @OptIn(ExperimentalAbiValidation::class)
-    abiValidation()
+    abiValidation {
+        // The Compose compiler's lambda holders: public bytecode whose names hash the lambda, not API.
+        filters { exclude { byNames.add("**.ComposableSingletons**") } }
+    }
 
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     androidLibrary {

@@ -16,6 +16,8 @@ import dev.nonbinary.outis.core.source.DrmScheme
 import dev.nonbinary.outis.core.source.MediaItem
 import dev.nonbinary.outis.core.source.MediaSource
 import dev.nonbinary.outis.core.source.MimeType
+import dev.nonbinary.outis.core.source.SubtitleFile
+import dev.nonbinary.outis.core.source.SubtitleFormat
 import dev.nonbinary.outis.sample.CUSTOM_STREAM_ID
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -67,10 +69,21 @@ data class CatalogueItem(
     val thumbnailsUrl: String? = null,
     /** Chapters declared inline. They win over [chaptersUrl], which older sample builds still read instead. */
     val chapters: List<CatalogueChapter>? = null,
+    /** Subtitle files beside the stream; the first is the default. */
+    val subtitles: List<CatalogueSubtitle> = emptyList(),
 )
 
 @Serializable
 data class CatalogueChapter(val startMs: Long, val title: String? = null, val endMs: Long? = null)
+
+@Serializable
+data class CatalogueSubtitle(
+    val url: String,
+    val language: String? = null,
+    val label: String? = null,
+    /** `null` => from [url]'s extension. */
+    val format: SubtitleFormat? = null,
+)
 
 @Serializable
 data class CatalogueDrm(
@@ -121,6 +134,7 @@ fun CatalogueItem.toMediaItem(startMuted: Boolean = false, series: String? = nul
     chaptersUrl = chaptersUrl,
     chapters = chapters?.map { Chapter(startMs = it.startMs, title = it.title, endMs = it.endMs) },
     thumbnailsUrl = thumbnailsUrl,
+    subtitles = subtitles.map { SubtitleFile(it.url, language = it.language, label = it.label, format = it.format) },
     adConfig = ads?.toAdConfig(),
     // The descriptive [label] is the human name (the terse [title] is just the card caption, e.g. "AVC").
     analytics = PlaybackMetadata(videoId = analyticsVideoId(), title = label ?: title, series = series),

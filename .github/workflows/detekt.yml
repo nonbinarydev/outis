@@ -33,15 +33,16 @@ jobs:
     name: Common, JVM, Android, JS, Wasm
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
+          cache-provider: basic
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Run detekt
@@ -64,14 +65,14 @@ jobs:
       # scanning rejects several runs under one category. detektMergeSarif folds them into one run.
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: build/reports/detekt/merged.sarif
           category: detekt-jvm
 
       - name: Upload HTML reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: detekt-reports-jvm
           path: '**/build/reports/detekt/*.html'
@@ -81,15 +82,16 @@ jobs:
     name: iOS and Apple metadata
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
+          cache-provider: basic
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       # No type resolution is available for Kotlin/Native, so these are parse-level only — but they
@@ -104,14 +106,14 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: build/reports/detekt/merged.sarif
           category: detekt-apple
 
       - name: Upload HTML reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: detekt-reports-apple
           path: '**/build/reports/detekt/*.html'

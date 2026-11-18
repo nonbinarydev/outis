@@ -39,8 +39,15 @@ rootProject.name = "outis"
 
 include(":core")
 include(":ui")
-include(":sample")
-include(":sample:android")
-include(":analytics:mux")
-include(":analytics:firebase")
-include(":bom")
+
+// The samples, the analytics adapters and the BOM only when Outis is the build being run. An app that builds
+// Outis from source (includeBuild, as Liberator does) substitutes just :core and :ui; with the adapters included,
+// every IDE sync of that app also ran CocoaPods and Xcode builds of Firebase and Mux, and two syncs at once
+// raced on the same synthetic Pods folder and left it half-installed.
+if (gradle.parent == null) {
+    include(":sample")
+    include(":sample:android")
+    include(":analytics:mux")
+    include(":analytics:firebase")
+    include(":bom")
+}
