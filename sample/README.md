@@ -66,6 +66,19 @@ copy `sample/iosApp/Configuration/Local.xcconfig.example` to `Local.xcconfig` an
 to your Apple Team ID, then sign into Xcode — signing is Automatic. `Local.xcconfig` is git-ignored, so
 your team ID is never committed.
 
+**macOS** — `sample/macosApp` is not the shared Compose app: Compose has no native macOS host here, and
+`outis-ui` has no macOS target. It is a small SwiftUI app built only by Xcode, and the reference for
+consuming Outis through the Swift package ([Getting started with Swift](../docs/getting-started-swift.md)).
+It is sandboxed and signed to run locally, so it needs no team. Build the framework once, then open
+`sample/macosApp/macosApp.xcodeproj` and Run:
+
+```bash
+./gradlew :core:assembleOutisCoreReleaseXCFramework
+```
+
+It plays the catalogue's MP4 and HLS streams, or a file chosen with **Open File…**, which it can reopen
+after a relaunch through a security-scoped bookmark.
+
 ## Analytics and consent
 
 The sample doubles as the reference wiring for the optional [Mux Data](../docs/analytics-mux.md) QoS

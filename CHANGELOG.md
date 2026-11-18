@@ -13,7 +13,24 @@ being treated as breaking changes.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **macOS** (`macosArm64`) in `outis-core`, running the same AVFoundation engine as iOS. The Apple code
+  moved from `iosMain` to a shared `appleMain`; `iosMain` keeps only the UIKit ad bridge and the audio
+  session. `outis-ui` and the analytics adapters have no macOS target.
+- A **Swift package** at the repository root: the `OutisCore` XCFramework as a binary target, and an
+  `Outis` Swift module with `makeVideoPlayer()`, `MediaItem.of(_:)`, `stateStream`/`eventStream` as
+  `AsyncStream`s, and a SwiftUI `PlayerSurface`. Resolves from a local clone until a release carries the
+  zipped framework.
+- Swift entry points in `outis-core`'s Apple targets (`makeVideoPlayer`, `mediaItemOf`, `observeState`,
+  `observeEvents`, `PlayerObservation`), marked `@ExperimentalPlayerApi`.
+- `sample/macosApp`, a sandboxed SwiftUI sample built only in Xcode.
+
+### Changed
+
+- The XCFramework is now `OutisCore.xcframework` (was `Outis.xcframework`), built by
+  `:core:assembleOutisCoreReleaseXCFramework`, and gains a `macos-arm64` slice. Swift code using it
+  directly imports `OutisCore`; through the package, `import Outis`.
 
 ## [0.1.0-alpha01] — unreleased
 

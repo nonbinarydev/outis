@@ -1,5 +1,6 @@
 // Klib ABI Dump
-// Targets: [iosArm64, iosSimulatorArm64, js, wasmJs]
+// Targets: [iosArm64, iosSimulatorArm64, js, macosArm64, wasmJs]
+// Alias: apple => [iosArm64, iosSimulatorArm64, macosArm64]
 // Alias: ios => [iosArm64, iosSimulatorArm64]
 // Rendering settings:
 // - Signature version: 2
@@ -1424,6 +1425,26 @@ final fun dev.nonbinary.outis.core.ads/parseMediaTailorAvails(kotlin/String): ko
 final fun dev.nonbinary.outis.core.ads/parseMediaTailorSession(kotlin/String): dev.nonbinary.outis.core.ads/MediaTailorSession // dev.nonbinary.outis.core.ads/parseMediaTailorSession|parseMediaTailorSession(kotlin.String){}[0]
 final fun dev.nonbinary.outis.core/VideoPlayer(dev.nonbinary.outis.core/AppContext, dev.nonbinary.outis.core/PlayerConfig = ...): dev.nonbinary.outis.core/VideoPlayer // dev.nonbinary.outis.core/VideoPlayer|VideoPlayer(dev.nonbinary.outis.core.AppContext;dev.nonbinary.outis.core.PlayerConfig){}[0]
 final suspend fun dev.nonbinary.outis.core.source/drmSupport(): dev.nonbinary.outis.core.source/DrmSupport // dev.nonbinary.outis.core.source/drmSupport|drmSupport(){}[0]
+
+// Targets: [apple]
+final class dev.nonbinary.outis.core/PlayerObservation { // dev.nonbinary.outis.core/PlayerObservation|null[0]
+    final fun cancel() // dev.nonbinary.outis.core/PlayerObservation.cancel|cancel(){}[0]
+}
+
+// Targets: [apple]
+final fun (dev.nonbinary.outis.core/VideoPlayer).dev.nonbinary.outis.core/observeEvents(kotlin/Function1<dev.nonbinary.outis.core/PlayerEvent, kotlin/Unit>): dev.nonbinary.outis.core/PlayerObservation // dev.nonbinary.outis.core/observeEvents|observeEvents@dev.nonbinary.outis.core.VideoPlayer(kotlin.Function1<dev.nonbinary.outis.core.PlayerEvent,kotlin.Unit>){}[0]
+
+// Targets: [apple]
+final fun (dev.nonbinary.outis.core/VideoPlayer).dev.nonbinary.outis.core/observeState(kotlin/Function1<dev.nonbinary.outis.core/PlayerState, kotlin/Unit>): dev.nonbinary.outis.core/PlayerObservation // dev.nonbinary.outis.core/observeState|observeState@dev.nonbinary.outis.core.VideoPlayer(kotlin.Function1<dev.nonbinary.outis.core.PlayerState,kotlin.Unit>){}[0]
+
+// Targets: [apple]
+final fun dev.nonbinary.outis.core/makeVideoPlayer(): dev.nonbinary.outis.core/VideoPlayer // dev.nonbinary.outis.core/makeVideoPlayer|makeVideoPlayer(){}[0]
+
+// Targets: [apple]
+final fun dev.nonbinary.outis.core/makeVideoPlayer(kotlin/Long): dev.nonbinary.outis.core/VideoPlayer // dev.nonbinary.outis.core/makeVideoPlayer|makeVideoPlayer(kotlin.Long){}[0]
+
+// Targets: [apple]
+final fun dev.nonbinary.outis.core/mediaItemOf(platform.Foundation/NSURL): dev.nonbinary.outis.core.source/MediaItem // dev.nonbinary.outis.core/mediaItemOf|mediaItemOf(platform.Foundation.NSURL){}[0]
 
 // Targets: [ios]
 final fun (dev.nonbinary.outis.core/VideoPlayer).dev.nonbinary.outis.core.ads/adContainer(): platform.UIKit/UIViewController? // dev.nonbinary.outis.core.ads/adContainer|adContainer@dev.nonbinary.outis.core.VideoPlayer(){}[0]

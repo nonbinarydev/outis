@@ -59,6 +59,8 @@ kotlin {
     }
     iosArm64()
     iosSimulatorArm64()
+    // The same AVFoundation engine as iOS, for AppKit/SwiftUI apps through the XCFramework.
+    macosArm64()
 
     js(IR) {
         browser()
@@ -72,10 +74,11 @@ kotlin {
         nodejs()
     }
 
-    // XCFramework so iOS consumers (SwiftUI/UIKit) can drop in the core engine directly.
-    val xcFrameworkName = "Outis"
+    // XCFramework so Swift apps on iOS and macOS can drop in the core engine directly. Package.swift
+    // at the repository root names this framework and its path; rename them together.
+    val xcFrameworkName = "OutisCore"
     val xcf = XCFramework(xcFrameworkName)
-    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+    listOf(iosArm64(), iosSimulatorArm64(), macosArm64()).forEach { target ->
         target.binaries.framework {
             baseName = xcFrameworkName
             isStatic = false
@@ -139,13 +142,21 @@ kotlin {
         }
 
         // Declaring the custom webMain hierarchy below disables Kotlin's default hierarchy
-        // template, so the iOS intermediate set must be wired explicitly too.
+        // template, so the Apple intermediate sets must be wired explicitly too. appleMain holds the
+        // AVFoundation engine; iosMain and macosArm64Main hold only what UIKit or AppKit differ on.
+        val appleMain by creating {
+            dependsOn(commonMain)
+        }
         val iosArm64Main by getting
         val iosSimulatorArm64Main by getting
         val iosMain by creating {
-            dependsOn(commonMain)
+            dependsOn(appleMain)
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
+        }
+        // The one macOS target, so no macosMain: detekt's per-target task sees only this set.
+        val macosArm64Main by getting {
+            dependsOn(appleMain)
         }
 
         // webMain intermediate set shared by JS(IR) + Wasm.
