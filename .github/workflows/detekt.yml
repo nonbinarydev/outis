@@ -79,7 +79,8 @@ jobs:
           if-no-files-found: ignore
 
   apple:
-    name: iOS, macOS and Apple metadata
+    # The ruleset on main and development requires this check by name; rename both together.
+    name: iOS and Apple metadata
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7

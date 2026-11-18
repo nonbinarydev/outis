@@ -42,7 +42,8 @@ jobs:
             os: ubuntu-latest
             key: linux
             tasks: ":core:jvmTest :core:jsNodeTest :core:jsBrowserTest :core:wasmJsNodeTest :core:wasmJsBrowserTest :ui:testAndroidHostTest :analytics:firebase:jsNodeTest"
-          - name: iOS simulator and macOS
+          # Also runs the macOS tests. The ruleset requires this check by name; rename both together.
+          - name: iOS simulator
             os: macos-latest
             key: apple
             tasks: ":core:iosSimulatorArm64Test :core:macosArm64Test"
