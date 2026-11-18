@@ -52,6 +52,7 @@ Nothing has been published to Maven Central yet, so these coordinates do not res
 | `android` | Yes | Yes | Yes | Yes |
 | `iosArm64` | Yes | Yes | Yes | Yes |
 | `iosSimulatorArm64` | Yes | Yes | Yes | Yes |
+| `macosArm64` | Yes | No | No | No |
 | `js(IR)` | Yes | Yes | Yes | Yes |
 | `jvm` | Yes (no engine — see below) | No | No | No |
 | `wasmJs` | Yes (no engine — see below) | No | No | No |
@@ -66,8 +67,11 @@ have them, or drop the extra targets.
 
 ### Targets that are absent
 
-- **No `iosX64`.** Intel Macs cannot build or run the iOS simulator target. Apple Silicon only.
-- **No macOS, tvOS, watchOS, Linux or Windows targets.**
+- **No `iosX64` or `macosX64`.** Intel Macs cannot build or run the iOS simulator target, and a Mac app
+  using `outis-core` must build for `arm64` only. Apple Silicon only.
+- **macOS is `outis-core` only.** `outis-ui` and the analytics adapters have no macOS target; a Mac app
+  draws the picture itself, or with the Swift package's `PlayerSurface` ([Swift guide](getting-started-swift.md)).
+- **No tvOS, watchOS, Linux or Windows targets.**
 - **`jvm` and `wasmJs` have no playback engine.** They compile the engine-agnostic API — useful for
   fast unit tests on the JVM, and for a Wasm module that shares non-playback code — but constructing
   a player throws:
@@ -95,10 +99,13 @@ needs declaring: the model's collections are plain `List` and `Map`
 
 ### Engines
 
-| | Android | iOS | Web |
+| | Android | iOS and macOS | Web |
 |---|---|---|---|
 | Engine | Media3 / ExoPlayer 1.11.1 | `AVPlayer` (AVFoundation) | Shaka Player 5.3.3, plus the native `<video>` for progressive files |
 | `nativePlayerHandle` is | `ExoPlayer` (`ExoPlayerEngine.kt`) | `AVPlayer` (`AVPlayerEngine.kt`) | `HTMLVideoElement`, **never** `shaka.Player` (`ShakaEngine.kt`) |
+
+iOS and macOS run the same engine (`core/src/appleMain`). Everything this page says about iOS applies to
+macOS too, except where the [macOS specifics](#macos-specifics-worth-knowing) below say otherwise.
 
 The Shaka `Player` instance is not exposed at all. On web, a progressive source (an `MimeType.MP4`, a
 `.mp4`/`.webm` URL, or any `MediaSource.LocalFile`) bypasses Shaka entirely and plays through the
@@ -226,6 +233,18 @@ the scrubber, mark the cue-points and draw a countdown and skip button, once giv
   yet resolved does not flicker `isLive = true`.
 - `MediaItem.headers` use the private-but-long-stable `AVURLAssetHTTPHeaderFieldsKey` option. Swap in
   an `AVAssetResourceLoaderDelegate` if you need a fully public path.
+
+### macOS specifics worth knowing
+
+- There is no audio session on macOS, so the engine configures none, and `AudioConfig` has no effect.
+- FairPlay is offered (`drmSupport()` reports FairPlay and Clear Key); only the iOS simulator lacks it.
+- The client-side ad bridge (`setAdState`, `setAdContainer`, `adContainer`) is iOS-only, because the IMA
+  SDK it serves has no macOS build.
+- In the App Sandbox, a local file plays from its path, so the app must hold access to it while it
+  plays: the open panel's choice for the rest of that launch, or a security-scoped bookmark between the
+  app's own `startAccessingSecurityScopedResource()` and its stop. Outis needs no entitlement of its own;
+  remote streams need `com.apple.security.network.client`.
+- Matroska (`.mkv`) does not play: AVFoundation has no demuxer for it, as on iOS.
 
 ---
 

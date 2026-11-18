@@ -44,10 +44,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import platform.AVFAudio.AVAudioSession
-import platform.AVFAudio.AVAudioSessionCategoryOptionMixWithOthers
-import platform.AVFAudio.AVAudioSessionCategoryPlayback
-import platform.AVFAudio.setActive
 import platform.AVFoundation.AVMediaCharacteristicAudible
 import platform.AVFoundation.AVMediaCharacteristicLegible
 import platform.AVFoundation.AVMediaSelectionGroup
@@ -106,7 +102,6 @@ import platform.MediaAccessibility.MACaptionAppearanceGetDisplayType
 import platform.MediaAccessibility.kMACaptionAppearanceDisplayTypeAlwaysOn
 import platform.MediaAccessibility.kMACaptionAppearanceDomainUser
 import platform.QuartzCore.CACurrentMediaTime
-import platform.UIKit.UIViewController
 import platform.darwin.NSObjectProtocol
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
@@ -128,7 +123,7 @@ import kotlin.native.ref.WeakReference
 private val liveEngines = mutableSetOf<AVPlayerEngine>()
 
 /**
- * iOS [VideoPlayer] backed by AVFoundation's [AVPlayer].
+ * Apple (iOS and macOS) [VideoPlayer] backed by AVFoundation's [AVPlayer].
  *
  * **Threading.** AVPlayer is main-thread affine. The engine is constructed on the main thread
  * (asserted), every public transport call is marshalled to main via [onMain], and the periodic
@@ -190,7 +185,8 @@ internal class AVPlayerEngine(
 
     // The :ui AVPlayerViewController: anchors CSAI IMA's ad-display container, and is the view-level
     // object Mux's iOS SDK monitors — surfaced to analytics components as nativePresentationHandle.
-    private val _presentation = MutableStateFlow<UIViewController?>(null)
+    // Typed Any so this file compiles for AppKit too; only iOS registers one.
+    private val _presentation = MutableStateFlow<Any?>(null)
 
     private val components = mutableListOf<PlayerComponent>()
     private val host = object : PlayerHost {
@@ -206,7 +202,7 @@ internal class AVPlayerEngine(
             "AVPlayerEngine must be constructed on the main thread (AVPlayer is main-thread affine)."
         }
         liveEngines.add(this)
-        activateAudioSession()
+        activatePlaybackAudioSession(config.audioConfig)
         val avPlayer = AVPlayer()
         avPlayer.setVolume(config.initialVolume)
         installTimeObserver(avPlayer)
@@ -412,10 +408,10 @@ internal class AVPlayerEngine(
     }
 
     /** Register/clear the :ui ad-container view controller (the AVPlayerViewController). Main-thread only. */
-    internal fun setAdContainer(controller: UIViewController?) = onMain { _presentation.value = controller }
+    internal fun setAdContainer(controller: Any?) = onMain { _presentation.value = controller }
 
     /** The registered ad-container view controller, for an iOS IMA adapter's IMAAdDisplayContainer. */
-    internal fun adContainer(): UIViewController? = _presentation.value
+    internal fun adContainer(): Any? = _presentation.value
 
     override fun stop() = onMain {
         val avPlayer = player ?: return@onMain
@@ -482,7 +478,7 @@ internal class AVPlayerEngine(
         liveEngines.remove(this)
         // Hand the audio session back so other apps' audio can resume — but only once no engine is
         // left using it (multiple players share the one process-wide session).
-        if (liveEngines.isEmpty()) AVAudioSession.sharedInstance().setActive(false, error = null)
+        if (liveEngines.isEmpty()) deactivatePlaybackAudioSession()
         components.toList().forEach { it.detach() }
         components.clear()
         fairPlay?.release()
@@ -823,7 +819,7 @@ internal class AVPlayerEngine(
         }
     }
 
-    /** Whether the user turned on Closed Captions + SDH in iOS's accessibility settings. */
+    /** Whether the user turned on Closed Captions + SDH in the system's accessibility settings. */
     private fun systemCaptionsOn(): Boolean =
         MACaptionAppearanceGetDisplayType(kMACaptionAppearanceDomainUser) == kMACaptionAppearanceDisplayTypeAlwaysOn
 
@@ -1018,27 +1014,6 @@ internal class AVPlayerEngine(
         } else {
             dispatch_async(dispatch_get_main_queue()) { block() }
         }
-    }
-
-    /**
-     * Put the shared audio session into the `playback` category so media audio plays through the
-     * hardware mute switch and isn't treated as transient/ambient — the iOS counterpart of the audio
-     * handling Media3 gives us on Android. Best-effort: errors (e.g. another app holding exclusive
-     * audio) are ignored rather than failing player construction.
-     */
-    private fun activateAudioSession() {
-        val session = AVAudioSession.sharedInstance()
-        // mixWithOthers plays alongside other apps' audio instead of interrupting it.
-        if (config.audioConfig?.mixWithOthers == true) {
-            session.setCategory(
-                AVAudioSessionCategoryPlayback,
-                withOptions = AVAudioSessionCategoryOptionMixWithOthers,
-                error = null,
-            )
-        } else {
-            session.setCategory(AVAudioSessionCategoryPlayback, error = null)
-        }
-        session.setActive(true, error = null)
     }
 }
 

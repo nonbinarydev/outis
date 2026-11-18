@@ -3,7 +3,7 @@
 # Outis documentation
 
 Outis is a Kotlin Multiplatform video player: `outis-core` is the engine-agnostic player (Media3 on
-Android, `AVPlayer` on iOS, Shaka Player on Web) and `outis-ui` is an optional Compose Multiplatform
+Android, `AVPlayer` on iOS and macOS, Shaka Player on Web) and `outis-ui` is an optional Compose Multiplatform
 chrome on top of it. Both are at `0.1.0-alpha01` and neither has been published to Maven Central yet.
 
 Start with the getting-started page for your platform, then move to the reference guide for whatever
@@ -19,6 +19,7 @@ Get to a playing video on one platform. These pages assume nothing but an existi
 |---|---|
 | [Getting started on Android](getting-started-android.md) | The dependency line, the `INTERNET` permission, the Activity attributes fullscreen and PiP need, and a complete Activity that plays a stream and releases the player. |
 | [Getting started on iOS](getting-started-ios.md) | The two routes that work: a KMP shared module that declares its own framework binary, or the prebuilt XCFramework for Swift-only apps. Framework search paths, hosting the Compose surface, and the ATS keys for HTTP test streams. |
+| [Getting started with Swift (iOS and macOS)](getting-started-swift.md) | The Swift package for apps built only in Xcode: adding it, a player and `MediaItem` in one line each, state as an `AsyncStream`, the SwiftUI `PlayerSurface` with your own overlay, and the App Sandbox entitlements on macOS. |
 | [Getting started on Web (JS)](getting-started-web.md) | The three prerequisites that each independently block a first run — the Compose JS canvas Gradle property, the host page, and mounting the engine's `<video>` element yourself if you use `:core` alone. |
 
 ## Build
@@ -48,6 +49,13 @@ Per-subsystem references. Read them in any order; each is self-contained.
 
 [Decision records](decisions/README.md) — why the project is shaped the way it is, one short record per
 decision that would otherwise have to be reverse-engineered from the code.
+
+## Design notes
+
+[macOS, embedding in Discern, and files AVPlayer cannot open](design/macos-discern-and-mkv.md) — the
+macOS target and Swift package, what a sandboxed timing tool needs from the API, the MKV engine options
+(remux, libmpv, VLCKit), how that reaches the JVM desktop, and a proposed order for the open issues.
+Proposals, not decisions: the outcomes become decision records.
 
 ## Sample
 
