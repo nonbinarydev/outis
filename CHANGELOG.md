@@ -32,6 +32,16 @@ being treated as breaking changes.
   `:core:assembleOutisCoreReleaseXCFramework`, and gains a `macos-arm64` slice. Swift code using it
   directly imports `OutisCore`; through the package, `import Outis`.
 
+### Fixed
+
+- **Apple:** an item that fails to load (a file AVFoundation cannot open, such as Matroska, a missing
+  URL, or a file the sandbox refuses) now ends with a `SOURCE` error and `IDLE`, instead of staying
+  `BUFFERING` with no error ([#68](https://github.com/nonbinarydev/outis/issues/68)).
+- **Apple:** `seekTo` lands on the exact millisecond rather than rounding to 1/600 s, which could show
+  the frame before the one asked for ([#69](https://github.com/nonbinarydev/outis/issues/69)).
+- **Apple:** an item that plays to its end now reports `isPlaying = false` with `ENDED`, and emits
+  `IsPlayingChanged(false)`; it used to stay `true`.
+
 ## [0.1.0-alpha01] — unreleased
 
 First release. Not yet published to Maven Central.

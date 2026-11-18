@@ -55,6 +55,7 @@ import platform.AVFoundation.AVPlayerItemFailedToPlayToEndTimeErrorKey
 import platform.AVFoundation.AVPlayerItemFailedToPlayToEndTimeNotification
 import platform.AVFoundation.AVPlayerItemStatusFailed
 import platform.AVFoundation.AVPlayerItemStatusReadyToPlay
+import platform.AVFoundation.AVPlayerItemStatusUnknown
 import platform.AVFoundation.AVPlayerItemVideoOutput
 import platform.AVFoundation.AVPlayerTimeControlStatusPlaying
 import platform.AVFoundation.AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate
@@ -102,9 +103,13 @@ import platform.MediaAccessibility.MACaptionAppearanceGetDisplayType
 import platform.MediaAccessibility.kMACaptionAppearanceDisplayTypeAlwaysOn
 import platform.MediaAccessibility.kMACaptionAppearanceDomainUser
 import platform.QuartzCore.CACurrentMediaTime
+import platform.darwin.DISPATCH_TIME_NOW
+import platform.darwin.NSEC_PER_MSEC
 import platform.darwin.NSObjectProtocol
+import platform.darwin.dispatch_after
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
+import platform.darwin.dispatch_time
 import platform.posix.O_RDONLY
 import platform.posix.SEEK_END
 import platform.posix.SEEK_SET
@@ -127,12 +132,13 @@ private val liveEngines = mutableSetOf<AVPlayerEngine>()
  *
  * **Threading.** AVPlayer is main-thread affine. The engine is constructed on the main thread
  * (asserted), every public transport call is marshalled to main via [onMain], and the periodic
- * time observer + notifications + the seek completion handler all resolve on the main thread — so
- * `released`/`player`/`state`/`events` are touched on one thread (no atomics needed).
+ * time observer + notifications + the item-status check + the seek completion handler all resolve on
+ * the main thread — so `released`/`player`/`state`/`events` are touched on one thread (no atomics needed).
  *
- * **State** is derived by polling in the periodic time observer (no KVO): AVPlayer.timeControlStatus
- * + AVPlayerItem.status drive [PlayerState]; seek uses the completion handler; end + failure surface
- * via NSNotificationCenter and AVPlayerItem.status==Failed.
+ * **State** is derived by polling (no KVO): in the periodic time observer, and for a new item until its
+ * `status` leaves `unknown`, since the time observer never fires while the playhead stands still.
+ * AVPlayer.timeControlStatus + AVPlayerItem.status drive [PlayerState]; seek uses the completion
+ * handler; end + failure surface via NSNotificationCenter and AVPlayerItem.status==Failed.
  *
  * **Memory.** Observer/notification closures capture only a [WeakReference] back to the engine
  * (AVFoundation retains the closures); [liveEngines] keeps the engine alive until [release].
@@ -301,6 +307,7 @@ internal class AVPlayerEngine(
         }
         installItemObservers(playerItem)
         avPlayer.replaceCurrentItemWithPlayerItem(playerItem)
+        reconcileWhenStatusSettles(playerItem)
 
         playWhenReady = autoPlay
         if (autoPlay) avPlayer.setRate(desiredRate)
@@ -364,7 +371,8 @@ internal class AVPlayerEngine(
         endedFlag = false // a seek means we're no longer at end-of-stream
         _state.update { it.copy(positionMs = positionMs, pendingSeekTargetMs = positionMs) }
         emit { p, t -> PlayerEvent.SeekStarted(positionMs, p, t) }
-        val target = CMTimeMakeWithSeconds(positionMs / 1000.0, 600)
+        // Milliseconds exactly: at timescale 600 a frame's own millisecond time rounds to just before it.
+        val target = CMTimeMake(positionMs, 1000)
         val zero = CMTimeMake(0, 1)
         val weakSelf = WeakReference(this)
         avPlayer.seekToTime(target, toleranceBefore = zero, toleranceAfter = zero) { _ ->
@@ -559,6 +567,18 @@ internal class AVPlayerEngine(
             queue = queue,
         ) { notification: NSNotification? ->
             weakSelf.get()?.onItemFailed(notification)
+        }
+    }
+
+    // The time observer never fires while the playhead stands still, so without this an item that fails
+    // to load is never reconciled and its error never surfaces.
+    private fun reconcileWhenStatusSettles(item: AVPlayerItem) {
+        val weakSelf = WeakReference(this)
+        val delayNs = config.positionPollIntervalMs * NSEC_PER_MSEC.toLong()
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, delayNs), dispatch_get_main_queue()) {
+            val self = weakSelf.get() ?: return@dispatch_after
+            if (self.released || !item.isEqual(self.player?.currentItem)) return@dispatch_after
+            if (item.status == AVPlayerItemStatusUnknown) self.reconcileWhenStatusSettles(item) else self.reconcile()
         }
     }
 
@@ -898,7 +918,8 @@ internal class AVPlayerEngine(
         // otherwise a deliberately-paused (rate 0) ready item flaps to BUFFERING.
         val buffering = avPlayer.timeControlStatus == AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate ||
             (playWhenReady && item?.playbackBufferEmpty == true)
-        val playing = avPlayer.timeControlStatus == AVPlayerTimeControlStatusPlaying
+        // The end notification arrives before AVPlayer pauses, and no time-observer tick follows the pause.
+        val playing = !endedFlag && avPlayer.timeControlStatus == AVPlayerTimeControlStatusPlaying
 
         // Surface a load/decode failure (bad URL, 404, unsupported codec) — these set status==Failed
         // and never fire the FailedToPlayToEndTime notification.
