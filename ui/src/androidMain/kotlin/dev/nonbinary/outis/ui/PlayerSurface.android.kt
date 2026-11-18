@@ -7,6 +7,7 @@
 package dev.nonbinary.outis.ui
 
 import android.graphics.Rect
+import android.util.TypedValue
 import android.view.View
 import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
@@ -23,6 +24,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.SubtitleView
 import dev.nonbinary.outis.core.PlaybackState
 import dev.nonbinary.outis.core.PlayerEvent
 import dev.nonbinary.outis.core.VideoPlayer
@@ -31,6 +33,7 @@ import dev.nonbinary.outis.core.ads.setAdContainer
 import java.util.WeakHashMap
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Rect as ComposeRect
 
 /**
@@ -54,6 +57,8 @@ public actual fun PlayerSurface(
     contentScale: ContentScale,
     surfaceType: SurfaceType,
     showSubtitles: Boolean,
+    subtitleSize: Float?,
+    subtitleBottom: Float?,
 ) {
     val media3Player by produceState(player.nativePlayerHandle as? Player, player) {
         value = player.nativePlayerHandle as? Player
@@ -92,6 +97,10 @@ public actual fun PlayerSurface(
             PlayerView(context).apply {
                 useController = false
                 setBackgroundColor(android.graphics.Color.BLACK)
+                // Both are fractions of the height, so they are redone whenever the height changes.
+                subtitleView?.addOnLayoutChangeListener { v, _, top, _, bottom, _, oldTop, _, oldBottom ->
+                    if (bottom - top != oldBottom - oldTop) (v as SubtitleView).layoutCues(subtitleLayouts[v])
+                }
             }
         },
         update = { view ->
@@ -106,6 +115,10 @@ public actual fun PlayerSurface(
                 else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
             }
             view.subtitleView?.visibility = if (showSubtitles) View.VISIBLE else View.GONE
+            view.subtitleView?.let { sv ->
+                subtitleLayouts[sv] = CueLayout(subtitleSize, subtitleBottom)
+                sv.layoutCues(subtitleLayouts[sv])
+            }
         },
         onRelease = {
             it.player = null
@@ -156,4 +169,34 @@ internal object PlayerSurfaceBounds {
 
     /** `null` when the player has no surface on screen — the caller then omits the hint entirely. */
     fun of(player: VideoPlayer): Rect? = bounds[player]?.takeIf { !it.isEmpty }
+}
+
+private class CueLayout(val size: Float?, val bottom: Float?)
+
+private val subtitleLayouts = WeakHashMap<SubtitleView, CueLayout>()
+
+/**
+ * Cue size and the gap under the cues, both fractions of this view's height.
+ *
+ * The gap is padding: Media3's bottomPaddingFraction only moves cues that carry no line position, and WebVTT's
+ * default "auto" line arrives as one. The size is then fixed in pixels, because padding shrinks the child that
+ * draws the cues and every fractional size (ignorePadding or not) is measured on that child -- the text would
+ * shrink as the gap grew.
+ */
+@OptIn(UnstableApi::class)
+private fun SubtitleView.layoutCues(layout: CueLayout?) {
+    val bottom = layout?.bottom
+    if (bottom == null) {
+        setPadding(0, 0, 0, 0)
+        setBottomPaddingFraction(SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION)
+    } else {
+        setBottomPaddingFraction(0f)
+        setPadding(0, 0, 0, (bottom * height).roundToInt())
+    }
+    val size = layout?.size
+    if (size == null || height == 0) {
+        setFractionalTextSize(size ?: SubtitleView.DEFAULT_TEXT_SIZE_FRACTION)
+    } else {
+        setFixedTextSize(TypedValue.COMPLEX_UNIT_PX, size * height)
+    }
 }

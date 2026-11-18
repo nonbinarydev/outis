@@ -27,6 +27,14 @@ internal external object shaka {
             object RequestType {
                 val LICENSE: Int
             }
+
+            fun registerScheme(scheme: String, plugin: (uri: String, request: dynamic) -> dynamic)
+        }
+    }
+
+    object util {
+        object AbortableOperation {
+            fun notAbortable(promise: kotlin.js.Promise<dynamic>): dynamic
         }
     }
 
@@ -41,6 +49,14 @@ internal external object shaka {
         fun getVariantTracks(): Array<dynamic>
         fun getAudioTracks(): Array<dynamic>
         fun getTextTracks(): Array<dynamic>
+        fun addTextTrackAsync(
+            uri: String,
+            language: String,
+            kind: String,
+            mimeType: String,
+            codec: String?,
+            label: String?,
+        ): kotlin.js.Promise<dynamic>
         fun selectAudioTrack(track: dynamic) // keeps video ABR, unlike selectVariantTrack
 
         // Selecting a track also shows it, and `null` hides text: Shaka 5 has no separate visibility switch.

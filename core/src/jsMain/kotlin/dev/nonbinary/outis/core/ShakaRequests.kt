@@ -149,7 +149,7 @@ private fun ByteArray.toJsBody(): ArrayBuffer {
 }
 
 /** Read a Shaka request headers object into a Kotlin map (so an interceptor sees Shaka's own headers). */
-private fun jsHeadersToMap(headers: dynamic): Map<String, String> {
+internal fun jsHeadersToMap(headers: dynamic): Map<String, String> {
     if (headers == null) return emptyMap()
     val keys: dynamic = js("Object").keys(headers)
     val len = keys.length.unsafeCast<Int>()
