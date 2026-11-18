@@ -162,28 +162,33 @@ struct PlayerScreen: UIViewControllerRepresentable {
 
 ## Route B: the prebuilt XCFramework
 
-For a Swift-only app, build the XCFramework from a clone of this repository:
+For a Swift-only app, prefer the Swift package, which wraps this framework with Swift-shaped entry
+points (`MediaItem.of(url)`, `for await state in player.stateStream`, a SwiftUI `PlayerSurface`): see
+[Getting started with Swift](getting-started-swift.md). The rest of this section is the framework on
+its own.
+
+Build the XCFramework from a clone of this repository:
 
 ```sh
-./gradlew :core:assembleOutisReleaseXCFramework
+./gradlew :core:assembleOutisCoreReleaseXCFramework
 ```
 
 Output:
 
 ```
-core/build/XCFrameworks/release/Outis.xcframework
+core/build/XCFrameworks/release/OutisCore.xcframework
 ```
 
-`assembleOutisDebugXCFramework` produces the debug variant, and `assembleOutisXCFramework` builds
-both. The name comes from `core/build.gradle.kts`.
+`assembleOutisCoreDebugXCFramework` produces the debug variant, and `assembleOutisCoreXCFramework`
+builds both. The name comes from `core/build.gradle.kts`.
 
 **This XCFramework is not part of the Maven publication.** Nothing on Maven Central ships it; you
 build it, and you version it, yourself.
 
 What you get:
 
-- Two slices, `ios-arm64` and `ios-arm64-simulator`, both `arm64`. No `x86_64`, so it does not run on
-  an Intel Mac's simulator.
+- Three slices, `ios-arm64`, `ios-arm64-simulator` and `macos-arm64`, all `arm64`. No `x86_64`, so it
+  runs neither on an Intel Mac nor in an Intel Mac's simulator.
 - A **dynamic** framework — `isStatic = false` at `core/build.gradle.kts` — so add it to your
   target under *Frameworks, Libraries, and Embedded Content* with **Embed & Sign**. Do not use "Do Not
   Embed"; the app will build and then fail to launch.
@@ -194,12 +199,12 @@ What you get:
   `./gradlew :ui:tasks --all`. **There is no way to get the Compose chrome through this route**; take
   route A if you want it.
 
-Do not combine the two routes. Linking the prebuilt `Outis.xcframework` alongside a shared framework
+Do not combine the two routes. Linking the prebuilt `OutisCore.xcframework` alongside a shared framework
 that also contains `outis-core` gives you the Kotlin runtime twice.
 
 ### Swift usage
 
-The generated Objective-C header strips the `Outis` prefix for Swift via `swift_name` attributes, so
+The generated Objective-C header strips the `OutisCore` prefix for Swift via `swift_name` attributes, so
 the Swift API reads close to the Kotlin one. Top-level Kotlin functions become members of a class
 named after their file: `VideoPlayer(...)` lives in `PlayerFactory.kt`, so it is
 `PlayerFactoryKt.VideoPlayer`.
@@ -208,7 +213,7 @@ Defaults do not survive the Objective-C bridge, so every parameter is required i
 
 ```swift
 import AVFoundation
-import Outis
+import OutisCore
 
 // Construct on the main thread — the engine asserts it.
 let player = PlayerFactoryKt.VideoPlayer(
@@ -259,11 +264,20 @@ let controller = AVPlayerViewController()
 controller.player = player.nativePlayerHandle as? AVPlayer
 ```
 
-Reading state from Swift is the rough edge of this route. `player.state` is a Kotlin
-`StateFlow`, which bridges as a protocol with a single `value: Any?` property — you can poll
-`player.state.value as? PlayerState`, but collecting the flow means implementing
-`Kotlinx_coroutines_coreFlowCollector` and calling `collect(collector:completionHandler:)`. If you
-need continuous observation in Swift, route A and a small Kotlin-side adapter is much less work.
+`player.state` is a Kotlin `StateFlow`, which bridges as a protocol with a single `value: Any?`
+property, so collecting it directly from Swift is awkward. Observe it through the callback the framework
+exports for Swift instead, on the main thread, and cancel the returned observation when done:
+
+```swift
+let observation = SwiftEntryPointsKt.observeState(player) { state in
+    print(state.playbackState.name, state.positionMs)
+}
+// later
+observation.cancel()
+```
+
+`SwiftEntryPointsKt.observeEvents` does the same for `PlayerEvent`s. The Swift package turns both into
+`AsyncStream`s ([Getting started with Swift](getting-started-swift.md)).
 
 ---
 

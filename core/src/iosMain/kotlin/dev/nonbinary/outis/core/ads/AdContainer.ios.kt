@@ -38,4 +38,5 @@ public fun VideoPlayer.setAdContainer(controller: UIViewController?) {
 
 /** The registered ad-container view controller (see [setAdContainer]), or `null`. */
 @ExperimentalPlayerApi
-public fun VideoPlayer.adContainer(): UIViewController? = (engine as? AVPlayerEngine)?.adContainer()
+public fun VideoPlayer.adContainer(): UIViewController? =
+    (engine as? AVPlayerEngine)?.adContainer() as? UIViewController

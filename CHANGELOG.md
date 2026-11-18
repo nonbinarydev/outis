@@ -13,7 +13,34 @@ being treated as breaking changes.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **macOS** (`macosArm64`) in `outis-core`, running the same AVFoundation engine as iOS. The Apple code
+  moved from `iosMain` to a shared `appleMain`; `iosMain` keeps only the UIKit ad bridge and the audio
+  session. `outis-ui` and the analytics adapters have no macOS target.
+- A **Swift package** at the repository root: the `OutisCore` XCFramework as a binary target, and an
+  `Outis` Swift module with `makeVideoPlayer()`, `MediaItem.of(_:)`, `stateStream`/`eventStream` as
+  `AsyncStream`s, and a SwiftUI `PlayerSurface`. Resolves from a local clone until a release carries the
+  zipped framework.
+- Swift entry points in `outis-core`'s Apple targets (`makeVideoPlayer`, `mediaItemOf`, `observeState`,
+  `observeEvents`, `PlayerObservation`), marked `@ExperimentalPlayerApi`.
+- `sample/macosApp`, a sandboxed SwiftUI sample built only in Xcode.
+
+### Changed
+
+- The XCFramework is now `OutisCore.xcframework` (was `Outis.xcframework`), built by
+  `:core:assembleOutisCoreReleaseXCFramework`, and gains a `macos-arm64` slice. Swift code using it
+  directly imports `OutisCore`; through the package, `import Outis`.
+
+### Fixed
+
+- **Apple:** an item that fails to load (a file AVFoundation cannot open, such as Matroska, a missing
+  URL, or a file the sandbox refuses) now ends with a `SOURCE` error and `IDLE`, instead of staying
+  `BUFFERING` with no error ([#68](https://github.com/nonbinarydev/outis/issues/68)).
+- **Apple:** `seekTo` lands on the exact millisecond rather than rounding to 1/600 s, which could show
+  the frame before the one asked for ([#69](https://github.com/nonbinarydev/outis/issues/69)).
+- **Apple:** an item that plays to its end now reports `isPlaying = false` with `ENDED`, and emits
+  `IsPlayingChanged(false)`; it used to stay `true`.
 
 ## [0.1.0-alpha01] — unreleased
 

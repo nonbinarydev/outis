@@ -19,8 +19,9 @@ Outis is a Kotlin Multiplatform video player SDK — one engine-agnostic playbac
 | `:bom` | yes (`outis-bom`) | Version alignment for the published modules. A new published module goes in here too. |
 | `:sample:android` | no | The installable Android host for `:sample`, phones and Android TV (the KMP Android plugin builds libraries only). |
 
-`:core` uses a **custom source-set hierarchy** (`webMain` shared by `jsMain`/`wasmJsMain`), so its
-default hierarchy template is disabled. `:ui` and `:sample` use the default template — reach `iosMain`
+`:core` uses a **custom source-set hierarchy** (`webMain` shared by `jsMain`/`wasmJsMain`; `appleMain`,
+holding the AVFoundation engine, shared by `iosMain` and `macosArm64Main`), so its default hierarchy
+template is disabled. Put Apple code in `appleMain` unless it needs UIKit or AppKit. `:ui` and `:sample` use the default template — reach `iosMain`
 there with the typed accessor `iosMain.dependencies { }`, never `val iosMain by getting` (it is
 materialised lazily and an eager lookup throws).
 

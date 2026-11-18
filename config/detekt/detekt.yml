@@ -368,8 +368,11 @@ naming:
     mustBeFirst: true
     # Every platform suffix this project actually uses, so `AppContext.web.kt` declaring `AppContext`
     # reads as correct rather than as a filename mismatch. Keep in sync with the source-set layout —
-    # `web` and `wasmJs` come from the custom webMain hierarchy in :core.
+    # `web` and `wasmJs` come from the custom webMain hierarchy in :core, `apple` and `macos` from its
+    # appleMain hierarchy.
     multiplatformTargets:
+      - 'apple'
+      - 'macos'
       - 'ios'
       - 'android'
       - 'js'

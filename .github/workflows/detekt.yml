@@ -79,6 +79,7 @@ jobs:
           if-no-files-found: ignore
 
   apple:
+    # The ruleset on main and development requires this check by name; rename both together.
     name: iOS and Apple metadata
     runs-on: macos-latest
     steps:
@@ -95,12 +96,13 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       # No type resolution is available for Kotlin/Native, so these are parse-level only — but they
-      # are the ONLY analysis iosMain gets anywhere in CI. Qodana cannot see these files at all.
+      # are the ONLY analysis appleMain, iosMain and macosArm64Main get anywhere in CI. Qodana cannot
+      # see these files at all.
       - name: Run detekt
         run: |
           ./gradlew --no-daemon \
-            :core:detektMetadataIosMain \
-            :core:detektIosArm64Main :core:detektIosSimulatorArm64Main \
+            :core:detektMetadataAppleMain :core:detektMetadataIosMain \
+            :core:detektIosArm64Main :core:detektIosSimulatorArm64Main :core:detektMacosArm64Main \
             :ui:detektMetadataIosMain :ui:detektMetadataAppleMain :ui:detektMetadataNativeMain \
             :ui:detektIosArm64Main :ui:detektIosSimulatorArm64Main
 

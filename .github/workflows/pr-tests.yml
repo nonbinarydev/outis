@@ -2,7 +2,7 @@
 # the result per target.
 #
 # The multiplatform point of this workflow: `commonTest` is compiled and executed six ways — JVM,
-# Node, browser, Wasm/Node, Wasm/browser and the iOS simulator. The same assertions running everywhere
+# Node, browser, Wasm/Node, Wasm/browser, the iOS simulator and macOS. The same assertions running everywhere
 # is what makes putting the parsers and the ad controller in commonMain worthwhile, so the comment is
 # grouped by TARGET rather than only by test class.
 #
@@ -42,10 +42,11 @@ jobs:
             os: ubuntu-latest
             key: linux
             tasks: ":core:jvmTest :core:jsNodeTest :core:jsBrowserTest :core:wasmJsNodeTest :core:wasmJsBrowserTest :ui:testAndroidHostTest :analytics:firebase:jsNodeTest"
+          # Also runs the macOS tests. The ruleset requires this check by name; rename both together.
           - name: iOS simulator
             os: macos-latest
             key: apple
-            tasks: ":core:iosSimulatorArm64Test"
+            tasks: ":core:iosSimulatorArm64Test :core:macosArm64Test"
 
     steps:
       - uses: actions/checkout@v7
@@ -127,6 +128,7 @@ jobs:
               .replace('jsBrowser', 'JS / browser').replace('wasmJsNode', 'Wasm / Node')
               .replace('wasmJsBrowser', 'Wasm / browser')
               .replace('iosSimulatorArm64', 'iOS simulator')
+              .replace('macosArm64', 'macOS')
               .replace('testAndroidHost', 'UI / Android host');
 
             for (const file of files) {

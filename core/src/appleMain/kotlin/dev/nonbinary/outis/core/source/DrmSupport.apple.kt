@@ -10,7 +10,7 @@ import platform.Foundation.NSProcessInfo
 
 public actual suspend fun drmSupport(): DrmSupport = deviceDrmSupport
 
-/** FairPlay decrypts only on a device: the simulator has no FairPlay CDM. Clear Key works on both. */
+/** FairPlay decrypts on a device or a Mac; the iOS simulator has no FairPlay CDM. Clear Key works on all. */
 internal val deviceDrmSupport: DrmSupport by lazy {
     val simulator = NSProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != null
     val schemes = if (simulator) setOf(DrmScheme.CLEARKEY) else setOf(DrmScheme.FAIRPLAY, DrmScheme.CLEARKEY)
